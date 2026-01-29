@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TimelineSwimlane } from '@/app/types';
+import { TimelineSwimlane } from '../types';
 import {
   Dialog,
   DialogContent,
@@ -7,10 +7,10 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from '@/app/components/ui/dialog';
-import { Button } from '@/app/components/ui/button';
-import { Input } from '@/app/components/ui/input';
-import { Label } from '@/app/components/ui/label';
+} from '../components/ui/dialog';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 
 interface SwimlaneDialogProps {
   isOpen: boolean;

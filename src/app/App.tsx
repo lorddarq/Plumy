@@ -1,120 +1,12 @@
 import { useState } from 'react';
-import { Task, TaskStatus, TimelineSwimlane } from '@/app/types';
-import { TimelineView } from '@/app/components/TimelineView';
-import { SwimlanesView } from '@/app/components/SwimlanesView';
-import { TaskDialog } from '@/app/components/TaskDialog';
-import { SwimlaneDialog } from '@/app/components/SwimlaneDialog';
-import { Button } from '@/app/components/ui/button';
+import { Task, TaskStatus, TimelineSwimlane } from './types';
+import { initialTasks, initialTimelineSwimlanes } from './data/sampleData';
+import { TimelineView } from './components/TimelineView';
+import { SwimlanesView } from './components/SwimlanesView';
+import { TaskDialog } from './components/TaskDialog';
+import { SwimlaneDialog } from './components/SwimlaneDialog';
+import { Button } from './components/ui/button';
 import { Menu, Plus, Bell, CheckCircle, User } from 'lucide-react';
-
-// Sample timeline swimlanes
-const initialTimelineSwimlanes: TimelineSwimlane[] = [
-  { id: '1', name: 'Rocket Engineering Team' },
-  { id: '2', name: 'Launch Operations' },
-  { id: '3', name: 'Mission Control' },
-];
-
-// Sample data
-const initialTasks: Task[] = [
-  {
-    id: '1',
-    title: 'Design a Rocket',
-    status: 'in-progress',
-    notes: 'Create the initial rocket design with detailed specifications',
-    startDate: '2026-02-22',
-    endDate: '2026-02-26',
-    swimlaneId: '1',
-  },
-  {
-    id: '2',
-    title: 'Look at the Mon...',
-    status: 'in-progress',
-    notes: 'Research moon observation techniques',
-    startDate: '2026-02-24',
-    endDate: '2026-02-28',
-    swimlaneId: '3',
-  },
-  {
-    id: '3',
-    title: 'Do Moon Research...',
-    status: 'done',
-    notes: 'Complete comprehensive moon research',
-    startDate: '2026-02-25',
-    endDate: '2026-02-27',
-    swimlaneId: '3',
-  },
-  {
-    id: '4',
-    title: 'Watch YouTube V...',
-    status: 'under-review',
-    notes: 'Review educational videos about rocket building',
-    startDate: '2026-03-01',
-    endDate: '2026-03-02',
-    swimlaneId: '1',
-  },
-  {
-    id: '5',
-    title: 'Build Launch Pad',
-    status: 'under-review',
-    notes: 'Construct the launch pad infrastructure',
-    startDate: '2026-03-03',
-    endDate: '2026-03-05',
-    swimlaneId: '2',
-  },
-  {
-    id: '6',
-    title: 'Design The Spac...',
-    status: 'under-review',
-    notes: 'Design spacesuits for the crew',
-    startDate: '2026-03-05',
-    endDate: '2026-03-07',
-    swimlaneId: '1',
-  },
-  {
-    id: '7',
-    title: 'Moon Astronauts',
-    status: 'done',
-    notes: 'Select and train astronauts',
-    startDate: '2026-03-02',
-    endDate: '2026-03-03',
-    swimlaneId: '2',
-  },
-  {
-    id: '8',
-    title: 'Build Launch Pad',
-    status: 'open',
-    notes: 'Initial planning for launch pad',
-    swimlaneOnly: true,
-  },
-  {
-    id: '9',
-    title: 'Design The Spacesuits',
-    status: 'open',
-    notes: 'Brainstorm spacesuit design ideas',
-    swimlaneOnly: true,
-  },
-  {
-    id: '10',
-    title: 'Look at the Moon Through a Telescope',
-    status: 'open',
-    notes: 'Set up telescope observation sessions',
-    swimlaneOnly: true,
-  },
-  {
-    id: '11',
-    title: 'Watch YouTube Video On Rocket Building',
-    status: 'under-review',
-    notes: 'Compile learning resources',
-    swimlaneOnly: true,
-  },
-  {
-    id: '12',
-    title: 'Meet Astronauts',
-    status: 'in-progress',
-    notes: 'Schedule meetings with potential crew',
-    swimlaneOnly: true,
-  },
-];
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
