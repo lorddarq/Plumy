@@ -551,7 +551,7 @@ export function TimelineView({
           {/* Right column: unified grid where each month is a column group (header + days + swimlane rows) */}
           <div className="flex-1">
                 <div className="relative">
-              <div className="timeline-viewport relative overflow-hidden" style={{ width: `calc(100vw - ${leftColWidth}px)` }}>
+              <div className="timeline-viewport relative overflow-hidden">
                 <button
                   aria-label="Scroll left"
                   className="timeline-scroll-btn left-2 top-2 absolute z-40 rounded-full bg-white/70 hover:bg-white p-1 shadow"
@@ -567,7 +567,7 @@ export function TimelineView({
                   ▶
                 </button>
 
-                <div ref={headerRef} className="hide-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', width: '100%' }} onMouseDown={handleHeaderMouseDown}>
+                <div ref={headerRef} className="hide-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto' }} onMouseDown={handleHeaderMouseDown}>
                 {/* Flex-based months wrapper + swimlanes rendered in same scroll container */}
                 {(() => {
                   // ordered month keys and month meta

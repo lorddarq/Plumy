@@ -1,7 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Task, TaskStatus, TimelineSwimlane } from './types';
 import { initialTasks, initialTimelineSwimlanes } from './data/sampleData';
 import { TimelineView } from './components/TimelineView';
+
+// LocalStorage keys
+const TASKS_KEY = 'plumy.tasks.v1';
+const SWIMLANES_KEY = 'plumy.swimlanes.v1';
+
+function safeReadJSON<T>(key: string, fallback: T): T {
+  try {
+    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as T;
+    return parsed;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function safeWriteJSON<T>(key: string, value: T) {
+  try {
+    if (typeof window !== 'undefined') window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    // ignore
+  }
+}
 import { SwimlanesView } from './components/SwimlanesView';
 import { TaskDialog } from './components/TaskDialog';
 import { SwimlaneDialog } from './components/SwimlaneDialog';
@@ -11,8 +34,17 @@ import { Agentation } from 'agentation';
 
 function App() {
   
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(initialTimelineSwimlanes);
+  const [tasks, setTasks] = useState<Task[]>(() => safeReadJSON<Task[]>(TASKS_KEY, initialTasks));
+  const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes));
+
+  // Persist tasks and swimlanes to localStorage whenever they change
+  useEffect(() => {
+    safeWriteJSON(TASKS_KEY, tasks);
+  }, [tasks]);
+
+  useEffect(() => {
+    safeWriteJSON(SWIMLANES_KEY, timelineSwimlanes);
+  }, [timelineSwimlanes]);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isSwimlaneDialogOpen, setIsSwimlaneDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
