@@ -1,9 +1,9 @@
 import { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Edit2, GripVertical } from 'lucide-react';
-import { Task, TimelineSwimlane } from '@/app/types';
-import { Button } from '@/app/components/ui/button';
-import { DraggableTimelineTask, TIMELINE_TASK_TYPE } from '@/app/components/DraggableTimelineTask';
+import { Task, TimelineSwimlane } from '../types';
+import { Button } from '../components/ui/button';
+import { DraggableTimelineTask, TIMELINE_TASK_TYPE } from '../components/DraggableTimelineTask';
 
 const ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -12,7 +12,12 @@ interface DraggableSwimlaneRowProps {
   index: number;
   tasks: Task[];
   dates: Date[];
-  dayWidth: number;
+  dateWidths?: number[]; // per-date widths computed by TimelineView
+  monthKeys?: string[];
+  monthWidths?: Record<string, number>;
+  datesByMonth?: Record<string, Date[]>;
+  totalTimelineWidth?: number;
+  rowHeight?: number;
   onTaskClick: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string) => void;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
@@ -22,7 +27,7 @@ interface DraggableSwimlaneRowProps {
   getTaskColor: (status: string) => string;
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   resizingTaskId: string | null;
-}
+} 
 
 interface DragItem {
   type: string;
@@ -40,7 +45,11 @@ export function DraggableSwimlaneRow({
   index,
   tasks,
   dates,
-  dayWidth,
+  dateWidths,
+  monthKeys,
+  monthWidths,
+  datesByMonth,
+  totalTimelineWidth,
   onTaskClick,
   onAddTask,
   onEditSwimlane,
@@ -50,45 +59,12 @@ export function DraggableSwimlaneRow({
   getTaskColor,
   handleResizeStart,
   resizingTaskId,
+  rowHeight,
 }: DraggableSwimlaneRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
-  const [{ isDragging }, drag, preview] = useDrag({
-    type: ITEM_TYPE,
-    item: { type: ITEM_TYPE, index, swimlane },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  });
-
-  const [{ isOver: isSwimlaneOver }, dropSwimlane] = useDrop({
-    accept: ITEM_TYPE,
-    hover: (item: DragItem, monitor) => {
-      if (!ref.current) return;
-
-      const dragIndex = item.index;
-      const hoverIndex = index;
-
-      if (dragIndex === hoverIndex) return;
-
-      const hoverBoundingRect = ref.current?.getBoundingClientRect();
-      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
-      const clientOffset = monitor.getClientOffset();
-      const hoverClientY = clientOffset!.y - hoverBoundingRect.top;
-
-      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
-      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
-
-      onMoveSwimlane(dragIndex, hoverIndex);
-      item.index = hoverIndex;
-    },
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-    }),
-  });
-
-  // Drop zone for timeline tasks
+  // Drop zone for timeline tasks — row handles only task drops
   const [{ isOver: isTaskOver, canDrop }, dropTask] = useDrop({
     accept: TIMELINE_TASK_TYPE,
     drop: (item: TaskDragItem) => {
@@ -102,9 +78,6 @@ export function DraggableSwimlaneRow({
     }),
   });
 
-  // Combine drag and drop refs for swimlane reordering
-  preview(dropSwimlane(ref));
-  
   // Apply task drop to timeline area
   dropTask(timelineRef);
 
@@ -113,27 +86,10 @@ export function DraggableSwimlaneRow({
   return (
     <div
       ref={ref}
-      className={`flex border-b hover:bg-gray-50/50 group ${isDragging ? 'opacity-50' : ''} ${
-        isSwimlaneOver ? 'bg-blue-50/50' : ''
-      }`}
+      className={`flex border-b border-gray-100 hover:bg-gray-50/50 group ${isTaskOver && canDrop ? 'bg-blue-100/50' : ''}`}
+      style={{ height: 'var(--row-height)' }}
     >
-      {/* Swimlane label */}
-      <div className="w-[200px] border-r px-4 py-3 bg-white flex items-center justify-between group-hover:bg-gray-50/50">
-        <div className="flex items-center gap-2">
-          <div ref={drag} className="cursor-move">
-            <GripVertical className="w-4 h-4 text-gray-400" />
-          </div>
-          <span className="text-sm font-medium text-gray-700">{swimlane.name}</span>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 opacity-0 group-hover:opacity-100"
-          onClick={() => onEditSwimlane(swimlane)}
-        >
-          <Edit2 className="w-3 h-3" />
-        </Button>
-      </div>
+    
 
       {/* Timeline grid for this swimlane */}
       <div
@@ -142,34 +98,86 @@ export function DraggableSwimlaneRow({
           isTaskOver && canDrop ? 'bg-blue-100/50' : ''
         }`}
       >
-        <div className="flex h-[60px]">
-          {dates.map((date, dateIndex) => (
-            <div
-              key={dateIndex}
-              className="w-[60px] border-r last:border-r-0 hover:bg-blue-50/30 cursor-pointer transition-colors"
-              onClick={() => onAddTask(date, swimlane.id)}
-            />
-          ))}
-        </div>
+        {/* Month containers; each contains the swimlane cell for that month and any task fragments that overlap it. */}
+        <div className="flex" style={{ height: 'var(--row-height)' }}>
+          {/* Precompute prefix sums for date widths to make slicing easier */}
+          {(() => {
+            const dayWidths = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
+            const prefix: number[] = [0];
+            for (let i = 0; i < dayWidths.length; i++) prefix.push(prefix[i] + dayWidths[i]);
 
-        {/* Task cards for this swimlane */}
-        <div className="absolute inset-0 pointer-events-none">
-          {timelineTasks.map((task) => {
-            const position = getTaskPosition(task);
-            if (!position) return null;
+            const firstDate = dates[0];
 
-            return (
-              <DraggableTimelineTask
-                key={task.id}
-                task={task}
-                position={position}
-                getTaskColor={getTaskColor}
-                handleResizeStart={handleResizeStart}
-                onTaskClick={onTaskClick}
-                resizingTaskId={resizingTaskId}
-              />
-            );
-          })}
+            // helper to compute day index for a date (0-based)
+            const dateIndex = (d: Date) => Math.floor((new Date(d).getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
+
+            // build monthStarts map
+            const monthStarts: Record<string, number> = {};
+            (monthKeys ?? []).forEach((k) => {
+              const md = datesByMonth?.[k];
+              if (md && md.length) {
+                const idx = dates.findIndex(d => d.getTime() === md[0].getTime());
+                monthStarts[k] = idx >= 0 ? idx : 0;
+              }
+            });
+
+            // Precompute task ranges
+            const tasksRanges = timelineTasks.map(task => {
+              const s = task.startDate ? dateIndex(new Date(task.startDate)) : -1;
+              const e = task.endDate ? (dateIndex(new Date(task.endDate))) : -1;
+              return { task, startIndex: s, endIndex: e };
+            });
+
+            return (monthKeys ?? []).map((monthKey) => {
+              const startIdx = monthStarts[monthKey] ?? 0;
+              const len = datesByMonth?.[monthKey]?.length ?? 0;
+              const monthLeft = prefix[startIdx];
+              const monthWidth = prefix[startIdx + len] - prefix[startIdx];
+
+              return (
+                <div
+                  key={monthKey}
+                  className="border-r last:border-r-0 relative flex-shrink-0"
+                  style={{ width: `${monthWidth}px` }}
+                >
+                  <div className="h-full relative">
+                    {tasksRanges.map(({ task, startIndex, endIndex }) => {
+                      if (startIndex < 0 || endIndex < 0) return null;
+
+                      const overlapStart = Math.max(startIndex, startIdx);
+                      const overlapEnd = Math.min(endIndex, startIdx + len - 1);
+                      if (overlapStart > overlapEnd) return null;
+
+                      const leftWithin = prefix[overlapStart] - monthLeft;
+                      let widthWithin = prefix[overlapEnd + 1] - prefix[overlapStart];
+                      widthWithin = Math.max(8, widthWithin - 8); // small padding like before
+
+                      // vertically center using CSS calc against the --row-height variable
+                      const TASK_RENDER_HEIGHT = 32; // matches h-8 in tailwind (8 * 4px)
+                      const topCalc = `calc((var(--row-height) - ${TASK_RENDER_HEIGHT}px) / 2)`;
+
+                      return (
+                        <div
+                          key={`${task.id}-${monthKey}`}
+                          className="absolute"
+                          style={{ left: `${leftWithin}px`, width: `${widthWithin}px`, top: topCalc as any }}
+                        >
+                          <DraggableTimelineTask
+                            task={task}
+                            position={{ left: 0, width: widthWithin }}
+                            getTaskColor={getTaskColor}
+                            handleResizeStart={handleResizeStart}
+                            onTaskClick={onTaskClick}
+                            resizingTaskId={resizingTaskId}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
       </div>
     </div>

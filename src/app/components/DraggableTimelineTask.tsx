@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useDrag } from 'react-dnd';
-import { Task } from '@/app/types';
+import { Task } from '../types';
 
 const TIMELINE_TASK_TYPE = 'TIMELINE_TASK';
 
@@ -36,7 +36,7 @@ export function DraggableTimelineTask({
   return (
     <div
       ref={ref}
-      className={`absolute h-8 mt-4 rounded-md px-3 flex items-center justify-between shadow-sm cursor-pointer pointer-events-auto group/task ${getTaskColor(
+      className={`absolute h-8 rounded-md px-3 flex items-center justify-between shadow-sm cursor-pointer pointer-events-auto group/task ${getTaskColor(
         task.status
       )} text-white text-xs transition-all ${
         resizingTaskId === task.id ? 'shadow-lg z-10' : ''

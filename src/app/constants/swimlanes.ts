@@ -1,4 +1,4 @@
-import { TaskStatus } from '@/app/types';
+import { TaskStatus } from '../types';
 
 export const swimlanes = [
   { id: 'open' as TaskStatus, title: 'Open', color: 'bg-cyan-500', icon: 'rocket' },

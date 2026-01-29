@@ -7,8 +7,10 @@ import { TaskDialog } from './components/TaskDialog';
 import { SwimlaneDialog } from './components/SwimlaneDialog';
 import { Button } from './components/ui/button';
 import { Menu, Plus, Bell, CheckCircle, User } from 'lucide-react';
+import { Agentation } from 'agentation';
 
 function App() {
+  
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(initialTimelineSwimlanes);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -132,6 +134,7 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
+      {process.env.NODE_ENV === "development" && <Agentation />}
       {/* Header */}
       <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">

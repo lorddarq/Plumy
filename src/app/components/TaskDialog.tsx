@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Task, TaskStatus, TimelineSwimlane } from '@/app/types';
+import { Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
   Dialog,
   DialogContent,

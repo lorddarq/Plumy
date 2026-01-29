@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { Task, TaskStatus } from '@/app/types';
+import { Task, TaskStatus } from '../types';
 import { Button } from '@/app/components/ui/button';
 
 const TASK_ITEM_TYPE = 'TASK_CARD';
