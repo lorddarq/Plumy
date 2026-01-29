@@ -139,27 +139,21 @@ function App() {
             <Menu className="w-5 h-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-gray-600">PM</span>
-            </div>
-            <h1 className="font-semibold text-gray-900">Project Moon</h1>
+            <h1 className="font-semibold text-gray-900">plumy</h1>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon">
-            <Plus className="w-5 h-5" />
-          </Button>
           <Button variant="ghost" size="icon">
             <Bell className="w-5 h-5" />
           </Button>
           <Button variant="ghost" size="icon">
             <CheckCircle className="w-5 h-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="relative">
+          {/* <Button variant="ghost" size="icon" className="relative">
             <Bell className="w-5 h-5" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </Button>
+          </Button> */}
           <Button variant="ghost" size="icon">
             <User className="w-5 h-5" />
           </Button>

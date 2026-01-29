@@ -3,9 +3,15 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite"
+    "dev:vite": "vite --port 5173",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "build:renderer": "vite build",
+    "build:electron": "electron-builder",
+    "dist": "npm run build:renderer && npm run build:electron",
+    "start": "electron ."
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.6",
@@ -18,14 +24,19 @@
     "lucide-react": "0.487.0",
     "react-dnd": "16.0.1",
     "react-dnd-html5-backend": "16.0.1",
-    "tailwind-merge": "3.2.0"
+    "tailwind-merge": "3.2.0",
+    "electron-store": "^8.1.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",
     "@types/react": "^19.2.10",
     "@vitejs/plugin-react": "4.7.0",
     "tailwindcss": "4.1.12",
-    "vite": "6.3.5"
+    "vite": "6.3.5",
+    "electron": "^26.2.0",
+    "electron-builder": "^24.6.0",
+    "wait-on": "^7.0.1",
+    "concurrently": "^8.2.0"
   },
   "peerDependencies": {
     "react": "^18.3.1",
@@ -37,6 +48,24 @@
     },
     "react-dom": {
       "optional": true
+    }
+  },
+  "build": {
+    "appId": "com.plumy.app",
+    "productName": "Plumy",
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "mac": {
+      "target": ["dmg", "pkg"]
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "linux": {
+      "target": ["AppImage"]
     }
   },
   "pnpm": {
