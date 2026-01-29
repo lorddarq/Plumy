@@ -7,7 +7,6 @@ interface MonthColumnProps {
   dayWidths: number[];
   getMonthLabel: (d: Date) => string;
   getDayLabel: (d: Date) => string;
-  onResizeStart: (e: React.MouseEvent, monthKey: string) => void;
   rowHeight?: number;
   swimlaneCount?: number;
 }
@@ -19,19 +18,11 @@ export function MonthColumn({
   dayWidths,
   getMonthLabel,
   getDayLabel,
-  onResizeStart,
 }: MonthColumnProps): React.ReactElement {
   return (
     <div className="border-r last:border-r-0 bg-white flex-shrink-0" style={{ width: `${monthWidth}px` }}>
       <div className="px-3 py-2 border-b bg-white relative">
         <span className="text-sm font-medium text-gray-700">{getMonthLabel(monthDates[0])}</span>
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={`Resize month ${getMonthLabel(monthDates[0])}`}
-          onMouseDown={(e) => onResizeStart(e, monthKey)}
-          className="absolute top-0 right-0 h-full w-2 cursor-col-resize hover:bg-gray-100"
-        />
       </div>
 
       <div className="px-3 py-2 border-b bg-white">

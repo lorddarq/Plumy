@@ -22,7 +22,7 @@ interface DraggableSwimlaneRowProps {
   onAddTask: (date: Date, swimlaneId: string) => void;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
   onMoveSwimlane: (dragIndex: number, hoverIndex: number) => void;
-  onMoveTaskToSwimlane: (taskId: string, swimlaneId: string) => void;
+  onMoveTaskToSwimlane: (taskId: string, swimlaneId: string, newStartDate?: string, newEndDate?: string) => void;
   getTaskPosition: (task: Task) => { left: number; width: number } | null;
   getTaskColor: (status: string) => string;
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
@@ -64,13 +64,76 @@ export function DraggableSwimlaneRow({
   const ref = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
-  // Drop zone for timeline tasks — row handles only task drops
+  // Drop zone for timeline tasks — row handles task drops and repositioning
   const [{ isOver: isTaskOver, canDrop }, dropTask] = useDrop({
     accept: TIMELINE_TASK_TYPE,
-    drop: (item: TaskDragItem) => {
-      if (item.task.swimlaneId !== swimlane.id) {
-        onMoveTaskToSwimlane(item.task.id, swimlane.id);
+    drop: (item: TaskDragItem, monitor) => {
+      const task = item.task;
+      if (!timelineRef.current) {
+        // fallback: just move swimlane
+        onMoveTaskToSwimlane(task.id, swimlane.id);
+        return;
       }
+
+      const clientOffset = monitor.getClientOffset();
+      if (!clientOffset) {
+        onMoveTaskToSwimlane(task.id, swimlane.id);
+        return;
+      }
+
+      // find nearest scrollable ancestor to account for scrolling
+      const getScrollAncestor = (el: HTMLElement | null): HTMLElement | null => {
+        let cur = el as HTMLElement | null;
+        while (cur) {
+          if (cur.scrollWidth > cur.clientWidth) return cur;
+          cur = cur.parentElement;
+        }
+        return null;
+      };
+
+      const rect = timelineRef.current.getBoundingClientRect();
+      const scrollAncestor = getScrollAncestor(timelineRef.current);
+      const scrollLeft = scrollAncestor ? scrollAncestor.scrollLeft : 0;
+
+      // x relative to the entire timeline content
+      const localX = clientOffset.x - rect.left + scrollLeft;
+
+      // compute prefix sums for day widths
+      const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
+      const prefix: number[] = [0];
+      for (let i = 0; i < dayWidthsLocal.length; i++) prefix.push(prefix[i] + (dayWidthsLocal[i] ?? 60));
+
+      // binary search for index where prefix[idx] <= localX < prefix[idx+1]
+      let lo = 0; let hi = prefix.length - 2; let idx = 0;
+      while (lo <= hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (prefix[mid] <= localX && localX < prefix[mid + 1]) {
+          idx = mid; break;
+        }
+        if (localX < prefix[mid]) hi = mid - 1; else lo = mid + 1;
+      }
+
+      // clamp idx
+      idx = Math.max(0, Math.min(dates.length - 1, idx));
+
+      // compute original duration
+      const MS_PER_DAY = 1000 * 60 * 60 * 24;
+      const origStart = task.startDate ? new Date(task.startDate) : null;
+      const origEnd = task.endDate ? new Date(task.endDate) : null;
+      let durationDays = 1;
+      if (origStart && origEnd) {
+        durationDays = Math.floor((origEnd.getTime() - origStart.getTime()) / MS_PER_DAY) + 1;
+      }
+
+      const newStart = new Date(dates[0]);
+      newStart.setDate(newStart.getDate() + idx);
+      const newEnd = new Date(newStart);
+      newEnd.setDate(newStart.getDate() + durationDays - 1);
+
+      const newStartISO = newStart.toISOString().split('T')[0];
+      const newEndISO = newEnd.toISOString().split('T')[0];
+
+      onMoveTaskToSwimlane(task.id, swimlane.id, newStartISO, newEndISO);
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
@@ -141,6 +204,26 @@ export function DraggableSwimlaneRow({
                   style={{ width: `${monthWidth}px` }}
                 >
                   <div className="h-full relative">
+                    {/* Clickable day overlay: clicking a day cell creates a new task at that date in this swimlane */}
+                    <div className="absolute inset-0 flex" aria-hidden>
+                      {(datesByMonth?.[monthKey] ?? []).map((d, di) => {
+                        const globalIdx = startIdx + di;
+                        const w = dayWidths?.[globalIdx] ?? 60;
+                        return (
+                          <div
+                            key={`day-${monthKey}-${di}`}
+                            className="day-click-cell hover:bg-gray-100/40 cursor-pointer"
+                            title={`Add task for ${d.toDateString()}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onAddTask(new Date(d), swimlane.id);
+                            }}
+                            style={{ width: `${w}px`, height: '100%' }}
+                          />
+                        );
+                      })}
+                    </div>
+
                     {tasksRanges.map(({ task, startIndex, endIndex }) => {
                       if (startIndex < 0 || endIndex < 0) return null;
 

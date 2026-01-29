@@ -6,14 +6,13 @@ interface MonthsScrollerProps {
   monthWidths: Record<string, number>;
   dayWidths: number[];
   dates: Date[];
-  onMonthResizeStart: (e: React.MouseEvent, monthKey: string) => void;
   getMonthLabel: (d: Date) => string;
   getDayLabel: (d: Date) => string;
   swimlaneCount?: number;
   rowHeight?: number;
 }
 
-export default function MonthsScrollerFixed({ datesByMonth, monthWidths, dayWidths, dates, onMonthResizeStart, getMonthLabel, getDayLabel, swimlaneCount, rowHeight }: MonthsScrollerProps) {
+export default function MonthsScrollerFixed({ datesByMonth, monthWidths, dayWidths, dates, getMonthLabel, getDayLabel, swimlaneCount, rowHeight }: MonthsScrollerProps) {
   const monthKeys = useMemo(() =>
     Object.keys(datesByMonth).sort((a, b) => {
       const ta = datesByMonth[a]?.[0]?.getTime() ?? 0;
@@ -46,7 +45,6 @@ export default function MonthsScrollerFixed({ datesByMonth, monthWidths, dayWidt
             dayWidths={monthSlices[k] ?? []}
             getMonthLabel={getMonthLabel}
             getDayLabel={getDayLabel}
-            onResizeStart={onMonthResizeStart}
             rowHeight={rowHeight}
             swimlaneCount={swimlaneCount}
           />

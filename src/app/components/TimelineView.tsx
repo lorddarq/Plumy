@@ -78,21 +78,54 @@ export function TimelineView({
   }, [isResizingLeft]);
 
 
-  // Generate dates for the timeline (30 days starting from today)
-  const generateDates = () => {
-    const dates = [];
-    const today = new Date(2026, 1, 16); // Feb 16, 2026 as starting point
-    
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      dates.push(date);
-    }
-    return dates;
-  };
-
-  const dates = useMemo(() => generateDates(), []);
   const defaultDayWidth = 60; // base day width used to initialize month widths
+
+  // Compute visible date range from real tasks (pad and align to month boundaries). If there
+  // are no dated tasks, show current + next month by default.
+  const dates = useMemo(() => {
+    const datedTasks = tasks.filter(t => t.startDate && t.endDate);
+
+    if (datedTasks.length === 0) {
+      const today = new Date();
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      // include next month for some context
+      const extendedEnd = new Date(end);
+      extendedEnd.setMonth(extendedEnd.getMonth() + 1);
+
+      const arr: Date[] = [];
+      const d = new Date(start);
+      while (d <= extendedEnd) {
+        arr.push(new Date(d));
+        d.setDate(d.getDate() + 1);
+      }
+      return arr;
+    }
+
+    // find min and max from tasks
+    let minDate = datedTasks.map(t => new Date(t.startDate!)).reduce((a, b) => a < b ? a : b);
+    let maxDate = datedTasks.map(t => new Date(t.endDate!)).reduce((a, b) => a > b ? a : b);
+
+    // pad for breathing room
+    const PAD_DAYS = 7;
+    minDate = new Date(minDate);
+    minDate.setDate(minDate.getDate() - PAD_DAYS);
+    maxDate = new Date(maxDate);
+    maxDate.setDate(maxDate.getDate() + PAD_DAYS);
+
+    // align to month boundaries for cleaner headers
+    const start = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    const end = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
+
+    const arr: Date[] = [];
+    const d = new Date(start);
+    while (d <= end) {
+      arr.push(new Date(d));
+      d.setDate(d.getDate() + 1);
+    }
+
+    return arr;
+  }, [tasks]);
 
   // Group dates by month (memoized)
   const datesByMonth = useMemo(() => {
@@ -126,6 +159,19 @@ export function TimelineView({
     return arr;
   });
 
+  // Ensure month widths exist for any newly created months when the date range changes
+  useEffect(() => {
+    setMonthWidths(prev => {
+      const nw: Record<string, number> = { ...prev };
+      Object.entries(datesByMonth).forEach(([k, monthDates]) => {
+        if (!nw[k]) nw[k] = monthDates.length * defaultDayWidth;
+      });
+      return nw;
+    });
+    // allow auto-sizing to re-run for the new date range
+    lastAutoSizeRef.current = null;
+  }, [datesByMonth]);
+
   
   const getMonthLabel = (date: Date) => {
     return date.toLocaleDateString('en-US', { month: 'long' });
@@ -147,9 +193,6 @@ export function TimelineView({
     setDayWidths(arr);
   }, [monthWidths, datesByMonth]);
 
-  // Month resize state
-  const [resizingMonth, setResizingMonth] = useState<{ monthKey: string; startX: number; startWidth: number } | null>(null);
-  const resizingMonthRef = useRef<{ monthKey: string; startX: number; startWidth: number } | null>(null);
   // End padding (breathing room) for timeline scrollers
   const [endPadding, setEndPadding] = useState<number>(24);
   const [isResizingEnd, setIsResizingEnd] = useState<boolean>(false);
@@ -159,7 +202,58 @@ export function TimelineView({
   const headerRef = useRef<HTMLDivElement | null>(null);
   const leftListRef = useRef<HTMLDivElement | null>(null);
   const isSyncingRef = useRef(false);
-  // CSS vars: --row-height and --timeline-header-height will be set on the timeline container
+  const lastAutoSizeRef = useRef<number | null>(null);
+
+  // Panning (drag-to-scroll) state refs
+  const panRef = useRef<{ isPanning: boolean; startX: number; startScrollLeft: number }>({ isPanning: false, startX: 0, startScrollLeft: 0 });
+
+  const startPan = (clientX: number) => {
+    const el = headerRef.current;
+    if (!el) return;
+    panRef.current.isPanning = true;
+    panRef.current.startX = clientX;
+    panRef.current.startScrollLeft = el.scrollLeft;
+    // prevent text selection while panning
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+  };
+
+  const scrollByAmount = useCallback((amount: number) => {
+    const el = headerRef.current;
+    if (!el) return;
+    el.scrollBy({ left: amount, behavior: 'smooth' });
+  }, []);
+
+  const handleHeaderMouseDown = useCallback((e: any) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('.group/task')) return;
+    startPan(e.clientX);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!panRef.current.isPanning) return;
+      const el = headerRef.current;
+      if (!el) return;
+      const delta = e.clientX - panRef.current.startX;
+      el.scrollLeft = Math.max(0, panRef.current.startScrollLeft - delta);
+    };
+
+    const handleMouseUp = () => {
+      if (!panRef.current.isPanning) return;
+      panRef.current.isPanning = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);  // CSS vars: --row-height and --timeline-header-height will be set on the timeline container
   const DEFAULT_ROW_HEIGHT = 48; // px
   const DEFAULT_HEADER_HEIGHT = 72; // px (month label + day row)
 
@@ -180,44 +274,33 @@ export function TimelineView({
     container.style.setProperty('--timeline-header-height', `${h}px`);
   }, [dayWidths, monthWidths, dates.length]);
 
+  // Auto-resize months to fill available container width when the timeline is much smaller than viewport
+  useLayoutEffect(() => {
+    const container = timelineContainerRef.current;
+    if (!container) return;
+    const availableWidth = Math.max(0, container.clientWidth - leftColWidth);
+    const currentTotal = Object.values(monthWidths).reduce((a, b) => a + (b || 0), 0) + endPadding;
+
+    // If there's extra room, distribute it proportionally to months (but only re-run when different available width)
+    if (availableWidth > currentTotal && lastAutoSizeRef.current !== availableWidth) {
+      const scale = (availableWidth - endPadding) / (currentTotal - endPadding || 1);
+      setMonthWidths(prev => {
+        const out: Record<string, number> = {};
+        Object.entries(prev).forEach(([k, v]) => {
+          const minW = 40 * (datesByMonth[k]?.length ?? 1);
+          out[k] = Math.max(minW, Math.round(v * scale));
+        });
+        return out;
+      });
+      lastAutoSizeRef.current = availableWidth;
+    }
+  }, [leftColWidth, monthWidths, endPadding, datesByMonth]);
+
   // We now render months (header + body) together so no scroll-sync is needed.
 
 
 
-  const handleMonthResizeStart = (e: React.MouseEvent, monthKey: string) => {
-    e.preventDefault();
-    setResizingMonth({ monthKey, startX: e.clientX, startWidth: monthWidths[monthKey] });
-    resizingMonthRef.current = { monthKey, startX: e.clientX, startWidth: monthWidths[monthKey] };
-  };
 
-  useEffect(() => {
-    if (!resizingMonth) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!resizingMonthRef.current) return;
-      const delta = e.clientX - resizingMonthRef.current.startX;
-      const monthKey = resizingMonthRef.current.monthKey;
-      const numDays = datesByMonth[monthKey].length;
-      let newWidth = Math.round(resizingMonthRef.current.startWidth + delta);
-      const minWidth = 40 * numDays; // min 40px per day
-      const maxWidth = 1000; // arbitrary max
-      newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
-      setMonthWidths(prev => ({ ...prev, [monthKey]: newWidth }));
-    };
-
-    const handleMouseUp = () => {
-      setResizingMonth(null);
-      resizingMonthRef.current = null;
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [resizingMonth, datesByMonth]);
 
   // End padding resize handlers
   const handleEndResizeStart = (e: React.MouseEvent) => {
@@ -255,28 +338,27 @@ export function TimelineView({
   // Get timeline tasks (tasks with dates)
   const timelineTasks = tasks.filter(task => task.startDate && task.endDate);
 
-  // Calculate task position and width
+  // Calculate task position and width (robust to tasks outside the visible date range)
   const getTaskPosition = useCallback((task: Task) => {
     if (!task.startDate || !task.endDate) return null;
 
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
     const startDate = new Date(task.startDate);
     const endDate = new Date(task.endDate);
     const firstDate = dates[0];
 
-    const startIndex = Math.floor((startDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
-    const duration = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    // build prefix sums of day widths for O(1) range queries
+    const prefix: number[] = [0];
+    for (let i = 0; i < dayWidths.length; i++) prefix.push(prefix[i] + (dayWidths[i] ?? defaultDayWidth));
 
-    // compute left by summing dayWidths up to startIndex
-    let left = 0;
-    for (let i = 0; i < startIndex; i++) {
-      left += dayWidths[i] ?? defaultDayWidth;
-    }
+    const rawStart = Math.floor((startDate.getTime() - firstDate.getTime()) / MS_PER_DAY);
+    const rawEnd = Math.floor((endDate.getTime() - firstDate.getTime()) / MS_PER_DAY);
 
-    // compute width by summing dayWidths across duration
-    let width = 0;
-    for (let i = startIndex; i < startIndex + duration; i++) {
-      width += dayWidths[i] ?? defaultDayWidth;
-    }
+    const startIndex = Math.max(0, Math.min(dates.length - 1, rawStart));
+    const endIndex = Math.max(0, Math.min(dates.length - 1, rawEnd));
+
+    const left = prefix[startIndex] ?? 0;
+    const width = (prefix[endIndex + 1] ?? prefix[prefix.length - 1]) - (prefix[startIndex] ?? 0);
 
     return {
       left,
@@ -373,12 +455,16 @@ export function TimelineView({
     onReorderSwimlanes(updatedSwimlanes);
   }, [swimlanes, onReorderSwimlanes]);
 
-  const handleMoveTaskToSwimlane = useCallback((taskId: string, swimlaneId: string) => {
+  const handleMoveTaskToSwimlane = useCallback((taskId: string, swimlaneId: string, newStartDate?: string, newEndDate?: string) => {
     const updatedTasks = tasks.map(task =>
-      task.id === taskId ? { ...task, swimlaneId } : task
+      task.id === taskId ? { ...task, swimlaneId, ...(newStartDate ? { startDate: newStartDate } : {}), ...(newEndDate ? { endDate: newEndDate } : {}) } : task
     );
+    // if dates were provided, also call onUpdateTaskDates for single-source-of-truth handlers
+    if (newStartDate && newEndDate) {
+      onUpdateTaskDates(taskId, newStartDate, newEndDate);
+    }
     onReorderTasks(updatedTasks);
-  }, [tasks, onReorderTasks]);
+  }, [tasks, onReorderTasks, onUpdateTaskDates]);
 
   // Keep left and right vertical scroll positions in sync so swimlane rows line up
   // with the left labels. Sync in both directions and guard against feedback loops.
@@ -464,8 +550,24 @@ export function TimelineView({
 
           {/* Right column: unified grid where each month is a column group (header + days + swimlane rows) */}
           <div className="flex-1">
-            <div className="relative">
-              <div className="overflow-auto" ref={headerRef}>
+                <div className="relative">
+              <div className="timeline-viewport relative overflow-hidden" style={{ width: `calc(100vw - ${leftColWidth}px)` }}>
+                <button
+                  aria-label="Scroll left"
+                  className="timeline-scroll-btn left-2 top-2 absolute z-40 rounded-full bg-white/70 hover:bg-white p-1 shadow"
+                  onClick={() => scrollByAmount(-400)}
+                >
+                  ◀
+                </button>
+                <button
+                  aria-label="Scroll right"
+                  className="timeline-scroll-btn right-2 top-2 absolute z-40 rounded-full bg-white/70 hover:bg-white p-1 shadow"
+                  onClick={() => scrollByAmount(400)}
+                >
+                  ▶
+                </button>
+
+                <div ref={headerRef} className="hide-scrollbar" style={{ overflowX: 'auto', overflowY: 'auto', width: '100%' }} onMouseDown={handleHeaderMouseDown}>
                 {/* Flex-based months wrapper + swimlanes rendered in same scroll container */}
                 {(() => {
                   // ordered month keys and month meta
@@ -496,13 +598,6 @@ export function TimelineView({
                                                   <div key={m.key} style={{ width: `${m.width}px` }} className="month-column border-r bg-white relative">
                                                     <div data-month-header className="month-header px-3 py-2 border-b bg-white relative">
                                                 <span className="text-sm font-medium text-gray-700">{getMonthLabel(m.dates[0])}</span>
-                                <div
-                                  role="separator"
-                                  aria-orientation="vertical"
-                                  aria-label={`Resize month ${m.key}`}
-                                  onMouseDown={(e) => handleMonthResizeStart(e, m.key)}
-                                  className="absolute top-0 right-0 h-full w-2 cursor-col-resize hover:bg-gray-100"
-                                />
                               </div>
                               <div data-day-header className="day-row px-1 py-2 border-b bg-white flex h-[var(--row-height)]">
                                 {m.dates.map((d, i) => {
@@ -527,6 +622,8 @@ export function TimelineView({
                           <div className="months-end-spacer w-[var(--end-padding)] flex-shrink-0" aria-hidden />
                         </div>
                       </div>
+
+                      {/* Swimlane area: stacked rows positioned over the same horizontal width */}
 
                       {/* Swimlane area: stacked rows positioned over the same horizontal width */}
                       <div className="swimlane-rows relative min-w-[var(--total-timeline-width)]">
@@ -558,10 +655,11 @@ export function TimelineView({
                     </div>
                   );
                 })()}
-              </div>
+                  </div>
+                </div>
             </div>
-          </div>
         </div>
+      </div>
       </div>
     </DndProvider>
   );
