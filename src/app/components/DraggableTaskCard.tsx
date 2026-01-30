@@ -86,6 +86,7 @@ export function DraggableTaskCard({
         title={task.title}
         notes={task.notes}
         color={task.color}
+        swimlane={swimlanes.find(s => s.id === task.status)?.title}
         onClick={() => onTaskClick(task)}
         onRename={(newTitle) => onRenameTask && onRenameTask(task.id, newTitle)}
       />

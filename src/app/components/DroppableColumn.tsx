@@ -2,7 +2,6 @@ import { useRef, useState, useEffect } from 'react';
 import { useDrop } from 'react-dnd';
 import { Plus, Edit2 } from 'lucide-react';
 import { Task, TaskStatus, Swimlane } from '../types';
-import { getIcon } from '../constants/swimlanes';
 import { DraggableTaskCard } from '../components/DraggableTaskCard';
 
 interface DroppableColumnProps {
@@ -102,11 +101,6 @@ export function DroppableColumn({
       ) : (
         <div className={`${!swimlane.color?.startsWith('#') ? swimlane.color : ''} text-white p-3 rounded-t-lg flex items-center justify-between`} style={headerStyle(swimlane.color)}>
           <div className="flex items-center gap-2">
-            {swimlane.icon && (
-              <span className="w-4 h-4 flex items-center justify-center">
-                {getIcon(swimlane.icon)}
-              </span>
-            )}
             <span className="font-medium" onDoubleClick={() => setIsEditing(true)}>{swimlane.title}</span>
           </div>
           <div className="flex items-center gap-2">

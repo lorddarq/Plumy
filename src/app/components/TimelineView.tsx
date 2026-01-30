@@ -245,6 +245,20 @@ export function TimelineView({
   const scrolledToTodayRef = useRef(false);
   const [todayIndex, setTodayIndex] = useState<number | null>(null);
   const [todayOffset, setTodayOffset] = useState<number | null>(null);
+  const [highlightToday, setHighlightToday] = useState(false);
+
+  const scrollToToday = (opts?: { smooth?: boolean }) => {
+    const offset = typeof todayOffset === 'number' ? todayOffset : (todayIndex != null ? dayWidths.slice(0, todayIndex).reduce((a, b) => a + b, 0) : null);
+    if (offset == null || !headerRef.current) return;
+    try {
+      headerRef.current.scrollTo({ left: offset, behavior: opts?.smooth ? 'smooth' : 'auto' });
+    } catch (e) {
+      // some environments might not support smooth option; fallback
+      headerRef.current.scrollLeft = offset;
+    }
+    setHighlightToday(true);
+    window.setTimeout(() => setHighlightToday(false), 900);
+  };
 
   // Timestamp until which clicks to add tasks should be ignored (used to prevent click-after-resize)
   const [ignoreAddTaskUntil, setIgnoreAddTaskUntil] = useState<number | null>(null);
@@ -367,20 +381,7 @@ export function TimelineView({
       }
     }
 
-    // also log potential scrollers dimensions for debugging
-    const headerDims = headerRef.current ? { scrollWidth: headerRef.current.scrollWidth, clientWidth: headerRef.current.clientWidth } : null;
-    const rowsDims = rowsContainerRef.current ? { scrollWidth: rowsContainerRef.current.scrollWidth, clientWidth: rowsContainerRef.current.clientWidth } : null;
-    const docDims = { scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth };
-    // eslint-disable-next-line no-console
-    console.debug('[Timeline] scrollByAmount', amount, 'target', target.tagName + (target.className ? `.${target.className}` : ''), 'before', (target as any).scrollLeft, 'max', max, 'used', used, { headerDims, rowsDims, docDims });
 
-    // temporary visual debug outline so it's obvious which element we target
-    try {
-      target.style.outline = '2px dashed rgba(255,0,0,0.85)';
-      setTimeout(() => { try { target.style.outline = ''; } catch (e) {} }, 800);
-    } catch (e) {
-      // ignore
-    }
 
     if (typeof target.scrollBy === 'function' && max > 0) {
       try {
@@ -396,95 +397,20 @@ export function TimelineView({
       const next = Math.max(0, Math.min(cur + amount, max));
       target.scrollLeft = next;
     } else {
-      // nothing scrollable found — log for debugging
-      // eslint-disable-next-line no-console
-      console.debug('[Timeline] scrollByAmount: no scrollable target found (no-op)');
+      // nothing scrollable found — no-op
     }
   }, []);
 
-  // Debug helper: find elements that are wider than their client width and show overlay
-  const debugFindScrollers = useCallback(() => {
-    try {
-      const candidates: Array<{ el: HTMLElement; overflowX: string; diff: number; rect: DOMRect | null }> = [];
-      document.querySelectorAll<HTMLElement>('*').forEach(el => {
-        const diff = (el.scrollWidth || 0) - (el.clientWidth || 0);
-        const style = getComputedStyle(el);
-        if (diff > 3) {
-          candidates.push({ el, overflowX: style.overflowX, diff, rect: el.getBoundingClientRect() });
-        }
-      });
 
-      candidates.sort((a, b) => b.diff - a.diff);
-
-      // create overlay with information
-      const existing = document.getElementById('timeline-debug-overlay');
-      if (existing) existing.remove();
-
-      const overlay = document.createElement('div');
-      overlay.id = 'timeline-debug-overlay';
-      overlay.style.position = 'fixed';
-      overlay.style.right = '8px';
-      overlay.style.bottom = '8px';
-      overlay.style.zIndex = '999999';
-      overlay.style.background = 'rgba(0,0,0,0.8)';
-      overlay.style.color = 'white';
-      overlay.style.padding = '8px 12px';
-      overlay.style.fontSize = '12px';
-      overlay.style.maxWidth = '420px';
-      overlay.style.maxHeight = '60vh';
-      overlay.style.overflow = 'auto';
-      overlay.style.borderRadius = '6px';
-      overlay.innerHTML = '<strong>Timeline debug: scrollable elements</strong><br/>' + candidates.slice(0, 12).map(c => {
-        const tag = c.el.tagName.toLowerCase();
-        const cls = c.el.className ? `.${String(c.el.className).split(' ').join('.')}` : '';
-        const rect = c.rect ? `top:${Math.round(c.rect.top)} left:${Math.round(c.rect.left)}` : '';
-        return `<div style="margin-top:6px">${tag}${cls} <small style='opacity:.8'>overflow-x:${c.overflowX} diff:${c.diff} ${rect}</small></div>`;
-      }).join('');
-
-      document.body.appendChild(overlay);
-
-      // outline the top few elements
-      const outlines: HTMLElement[] = [];
-      candidates.slice(0, 6).forEach(c => {
-        const el = c.el;
-        const prev = el.style.outline;
-        outlines.push(el);
-        el.style.outline = '3px dashed rgba(255,165,0,0.95)';
-        (el as any).__prevOutline = prev;
-      });
-
-      setTimeout(() => {
-        const o = document.getElementById('timeline-debug-overlay');
-        if (o) o.remove();
-        outlines.forEach(el => { try { el.style.outline = (el as any).__prevOutline || ''; delete (el as any).__prevOutline; } catch (e) {} });
-      }, 3000);
-
-      // log candidates for inspection
-      // eslint-disable-next-line no-console
-      console.debug('[Timeline] debugFindScrollers', candidates.slice(0, 20).map(c => ({ tag: c.el.tagName, className: c.el.className, diff: c.diff, overflowX: c.overflowX })));
-
-      return candidates;
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[Timeline] debugFindScrollers error', err);
-      return [];
-    }
-  }, []);
 
   // Handlers that log clicks and call the scroller helper
   const handleScrollLeft = useCallback(() => {
-    // eslint-disable-next-line no-console
-    console.debug('[Timeline] scroll-button click left');
-    debugFindScrollers();
     scrollByAmount(-400);
-  }, [scrollByAmount, debugFindScrollers]);
+  }, [scrollByAmount]);
 
   const handleScrollRight = useCallback(() => {
-    // eslint-disable-next-line no-console
-    console.debug('[Timeline] scroll-button click right');
-    debugFindScrollers();
     scrollByAmount(400);
-  }, [scrollByAmount, debugFindScrollers]);
+  }, [scrollByAmount]);
 
   const handleHeaderMouseDown = useCallback((e: any) => {
     const target = e.target as HTMLElement;
@@ -582,36 +508,7 @@ export function TimelineView({
     };
   }, [headerRef, leftColWidth, monthWidths, endPadding, dates.length]);
 
-  // Capture-phase pointerdown listener to detect why buttons may be not receiving clicks
-  useEffect(() => {
-    const onCapturePointerDown = (e: PointerEvent) => {
-      try {
-        const wrapper = fixedBtnRef.current;
-        if (!wrapper) return;
-        const rect = wrapper.getBoundingClientRect();
-        // only log pointerdowns near the wrapper area to avoid spam
-        if (e.clientX >= rect.left - 8 && e.clientX <= rect.right + 8 && e.clientY >= rect.top - 8 && e.clientY <= rect.bottom + 8) {
-          // gather hit-test stack
-          const stack = document.elementsFromPoint(e.clientX, e.clientY) as HTMLElement[];
-          // eslint-disable-next-line no-console
-          console.debug('[Timeline] pointerdown capture near buttons', { x: e.clientX, y: e.clientY, stack: stack.slice(0, 6).map(el => ({ tag: el.tagName, className: el.className, zIndex: getComputedStyle(el).zIndex })) });
 
-          // flash outline on top element to visualize hit target
-          if (stack.length) {
-            const top = stack[0];
-            const prev = top.style.outline;
-            top.style.outline = '3px solid rgba(0,200,0,0.95)';
-            setTimeout(() => { try { top.style.outline = prev; } catch (err) {} }, 1200);
-          }
-        }
-      } catch (err) {
-        // ignore
-      }
-    };
-
-    document.addEventListener('pointerdown', onCapturePointerDown, true);
-    return () => document.removeEventListener('pointerdown', onCapturePointerDown, true);
-  }, []);
 
   // We now render months (header + body) together so no scroll-sync is needed.
 
@@ -928,9 +825,12 @@ export function TimelineView({
                 <div className="relative">
                   {/* Buttons anchored to the viewport: position:fixed and measured so they stay visible */}
                   <div ref={fixedBtnRef} style={{ position: 'fixed', right: 8, top: 80, zIndex: 99999, pointerEvents: 'auto' }}>
-                    <div style={{ pointerEvents: 'auto', display: 'flex', gap: 8 }}>
-                      <button aria-label="Scroll left" title="Scroll left" className="timeline-scroll-btn z-40 rounded-full bg-white/70 hover:bg-white p-1 shadow" onPointerDown={() => console.debug('[Timeline] button pointerdown left')} onClick={handleScrollLeft}>◀</button>
-                      <button aria-label="Scroll right" title="Scroll right" className="timeline-scroll-btn z-40 rounded-full bg-white/70 hover:bg-white p-1 shadow" onPointerDown={() => console.debug('[Timeline] button pointerdown right')} onClick={handleScrollRight}>▶</button>
+                    <div style={{ pointerEvents: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <button aria-label="Scroll left" title="Scroll left" className="timeline-scroll-btn z-40 rounded-full bg-white/70 hover:bg-white p-1 shadow" onClick={handleScrollLeft}>◀</button>
+
+                      <button aria-label="Today" title="Today" className="timeline-today-btn z-40 rounded bg-white/90 hover:bg-white px-3 py-1 shadow text-sm" onClick={() => scrollToToday({ smooth: true })}>Today</button>
+
+                      <button aria-label="Scroll right" title="Scroll right" className="timeline-scroll-btn z-40 rounded-full bg-white/70 hover:bg-white p-1 shadow" onClick={handleScrollRight}>▶</button>
                     </div>
                   </div>
               <div className="timeline-viewport relative overflow-hidden">
@@ -975,7 +875,13 @@ export function TimelineView({
                                   const isToday = isSameDate(d, todayNoTime);
                                   return (
                                     <div key={i} className="day-cell flex items-center justify-center" style={{ width: `${w}px` }}>
-                                      <div title={isToday ? 'Today' : undefined} aria-label={isToday ? 'Today' : undefined} className={`text-xs ${isToday ? 'border-2 border-blue-500 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center' : 'text-gray-500'}`}>{getDayLabel(d)}</div>
+                                      <div
+                                        title={isToday ? 'Today' : undefined}
+                                        aria-label={isToday ? 'Today' : undefined}
+                                        className={`text-xs ${isToday ? 'border-2 border-blue-500 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center' : 'text-gray-500'} ${isToday && highlightToday ? 'ring-2 ring-blue-300' : ''}`}
+                                      >
+                                        {getDayLabel(d)}
+                                      </div>
                                     </div>
                                   );
                                 })}

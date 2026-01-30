@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useDrop } from 'react-dnd';
-import { Plus, Rocket, Zap, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Task, TaskStatus, Swimlane } from '@/app/types';
 import { DraggableTaskCard } from '@/app/components/DraggableTaskCard';
 
@@ -15,26 +15,13 @@ interface SwimlanesViewProps {
 }
 
 const swimlanes: Swimlane[] = [
-  { id: 'open', title: 'Open', color: 'bg-cyan-500', icon: 'rocket' },
-  { id: 'in-progress', title: 'In Progress', color: 'bg-blue-500', icon: 'zap' },
-  { id: 'under-review', title: 'Under Review', color: 'bg-pink-500', icon: 'alert' },
-  { id: 'done', title: 'Done', color: 'bg-purple-500', icon: 'check' },
+  { id: 'open', title: 'Open', color: 'bg-cyan-500' },
+  { id: 'in-progress', title: 'In Progress', color: 'bg-blue-500' },
+  { id: 'under-review', title: 'Under Review', color: 'bg-pink-500' },
+  { id: 'done', title: 'Done', color: 'bg-purple-500' },
 ];
 
-const getIcon = (iconName: string) => {
-  switch (iconName) {
-    case 'rocket':
-      return <Rocket className="w-4 h-4" />;
-    case 'zap':
-      return <Zap className="w-4 h-4" />;
-    case 'alert':
-      return <AlertCircle className="w-4 h-4" />;
-    case 'check':
-      return <CheckCircle className="w-4 h-4" />;
-    default:
-      return null;
-  }
-};
+
 
 interface DroppableColumnProps {
   swimlane: Swimlane;
@@ -80,7 +67,6 @@ function DroppableColumn({
       {/* Swimlane header */}
       <div className={`${swimlane.color} text-white p-3 rounded-t-lg flex items-center justify-between`}>
         <div className="flex items-center gap-2">
-          {getIcon(swimlane.icon)}
           <span className="font-medium">{swimlane.title}</span>
         </div>
         <span className="text-white/80 text-sm">{swimlaneTasks.length}</span>

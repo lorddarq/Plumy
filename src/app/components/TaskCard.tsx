@@ -1,15 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Edit2 } from 'lucide-react';
+import { Badge } from './ui/badge';
 
 interface TaskCardProps {
   title: string;
   notes?: string;
   color?: string;
+  swimlane?: string;
   onClick?: () => void;
   onRename?: (newTitle: string) => void;
 }
 
-export function TaskCard({ title, notes, color, onClick, onRename }: TaskCardProps) {
+export function TaskCard({ title, notes, color, swimlane, onClick, onRename }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -57,6 +59,7 @@ export function TaskCard({ title, notes, color, onClick, onRename }: TaskCardPro
               </p>
             )}
 
+            {swimlane && <div className="mt-1"><Badge variant="secondary">{swimlane}</Badge></div>}
             {notes && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{notes}</p>}
           </div>
         </div>

@@ -16,7 +16,6 @@ export interface Swimlane {
   id: TaskStatus;
   title: string;
   color?: string;
-  icon?: string;
 }
 
 export interface TimelineSwimlane {
