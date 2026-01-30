@@ -50,6 +50,7 @@ export function TaskDialog({
   const [endDate, setEndDate] = useState('');
   const [swimlaneOnly, setSwimlaneOnly] = useState(false);
   const [swimlaneId, setSwimlaneId] = useState('');
+  const [color, setColor] = useState('');
 
   useEffect(() => {
     if (task) {
@@ -65,6 +66,7 @@ export function TaskDialog({
       setStatus(defaultStatus || 'open');
       setNotes('');
       setSwimlaneId(defaultSwimlaneId || (swimlanes[0]?.id || ''));
+      setColor('');
       
       if (defaultDate) {
         const dateStr = defaultDate.toISOString().split('T')[0];
@@ -89,6 +91,7 @@ export function TaskDialog({
       title: title.trim(),
       status,
       notes: notes.trim(),
+      color: color || undefined,
       swimlaneOnly,
       swimlaneId: swimlaneOnly ? undefined : swimlaneId,
     };
@@ -146,6 +149,15 @@ export function TaskDialog({
                 <SelectItem value="done">Done</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Color */}
+          <div className="space-y-2">
+            <Label htmlFor="color">Accent Color</Label>
+            <div className="flex items-center gap-2">
+              <input id="color" type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+              <Input id="color-hex" value={color} onChange={(e) => setColor(e.target.value)} placeholder="#aabbcc" />
+            </div>
           </div>
 
           {/* Timeline toggle */}

@@ -83,40 +83,73 @@ export function DraggableSwimlaneRow({
         return;
       }
 
-      // find nearest scrollable ancestor to account for scrolling
+      // Determine horizontal scroller (prefer headerRef if provided) and compute x relative to timeline start
+      let scrollAncestor: HTMLElement | null = null;
+      let rect: DOMRect | null = null;
+      let scrollLeft = 0;
+
+      if (typeof (timelineRef as any).current !== 'undefined' && (timelineRef as any).current) {
+        // If parent provided a headerRef via props, prefer that for consistent scrolling
+        const headerEl = (arguments[0] && (arguments[0] as any).headerRef) || undefined; // no-op to hint TS
+      }
+
+      // If caller provided headerRef prop, use it (accessed via closure)
+      const providedHeader = (typeof (arguments as any)[0] === 'object' && (arguments as any)[0]?.headerRef) ? (arguments as any)[0].headerRef : undefined;
+
+      // Pragmatic: if a headerRef prop was passed to the component, use that
+      // (we add headerRef prop in TimelineView when rendering rows). Fallback to walk-up ancestor.
+      // We access it via the component prop 'headerRef' closed over by the function.
+      const headerProp = (typeof ({} as any) !== 'undefined') ? (undefined as any) : undefined; // placeholder to satisfy linter
+
+      // proper approach: try to find an ancestor with overflowX and scrollWidth>clientWidth starting from timelineRef
       const getScrollAncestor = (el: HTMLElement | null): HTMLElement | null => {
         let cur = el as HTMLElement | null;
         while (cur) {
-          if (cur.scrollWidth > cur.clientWidth) return cur;
+          const style = getComputedStyle(cur);
+          const overflowX = style.overflowX;
+          if ((overflowX === 'auto' || overflowX === 'scroll') && cur.scrollWidth > cur.clientWidth) return cur;
           cur = cur.parentElement;
         }
         return null;
       };
 
-      const rect = timelineRef.current.getBoundingClientRect();
-      const scrollAncestor = getScrollAncestor(timelineRef.current);
-      const scrollLeft = scrollAncestor ? scrollAncestor.scrollLeft : 0;
+      // Prefer headerRef if it's reachable via document query (class on header) — try to find element with class hide-scrollbar (our header)
+      const possibleHeader = document.querySelector('.hide-scrollbar') as HTMLElement | null;
+      if (possibleHeader && possibleHeader.scrollWidth > possibleHeader.clientWidth) {
+        scrollAncestor = possibleHeader;
+        rect = scrollAncestor.getBoundingClientRect();
+        scrollLeft = scrollAncestor.scrollLeft;
+      } else {
+        const rectTimeline = timelineRef.current.getBoundingClientRect();
+        const ancestor = getScrollAncestor(timelineRef.current);
+        scrollAncestor = ancestor;
+        rect = rectTimeline;
+        scrollLeft = ancestor ? ancestor.scrollLeft : 0;
+      }
 
       // x relative to the entire timeline content
-      const localX = clientOffset.x - rect.left + scrollLeft;
+      const localX = clientOffset.x - (rect ? rect.left : 0) + scrollLeft;
 
       // compute prefix sums for day widths
       const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
       const prefix: number[] = [0];
       for (let i = 0; i < dayWidthsLocal.length; i++) prefix.push(prefix[i] + (dayWidthsLocal[i] ?? 60));
 
-      // binary search for index where prefix[idx] <= localX < prefix[idx+1]
-      let lo = 0; let hi = prefix.length - 2; let idx = 0;
-      while (lo <= hi) {
-        const mid = Math.floor((lo + hi) / 2);
-        if (prefix[mid] <= localX && localX < prefix[mid + 1]) {
-          idx = mid; break;
-        }
-        if (localX < prefix[mid]) hi = mid - 1; else lo = mid + 1;
-      }
+      // compute total timeline width and average day width
+      const totalContentWidth = prefix[prefix.length - 1] || 1;
+      const avgDayWidth = totalContentWidth / Math.max(1, dates.length);
 
-      // clamp idx
-      idx = Math.max(0, Math.min(dates.length - 1, idx));
+      // derive a day index that can be outside [0, dates.length-1] to allow past/future drops
+      let rawIdx = Math.floor(localX / Math.max(1, avgDayWidth));
+
+      // snap to nearest day (center) by checking offset within that day
+      const dayStart = rawIdx * avgDayWidth;
+      const offsetInDay = localX - dayStart;
+      if (offsetInDay > avgDayWidth / 2) rawIdx += 1;
+
+      // don't clamp here: allow negative (past) or >last (future) indices
+      let idx = Math.max(-10000, Math.min(10000, rawIdx)); // sanity clamp to avoid runaway values
+
 
       // compute original duration
       const MS_PER_DAY = 1000 * 60 * 60 * 24;

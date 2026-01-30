@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Task, TaskStatus } from '../types';
 import { Button } from '@/app/components/ui/button';
+import { TaskCard } from './TaskCard';
 
 const TASK_ITEM_TYPE = 'TASK_CARD';
 
@@ -11,6 +12,7 @@ interface DraggableTaskCardProps {
   onTaskClick: (task: Task) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onReorderTask: (dragIndex: number, hoverIndex: number, status: TaskStatus) => void;
+  onRenameTask?: (taskId: string, newTitle: string) => void;
   swimlanes: Array<{ id: TaskStatus; title: string }>;
 }
 
@@ -27,6 +29,7 @@ export function DraggableTaskCard({
   onTaskClick,
   onMoveTask,
   onReorderTask,
+  onRenameTask,
   swimlanes,
 }: DraggableTaskCardProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -77,20 +80,15 @@ export function DraggableTaskCard({
   return (
     <div
       ref={ref}
-      className={`bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200 ${
-        isDragging ? 'opacity-50' : ''
-      } ${isOver ? 'border-blue-400 border-2' : ''}`}
-      onClick={() => onTaskClick(task)}
+      className={`${isDragging ? 'opacity-50' : ''} ${isOver ? 'border-blue-400 border-2' : ''}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-900">{task.title}</p>
-          {task.notes && (
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{task.notes}</p>
-          )}
-        </div>
-        <div className="w-3 h-3 rounded-full border-2 border-gray-300"></div>
-      </div>
+      <TaskCard
+        title={task.title}
+        notes={task.notes}
+        color={task.color}
+        onClick={() => onTaskClick(task)}
+        onRename={(newTitle) => onRenameTask && onRenameTask(task.id, newTitle)}
+      />
 
       {/* Move buttons */}
       <div className="mt-2 pt-2 border-t border-gray-100 flex gap-1">

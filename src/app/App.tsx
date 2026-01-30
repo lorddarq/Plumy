@@ -31,11 +31,20 @@ import { SwimlaneDialog } from './components/SwimlaneDialog';
 import { Button } from './components/ui/button';
 import { Menu, Plus, Bell, CheckCircle, User } from 'lucide-react';
 import { Agentation } from 'agentation';
+import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 function App() {
   
   const [tasks, setTasks] = useState<Task[]>(() => safeReadJSON<Task[]>(TASKS_KEY, initialTasks));
   const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes));
+
+  // Status columns (swimlane columns for the kanban view) — persisted separately
+  const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
+  const [statusColumns, setStatusColumns] = useState(() => safeReadJSON(STATUS_COLUMNS_KEY, defaultSwimlanes));
+
+  useEffect(() => { safeWriteJSON(STATUS_COLUMNS_KEY, statusColumns); }, [statusColumns]);
 
   // Persist tasks and swimlanes to localStorage whenever they change
   useEffect(() => {
@@ -109,6 +118,10 @@ function App() {
     setTasks(tasks.map(t => (t.id === taskId ? { ...t, startDate, endDate } : t)));
   };
 
+  const handleRenameTask = (taskId: string, newTitle: string) => {
+    setTasks(tasks.map(t => (t.id === taskId ? { ...t, title: newTitle } : t)));
+  };
+
   const handleCloseTaskDialog = () => {
     setIsTaskDialogOpen(false);
     setSelectedTask(null);
@@ -164,6 +177,33 @@ function App() {
     setTasks(reorderedTasks);
   };
 
+  // Status columns management (kanban/swimlane columns)
+  const handleRenameStatusColumn = (colId: string, newTitle: string) => {
+    setStatusColumns((cols: any[]) => cols.map(c => c.id === colId ? { ...c, title: newTitle } : c));
+  };
+
+  const handleChangeStatusColumnColor = (colId: string, newColorClass: string) => {
+    setStatusColumns((cols: any[]) => cols.map(c => c.id === colId ? { ...c, color: newColorClass } : c));
+  };
+
+  const handleReorderStatusColumns = (fromIndex: number, toIndex: number) => {
+    setStatusColumns((cols: any[]) => {
+      const copy = [...cols];
+      const [moved] = copy.splice(fromIndex, 1);
+      copy.splice(toIndex, 0, moved);
+      return copy;
+    });
+  };
+
+  const handleAddStatusColumn = (col: { id?: string; title: string; color?: string }) => {
+    const newCol = { id: col.id || Date.now().toString(), title: col.title, color: col.color || 'bg-gray-400' };
+    setStatusColumns((cols: any[]) => [...cols, newCol]);
+  };
+
+  const handleDeleteStatusColumn = (colId: string) => {
+    setStatusColumns((cols: any[]) => cols.filter(c => c.id !== colId));
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {process.env.NODE_ENV === "development" && <Agentation />}
@@ -209,13 +249,22 @@ function App() {
       />
 
       {/* Swimlanes View */}
-      <SwimlanesView
-        tasks={tasks}
-        onTaskClick={handleTaskClick}
-        onAddTask={handleAddTaskFromSwimlane}
-        onMoveTask={handleMoveTask}
-        onReorderTasks={handleReorderTasks}
-      />
+      <DndProvider backend={HTML5Backend}>
+        <SwimlanesView
+          tasks={tasks}
+          swimlanes={statusColumns}
+          onTaskClick={handleTaskClick}
+          onAddTask={handleAddTaskFromSwimlane}
+          onMoveTask={handleMoveTask}
+          onReorderTasks={handleReorderTasks}
+          onReorderColumns={handleReorderStatusColumns}
+          onRenameTask={handleRenameTask}
+          onRenameColumn={handleRenameStatusColumn}
+          onChangeColumnColor={handleChangeStatusColumnColor}
+          onAddColumn={handleAddStatusColumn}
+          onDeleteColumn={handleDeleteStatusColumn}
+        />
+      </DndProvider>
 
       {/* Task Dialog */}
       <TaskDialog

@@ -12,6 +12,9 @@
 - [ ] Add visible month resizer handle + double-click reset
 - [ ] Persist `monthWidths` and `leftColWidth` to `electron-store`
 - [ ] Add tests and visual QA page for alignment
+- [x] Extract `TaskCard` component for swimlane task cards and add inline rename + per-card color support ✅
+- [x] Enable inline re-ordering of swimlane cards (already supported) ✅
+- [x] Extract and enable customization for status/category columns (title, color, reorder) ✅
 
 ---
 

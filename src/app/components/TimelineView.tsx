@@ -147,8 +147,14 @@ export function TimelineView({
     maxDate.setDate(maxDate.getDate() + PAD_DAYS);
 
     // align to month boundaries for cleaner headers
-    const start = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-    const end = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
+    let start = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    let end = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
+
+    // Ensure today's date is included in the range so we can scroll to it and highlight it
+    const today = new Date();
+    const todayNoTime = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (todayNoTime < start) start = new Date(todayNoTime.getFullYear(), todayNoTime.getMonth(), 1);
+    if (todayNoTime > end) end = new Date(todayNoTime.getFullYear(), todayNoTime.getMonth() + 1, 0);
 
     const arr: Date[] = [];
     const d = new Date(start);
@@ -214,6 +220,10 @@ export function TimelineView({
     return date.getDate().toString().padStart(2, '0');
   };
 
+  const isSameDate = (a: Date, b: Date) => {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  };
+
   // datesByMonth creation moved above where month widths are initialized
 
   // Update dayWidths when monthWidths changes
@@ -230,6 +240,11 @@ export function TimelineView({
   const [endPadding, setEndPadding] = useState<number>(24);
   const [isResizingEnd, setIsResizingEnd] = useState<boolean>(false);
   const endResizeRef = useRef<{ startX: number; startPadding: number } | null>(null);
+
+  // Today marker and automatic scroll-to-today
+  const scrolledToTodayRef = useRef(false);
+  const [todayIndex, setTodayIndex] = useState<number | null>(null);
+  const [todayOffset, setTodayOffset] = useState<number | null>(null);
 
   // Timestamp until which clicks to add tasks should be ignored (used to prevent click-after-resize)
   const [ignoreAddTaskUntil, setIgnoreAddTaskUntil] = useState<number | null>(null);
@@ -258,6 +273,28 @@ export function TimelineView({
 
   // Force a small redraw/painter nudge on key timeline elements to fix repaint artifacts
   const [, setRerenderTick] = useState(0);
+
+  // Compute today's index & offset whenever dates/dayWidths changes
+  useEffect(() => {
+    if (!dayWidths || dayWidths.length === 0) return;
+    const today = new Date();
+    const todayNoTime = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const idx = dates.findIndex(d => isSameDate(d, todayNoTime));
+    if (idx >= 0) {
+      setTodayIndex(idx);
+      const prefix = dayWidths.slice(0, idx).reduce((a, b) => a + b, 0);
+      setTodayOffset(prefix);
+
+      // Scroll the header so that today is the leftmost visible date on initial render
+      if (headerRef.current && !scrolledToTodayRef.current) {
+        headerRef.current.scrollLeft = prefix;
+        scrolledToTodayRef.current = true;
+      }
+    } else {
+      setTodayIndex(null);
+      setTodayOffset(null);
+    }
+  }, [dates, dayWidths]);
 
   const triggerTimelineRedraw = useCallback(() => {
     try {
@@ -933,9 +970,12 @@ export function TimelineView({
                                 {m.dates.map((d, i) => {
                                   const globalIdx = m.startIndex + i;
                                   const w = dayWidths[globalIdx] ?? defaultDayWidth;
+                                  const today = new Date();
+                                  const todayNoTime = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                                  const isToday = isSameDate(d, todayNoTime);
                                   return (
                                     <div key={i} className="day-cell flex items-center justify-center" style={{ width: `${w}px` }}>
-                                      <div className="text-xs text-gray-500">{getDayLabel(d)}</div>
+                                      <div title={isToday ? 'Today' : undefined} aria-label={isToday ? 'Today' : undefined} className={`text-xs ${isToday ? 'border-2 border-blue-500 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center' : 'text-gray-500'}`}>{getDayLabel(d)}</div>
                                     </div>
                                   );
                                 })}
@@ -945,6 +985,11 @@ export function TimelineView({
                                 {swimlanes.map((s, si) => (
                                   <div key={s.id} data-month-cell className="month-swimlane-cell" style={{ height: 'var(--row-height)', minHeight: 'var(--row-height)', borderBottom: '1px solid rgba(0,0,0,0.04)' }} aria-hidden />
                                 ))}
+
+                                {/* Vertical today marker */}
+                                {typeof todayOffset !== 'undefined' && todayOffset !== null && (
+                                  <div className="absolute top-0 bottom-0 w-[2px] bg-blue-200 pointer-events-none" style={{ left: `${todayOffset}px` }} aria-hidden />
+                                )}
                               </div>
                             </div>
                           ))}

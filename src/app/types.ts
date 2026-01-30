@@ -7,6 +7,7 @@ export interface Task {
   notes?: string;
   startDate?: string;
   endDate?: string;
+  color?: string;
   swimlaneOnly?: boolean; // Tasks that only appear in swimlanes
   swimlaneId?: string; // Which timeline swimlane row this task belongs to
 }
@@ -14,8 +15,8 @@ export interface Task {
 export interface Swimlane {
   id: TaskStatus;
   title: string;
-  color: string;
-  icon: string;
+  color?: string;
+  icon?: string;
 }
 
 export interface TimelineSwimlane {
