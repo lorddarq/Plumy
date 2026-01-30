@@ -8,10 +8,13 @@
     "dev:vite": "vite --port 5173",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "build": "npm run build:renderer",
     "build:renderer": "vite build",
     "build:electron": "electron-builder",
-    "dist": "npm run build:renderer && npm run build:electron",
-    "start": "electron ."
+    "predist": "npm run generate:icons",
+    "dist": "npm run predist && npm run build:renderer && npm run build:electron",
+    "start": "electron .",
+    "generate:icons": "node electron/scripts/generate-icons.cjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.6",
@@ -34,6 +37,8 @@
     "concurrently": "^8.2.0",
     "electron": "^26.2.0",
     "electron-builder": "^24.6.0",
+    "icon-gen": "^5.0.0",
+    "sharp": "^0.34.5",
     "tailwindcss": "4.1.12",
     "typescript": "^5.9.3",
     "vite": "6.3.5",
@@ -52,6 +57,7 @@
     }
   },
   "build": {
+    "icon": "electron/assets/icon",
     "appId": "com.plumy.app",
     "productName": "Plumy",
     "files": [
@@ -60,17 +66,20 @@
       "package.json"
     ],
     "mac": {
+      "icon": "electron/assets/app.icns",
       "target": [
         "dmg",
         "pkg"
       ]
     },
     "win": {
+      "icon": "electron/assets/app.ico",
       "target": [
         "nsis"
       ]
     },
     "linux": {
+      "icon": "electron/assets/icon.png",
       "target": [
         "AppImage"
       ]

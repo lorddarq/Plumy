@@ -1,0 +1,59 @@
+name: Packaging CI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    name: Build and Package
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate icons
+        run: npm run generate:icons
+
+      - name: Commit generated icons
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add electron/assets/app.icns electron/assets/app.ico electron/assets/favicon.ico electron/assets/favicon-*.png || true
+          if git diff --cached --quiet; then
+            echo "No icon changes to commit"
+          else
+            git commit -m "chore(ci): add generated icons"
+            git push origin HEAD:main
+          fi
+
+      - name: Build renderer
+        run: npm run build:renderer
+
+      - name: Package app
+        run: npm run build:electron
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-artifacts-${{ matrix.os }}
+          path: dist/
