@@ -8,6 +8,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Plus } from 'lucide-react';
 import { Task, TimelineSwimlane, TaskStatus } from '../types';
+import { getReadableTextClassFor } from '../utils/contrast';
 import { DraggableSwimlaneRow } from '../components/DraggableSwimlaneRow';
 import { DraggableSwimlaneLabel } from '../components/DraggableSwimlaneLabel';
 
@@ -585,35 +586,49 @@ export function TimelineView({
     };
   }, [dates, dayWidths]);
 
+
   const getTaskColor = useCallback((status: string) => {
     // Prefer a statusColumns mapping provided by parent so colors stay in sync with columns
     const col = (statusColumns || []).find(s => s.id === status);
     if (col && col.color) {
       const c = col.color;
-      // If it's a Tailwind class like 'bg-cyan-500' use it as a className
+      // If it's a Tailwind class like 'bg-cyan-500' use it as a className and compute readable text color
       if (c.startsWith('bg-') || c.startsWith('text-') || c.startsWith('border-')) {
-        return { className: c };
+        const textClass = getReadableTextClassFor(c);
+        return { className: c, textClass };
       }
-      // If it's a hex color, return inline style
+      // If it's a hex color, return inline style and compute readable text class
       if (c.startsWith('#')) {
-        return { style: { backgroundColor: c } };
+        const textClass = getReadableTextClassFor(c, c);
+        return { style: { backgroundColor: c }, textClass };
       }
       // fallback: treat as className
-      return { className: c };
+      const textClass = getReadableTextClassFor(c);
+      return { className: c, textClass };
     }
 
     // Default theme mapping
     switch (status) {
-      case 'open':
-        return { className: 'bg-cyan-400 hover:bg-cyan-500' };
-      case 'in-progress':
-        return { className: 'bg-blue-400 hover:bg-blue-500' };
-      case 'under-review':
-        return { className: 'bg-pink-400 hover:bg-pink-500' };
-      case 'done':
-        return { className: 'bg-purple-400 hover:bg-purple-500' };
-      default:
-        return { className: 'bg-gray-400 hover:bg-gray-500' };
+      case 'open': {
+        const cn = 'bg-cyan-400 hover:bg-cyan-500';
+        return { className: cn, textClass: getReadableTextClassFor(cn) };
+      }
+      case 'in-progress': {
+        const cn = 'bg-blue-400 hover:bg-blue-500';
+        return { className: cn, textClass: getReadableTextClassFor(cn) };
+      }
+      case 'under-review': {
+        const cn = 'bg-pink-400 hover:bg-pink-500';
+        return { className: cn, textClass: getReadableTextClassFor(cn) };
+      }
+      case 'done': {
+        const cn = 'bg-purple-400 hover:bg-purple-500';
+        return { className: cn, textClass: getReadableTextClassFor(cn) };
+      }
+      default: {
+        const cn = 'bg-gray-400 hover:bg-gray-500';
+        return { className: cn, textClass: getReadableTextClassFor(cn) };
+      }
     }
   }, [statusColumns]);
 

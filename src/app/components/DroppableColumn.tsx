@@ -3,6 +3,7 @@ import { useDrop } from 'react-dnd';
 import { Plus, Edit2 } from 'lucide-react';
 import { Task, TaskStatus, Swimlane } from '../types';
 import { DraggableTaskCard } from '../components/DraggableTaskCard';
+import { getReadableTextClassFor } from '../utils/contrast';
 
 interface DroppableColumnProps {
   swimlane: Swimlane;
@@ -82,34 +83,45 @@ export function DroppableColumn({
     >
       {/* Swimlane header */}
       {isEditing ? (
-        <div className={`text-white p-3 rounded-t-lg flex items-center justify-between space-x-2`} style={headerStyle(colorDraft)}>
-          <div className="flex items-center gap-2 flex-1">
-            <input
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              className="rounded px-2 py-1 text-sm w-full"
-              aria-label="Edit column title"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <input type="color" value={colorDraft?.startsWith('#') ? colorDraft : '#9CA3AF'} onChange={(e) => setColorDraft(e.target.value)} aria-label="Pick color" />
-            <button className="text-white/90 px-2 py-1 bg-white/10 rounded" onClick={saveColumnEdits}>Save</button>
-            <button className="text-white/90 px-2 py-1 bg-white/10 rounded" onClick={cancelEdits}>Cancel</button>
-            <button className="text-white/90 px-2 py-1 bg-red-600 rounded" onClick={() => onDeleteColumn && onDeleteColumn(swimlane.id)}>Delete</button>
-          </div>
-        </div>
+        (() => {
+          const headerTextClass = getReadableTextClassFor(colorDraft || '#9CA3AF', colorDraft?.startsWith('#') ? colorDraft : undefined);
+          return (
+            <div className={`${headerTextClass} p-3 rounded-t-lg flex items-center justify-between space-x-2`} style={headerStyle(colorDraft)}>
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  className="rounded px-2 py-1 text-sm w-full"
+                  aria-label="Edit column title"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="color" value={colorDraft?.startsWith('#') ? colorDraft : '#9CA3AF'} onChange={(e) => setColorDraft(e.target.value)} aria-label="Pick color" />
+                <button className={`${headerTextClass} px-2 py-1 bg-white/10 rounded`} onClick={saveColumnEdits}>Save</button>
+                <button className={`${headerTextClass} px-2 py-1 bg-white/10 rounded`} onClick={cancelEdits}>Cancel</button>
+                <button className={`${headerTextClass} px-2 py-1 bg-red-600 rounded`} onClick={() => onDeleteColumn && onDeleteColumn(swimlane.id)}>Delete</button>
+              </div>
+            </div>
+          );
+        })()
       ) : (
-        <div className={`${!swimlane.color?.startsWith('#') ? swimlane.color : ''} text-white p-3 rounded-t-lg flex items-center justify-between`} style={headerStyle(swimlane.color)}>
-          <div className="flex items-center gap-2">
-            <span className="font-medium" onDoubleClick={() => setIsEditing(true)}>{swimlane.title}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-white/80 text-sm">{swimlaneTasks.length}</span>
-            <button className="text-white/90 p-1 ml-2" onClick={() => setIsEditing(true)} aria-label="Edit column">
-              <Edit2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        (() => {
+          const key = swimlane.color || '';
+          const headerTextClass = key ? getReadableTextClassFor(key, key.startsWith('#') ? key : undefined) : 'text-white';
+          return (
+            <div className={`${!swimlane.color?.startsWith('#') ? swimlane.color : ''} ${headerTextClass} p-3 rounded-t-lg flex items-center justify-between`} style={headerStyle(swimlane.color)}>
+              <div className="flex items-center gap-2">
+                <span className="font-medium" onDoubleClick={() => setIsEditing(true)}>{swimlane.title}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`${headerTextClass} text-sm`}>{swimlaneTasks.length}</span>
+                <button className={`${headerTextClass} p-1 ml-2`} onClick={() => setIsEditing(true)} aria-label="Edit column">
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          );
+        })()
       )}
 
       {/* Task cards */}
