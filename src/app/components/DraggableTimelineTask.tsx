@@ -26,6 +26,7 @@ export function DraggableTimelineTask({
   const [{ isDragging }, drag] = useDrag({
     type: TIMELINE_TASK_TYPE,
     item: { type: TIMELINE_TASK_TYPE, task },
+    canDrag: () => !resizingTaskId, // disable dragging while any task is being resized
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),

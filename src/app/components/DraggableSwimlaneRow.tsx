@@ -20,6 +20,7 @@ interface DraggableSwimlaneRowProps {
   rowHeight?: number;
   onTaskClick: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string) => void;
+  ignoreAddTaskUntil?: number | null;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
   onMoveSwimlane: (dragIndex: number, hoverIndex: number) => void;
   onMoveTaskToSwimlane: (taskId: string, swimlaneId: string, newStartDate?: string, newEndDate?: string) => void;
@@ -60,6 +61,7 @@ export function DraggableSwimlaneRow({
   handleResizeStart,
   resizingTaskId,
   rowHeight,
+  ignoreAddTaskUntil,
 }: DraggableSwimlaneRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -216,6 +218,12 @@ export function DraggableSwimlaneRow({
                             title={`Add task for ${d.toDateString()}`}
                             onClick={(e) => {
                               e.stopPropagation();
+                              // ignore clicks that occur immediately after a resize finished
+                              if (ignoreAddTaskUntil && Date.now() < ignoreAddTaskUntil) {
+                                // eslint-disable-next-line no-console
+                                console.debug('[Timeline] ignored add-task click due to recent resize');
+                                return;
+                              }
                               onAddTask(new Date(d), swimlane.id);
                             }}
                             style={{ width: `${w}px`, height: '100%' }}

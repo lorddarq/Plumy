@@ -10,4 +10,23 @@
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 
 /* Small scroll buttons */
-.timeline-scroll-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; }
+.timeline-scroll-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease; cursor: pointer; }
+.timeline-scroll-btn:active { transform: translateY(1px) scale(0.98); box-shadow: none; background-color: rgba(0,0,0,0.06); }
+.timeline-scroll-btn:focus-visible { outline: 2px solid rgba(59,130,246,0.45); outline-offset: 2px; }
+.timeline-scroll-btn:disabled { opacity: 0.5; pointer-events: none; }
+
+/* Paint-hints to reduce rendering artifacts when resizing */
+.timeline-viewport, .month-column, .day-row, .swimlane-rows, .swimlane-row {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Temporary CSS hook to nudge repaint/composition when needed */
+.timeline-redraw-flash {
+  /* No visual change but forces GPU/compositor layer and repaint */
+  transform: translateZ(0) scale(1);
+  will-change: transform, opacity;
+}
+
