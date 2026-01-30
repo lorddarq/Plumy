@@ -25,7 +25,7 @@ interface DraggableSwimlaneRowProps {
   onMoveSwimlane: (dragIndex: number, hoverIndex: number) => void;
   onMoveTaskToSwimlane: (taskId: string, swimlaneId: string, newStartDate?: string, newEndDate?: string) => void;
   getTaskPosition: (task: Task) => { left: number; width: number } | null;
-  getTaskColor: (status: string) => string;
+  getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties };
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   resizingTaskId: string | null;
 } 

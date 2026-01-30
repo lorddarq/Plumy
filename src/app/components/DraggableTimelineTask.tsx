@@ -7,7 +7,7 @@ const TIMELINE_TASK_TYPE = 'TIMELINE_TASK';
 interface DraggableTimelineTaskProps {
   task: Task;
   position: { left: number; width: number };
-  getTaskColor: (status: string) => string;
+  getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties };
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   onTaskClick: (task: Task) => void;
   resizingTaskId: string | null;
@@ -34,17 +34,18 @@ export function DraggableTimelineTask({
 
   drag(ref);
 
+  const color = getTaskColor(task.status);
+
   return (
     <div
       ref={ref}
-      className={`absolute h-8 rounded-md px-3 flex items-center justify-between shadow-sm cursor-pointer pointer-events-auto group/task ${getTaskColor(
-        task.status
-      )} text-white text-xs transition-all ${
+      className={`absolute h-8 rounded-md px-3 flex items-center justify-between shadow-sm cursor-pointer pointer-events-auto group/task ${color.className ?? ''} text-white text-xs transition-all ${
         resizingTaskId === task.id ? 'shadow-lg z-10' : ''
       } ${isDragging ? 'opacity-50' : ''}`}
       style={{
         left: `${position.left + 4}px`,
         width: `${position.width}px`,
+        ...(color.style || {}),
       }}
       onClick={() => onTaskClick(task)}
     >

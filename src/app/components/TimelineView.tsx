@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import type { CSSProperties } from 'react';
 import MonthsScroller from './MonthsScrollerFixed';
 
 // Left column resize defaults
@@ -6,13 +7,14 @@ import MonthsScroller from './MonthsScrollerFixed';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Plus } from 'lucide-react';
-import { Task, TimelineSwimlane } from '../types';
+import { Task, TimelineSwimlane, TaskStatus } from '../types';
 import { DraggableSwimlaneRow } from '../components/DraggableSwimlaneRow';
 import { DraggableSwimlaneLabel } from '../components/DraggableSwimlaneLabel';
 
 interface TimelineViewProps {
   tasks: Task[];
   swimlanes: TimelineSwimlane[];
+  statusColumns?: Array<{ id: TaskStatus; title: string; color?: string }>;
   onTaskClick: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string) => void;
   onUpdateTaskDates: (taskId: string, startDate: string, endDate: string) => void;
@@ -25,6 +27,7 @@ interface TimelineViewProps {
 export function TimelineView({
   tasks,
   swimlanes,
+  statusColumns,
   onTaskClick,
   onAddTask,
   onUpdateTaskDates,
@@ -583,19 +586,36 @@ export function TimelineView({
   }, [dates, dayWidths]);
 
   const getTaskColor = useCallback((status: string) => {
+    // Prefer a statusColumns mapping provided by parent so colors stay in sync with columns
+    const col = (statusColumns || []).find(s => s.id === status);
+    if (col && col.color) {
+      const c = col.color;
+      // If it's a Tailwind class like 'bg-cyan-500' use it as a className
+      if (c.startsWith('bg-') || c.startsWith('text-') || c.startsWith('border-')) {
+        return { className: c };
+      }
+      // If it's a hex color, return inline style
+      if (c.startsWith('#')) {
+        return { style: { backgroundColor: c } };
+      }
+      // fallback: treat as className
+      return { className: c };
+    }
+
+    // Default theme mapping
     switch (status) {
       case 'open':
-        return 'bg-cyan-400 hover:bg-cyan-500';
+        return { className: 'bg-cyan-400 hover:bg-cyan-500' };
       case 'in-progress':
-        return 'bg-blue-400 hover:bg-blue-500';
+        return { className: 'bg-blue-400 hover:bg-blue-500' };
       case 'under-review':
-        return 'bg-pink-400 hover:bg-pink-500';
+        return { className: 'bg-pink-400 hover:bg-pink-500' };
       case 'done':
-        return 'bg-purple-400 hover:bg-purple-500';
+        return { className: 'bg-purple-400 hover:bg-purple-500' };
       default:
-        return 'bg-gray-400 hover:bg-gray-500';
+        return { className: 'bg-gray-400 hover:bg-gray-500' };
     }
-  }, []);
+  }, [statusColumns]);
 
   const handleResizeStart = useCallback((
     e: React.MouseEvent,

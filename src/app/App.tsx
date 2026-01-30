@@ -231,6 +231,7 @@ function App() {
       <TimelineView
         tasks={tasks}
         swimlanes={timelineSwimlanes}
+        statusColumns={statusColumns}
         onTaskClick={handleTaskClick}
         onAddTask={handleAddTaskFromTimeline}
         onUpdateTaskDates={handleUpdateTaskDates}
