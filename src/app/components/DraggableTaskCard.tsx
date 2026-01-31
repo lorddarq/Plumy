@@ -80,7 +80,7 @@ export function DraggableTaskCard({
   return (
     <div
       ref={ref}
-      className={`${isDragging ? 'opacity-50' : ''} ${isOver ? 'border-blue-400 border-2' : ''}`}
+      className={`${isDragging ? 'opacity-50' : ''} ${isOver ? 'border-blue-400 border-2' : ''} min-w-0 w-full`}
     >
       <TaskCard
         title={task.title}
@@ -90,42 +90,6 @@ export function DraggableTaskCard({
         onClick={() => onTaskClick(task)}
         onRename={(newTitle) => onRenameTask && onRenameTask(task.id, newTitle)}
       />
-
-      {/* Move buttons */}
-      <div className="mt-2 pt-2 border-t border-gray-100 flex gap-1">
-        {task.status !== 'open' && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs px-2"
-            onClick={(e) => {
-              e.stopPropagation();
-              const currentIndex = swimlanes.findIndex(s => s.id === task.status);
-              if (currentIndex > 0) {
-                onMoveTask(task.id, swimlanes[currentIndex - 1].id);
-              }
-            }}
-          >
-            ←
-          </Button>
-        )}
-        {task.status !== 'done' && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs px-2"
-            onClick={(e) => {
-              e.stopPropagation();
-              const currentIndex = swimlanes.findIndex(s => s.id === task.status);
-              if (currentIndex < swimlanes.length - 1) {
-                onMoveTask(task.id, swimlanes[currentIndex + 1].id);
-              }
-            }}
-          >
-            →
-          </Button>
-        )}
-      </div>
     </div>
   );
 }

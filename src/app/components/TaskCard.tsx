@@ -28,16 +28,11 @@ export function TaskCard({ title, notes, color, swimlane, onClick, onRename }: T
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-      className="bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
+      className="bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200 max-w-[300px] overflow-hidden"
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-3">
-          <div
-            className="w-3 h-3 rounded-full flex-shrink-0"
-            style={{ backgroundColor: color || '#E5E7EB', border: '2px solid rgba(0,0,0,0.06)' }}
-          />
-
-          <div className="flex-1">
+        <div className="flex items-start gap-3 ">
+          <div className="flex-1 min-w-0 overflow-hidden pr-12 truncate-anywhere max-w-[320px]">
             {isEditing ? (
               <input
                 ref={inputRef}
@@ -52,7 +47,7 @@ export function TaskCard({ title, notes, color, swimlane, onClick, onRename }: T
               />
             ) : (
               <p
-                className="text-sm font-medium text-gray-900"
+                className="text-sm font-medium text-gray-900 w-full max-w-[296px] truncate-anywhere truncate-fade truncate-fade-horizontal"
                 onDoubleClick={(e) => { e.stopPropagation(); if (onRename) setIsEditing(true); }}
               >
                 {title}
@@ -60,7 +55,7 @@ export function TaskCard({ title, notes, color, swimlane, onClick, onRename }: T
             )}
 
             {swimlane && <div className="mt-1"><Badge variant="secondary">{swimlane}</Badge></div>}
-            {notes && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{notes}</p>}
+            {notes && <p className="text-xs text-gray-500 mt-1 line-clamp-3">{notes}</p>}
           </div>
         </div>
 

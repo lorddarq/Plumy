@@ -30,3 +30,35 @@
   will-change: transform, opacity;
 }
 
+/* Fallback line-clamp utilities (used when Tailwind line-clamp plugin isn't enabled) */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Fallback utility to robustly truncate single-line text even when words have no spaces */
+.truncate-anywhere {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-overflow-wrap: anywhere;
+}
+
+/* Smooth fade for single-line truncation (uses mask to avoid depending on background color).
+   We use calc(100% - 18px) so the last ~18px remain fully visible for the ellipsis character;
+   components should also add a small right padding (e.g., `pr-4`) to create space. */
+.truncate-fade {
+  -webkit-mask-image: linear-gradient(to right, black 0%, black calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to right, black 0%, black calc(100% - 18px), transparent 100%);
+}
+
+/* Smooth fade for multi-line clamped content. Use a small bottom padding in the component to avoid an abrupt clip. */
+.truncate-fade-vertical {
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 18px), transparent 100%);
+}
