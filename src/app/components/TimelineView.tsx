@@ -34,7 +34,7 @@ interface TimelineViewProps {
   swimlanes: TimelineSwimlane[];
   statusColumns?: Array<{ id: TaskStatus; title: string; color?: string }>;
   onTaskClick: (task: Task) => void;
-  onAddTask: (date: Date, swimlaneId: string) => void;
+  onAddTask: (date: Date, swimlaneId: string, endDate?: Date) => void;
   onUpdateTaskDates: (taskId: string, startDate: string, endDate: string) => void;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
   onAddSwimlane: () => void;
@@ -535,38 +535,38 @@ export function TimelineView({
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div ref={timelineContainerRef} className="timeline-container bg-white h-full flex flex-col">
+      <div ref={timelineContainerRef} className="timeline-container">
         {/* Header with controls */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b bg-gray-50">
-          <h3 className="text-sm font-medium">Timeline</h3>
-          <button onClick={handleScrollLeft} className="p-1 rounded hover:bg-gray-200">
+        <div className="timeline-toolbar">
+          <h3 className="timeline-toolbar-title">Timeline</h3>
+          <button onClick={handleScrollLeft} className="timeline-toolbar-button">
             ◀
           </button>
-          <button onClick={() => scrollToToday({ smooth: true })} className="px-3 py-1 text-sm bg-white border rounded hover:bg-gray-50">
+          <button onClick={() => scrollToToday({ smooth: true })} className="timeline-toolbar-button-primary">
             Today
           </button>
-          <button onClick={handleScrollRight} className="p-1 rounded hover:bg-gray-200">
+          <button onClick={handleScrollRight} className="timeline-toolbar-button">
             ▶
           </button>
           
           {/* Mode toggle */}
-          <div className="ml-auto flex gap-1">
+          <div className="ml-auto flex items-center gap-1 bg-gray-100 p-1 rounded-md">
             <button
               onClick={() => setMode('projects')}
-              className={`px-3 py-1 text-sm rounded ${
+              className={`px-3 py-1 text-sm rounded-sm font-medium transition-all ${
                 mode === 'projects'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white border text-gray-700 hover:bg-gray-50'
+                  ? 'bg-white shadow-sm text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               Projects
             </button>
             <button
               onClick={() => setMode('people')}
-              className={`px-3 py-1 text-sm rounded ${
+              className={`px-3 py-1 text-sm rounded-sm font-medium transition-all ${
                 mode === 'people'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white border text-gray-700 hover:bg-gray-50'
+                  ? 'bg-white shadow-sm text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               People
@@ -575,27 +575,27 @@ export function TimelineView({
         </div>
 
         {/* Main content */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="timeline-main-content">
           {/* Left column: swimlane labels */}
-          <div className="flex-shrink-0 flex flex-col" style={{ width: `${leftColWidth}px` }}>
-            <div className="left-col-header border-r border-gray-100 px-3 py-2 bg-gray-50 sticky z-40 flex items-center gap-2 top-0" style={{ height: 'fit-content', minHeight: `${HEADER_HEIGHT}px` }}>
-              <span className="text-sm font-medium text-gray-700">Swimlanes</span>
-              <button onClick={onAddSwimlane} className="ml-auto w-8 h-8 rounded flex items-center justify-center text-gray-600 hover:bg-gray-100">
+          <div className="timeline-left-column" style={{ width: `${leftColWidth}px` }}>
+            <div className="timeline-left-header" style={{ height: 'fit-content', minHeight: `${HEADER_HEIGHT}px` }}>
+              <span className="timeline-left-header-title">Swimlanes</span>
+              <button onClick={onAddSwimlane} className="timeline-left-header-button">
                 <Plus className="w-4 h-4" />
               </button>
               <div
                 role="separator"
                 aria-orientation="vertical"
                 onMouseDown={handleLeftResizeStart}
-                className="absolute top-0 right-0 h-full w-2 cursor-col-resize hover:bg-gray-200"
+                className="timeline-left-resize-handle"
               />
             </div>
 
-            <div className="left-list flex-1 overflow-auto border-r border-gray-100 bg-white flex flex-col" ref={leftListRef}>
+            <div className="timeline-left-list" ref={leftListRef}>
               {swimlanes.map((swimlane, index) => {
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
                 return (
-                  <div key={swimlane.id} className="flex-shrink-0" style={{ height: `${height}px`, minHeight: `${height}px` }}>
+                  <div key={swimlane.id} className="timeline-swimlane-label-container" style={{ height: `${height}px`, minHeight: `${height}px` }}>
                     <DraggableSwimlaneLabel
                       swimlane={swimlane}
                       index={index}
@@ -611,10 +611,10 @@ export function TimelineView({
           </div>
 
           {/* Right column: timeline */}
-          <div ref={rowsContainerRef} className="flex-1 overflow-auto relative">
-            <div className="flex flex-col" style={{ minWidth: `${totalTimelineWidth + endPadding}px` }}>
+          <div ref={rowsContainerRef} className="timeline-right-column">
+            <div className="timeline-grid-container" style={{ minWidth: `${totalTimelineWidth + endPadding}px` }}>
               {/* Header: months and days - sticky at top */}
-              <div className="timeline-header-container sticky top-0 z-30 bg-white" style={{ height: 'fit-content', minHeight: `${HEADER_HEIGHT}px`, overflow: 'visible' }}>
+              <div className="timeline-header-container" style={{ height: 'fit-content', minHeight: `${HEADER_HEIGHT}px`, overflow: 'visible' }}>
               <TimelineHeader
                 datesByMonth={datesByMonth}
                 monthWidths={monthWidths}
@@ -631,7 +631,7 @@ export function TimelineView({
             </div>
 
             {/* Swimlane rows: tasks */}
-            <div className="flex flex-col">
+            <div className="timeline-rows-container">
               {swimlanes.map((swimlane, idx) => {
                 const swimlaneTasks = tasks.filter(t => t.swimlaneId === swimlane.id);
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;

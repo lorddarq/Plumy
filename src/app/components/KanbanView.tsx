@@ -78,7 +78,7 @@ export function KanbanView({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="h-full w-full overflow-x-auto overflow-y-hidden bg-gray-50"
+      className="h-full w-full overflow-x-auto overflow-y-auto bg-gray-50"
     >
       <SwimlanesView
         tasks={tasks}

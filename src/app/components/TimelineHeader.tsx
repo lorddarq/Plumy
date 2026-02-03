@@ -92,14 +92,14 @@ export function TimelineHeader({
               <div
                 key={m.key}
                 style={{ width: `${m.width}px` }}
-                className="month-column border-r border-gray-100 bg-white relative"
+                className="month-column"
               >
                 {/* Month header */}
                 <div
                   data-month-header
-                  className="month-header px-3 py-2 border-b border-gray-100 bg-white relative"
+                  className="month-header"
                 >
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="month-header-text">
                     {getMonthLabel(m.dates[0])}
                   </span>
                 </div>
@@ -107,7 +107,7 @@ export function TimelineHeader({
                 {/* Day row */}
                 <div
                   data-day-header
-                  className="day-row px-1 py-2 border-b border-gray-100 bg-white flex"
+                  className="day-row"
                   style={{ height: `${rowHeight}px` }}
                 >
                   {m.dates.map((d, i) => {
@@ -124,18 +124,16 @@ export function TimelineHeader({
                     return (
                       <div
                         key={i}
-                        className="day-cell flex items-center justify-center"
+                        className="day-cell"
                         style={{ width: `${w}px` }}
                       >
                         <div
                           title={isToday ? 'Today' : undefined}
                           aria-label={isToday ? 'Today' : undefined}
-                          className={`text-xs ${
-                            isToday
-                              ? 'border-2 border-blue-500 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center'
-                              : 'text-gray-500'
+                          className={`day-label ${
+                            isToday ? 'today' : ''
                           } ${
-                            isToday && highlightToday ? 'ring-2 ring-blue-300' : ''
+                            isToday && highlightToday ? 'highlight' : ''
                           }`}
                         >
                           {getDayLabel(d)}
@@ -174,7 +172,7 @@ export function TimelineHeader({
             {typeof todayOffset !== 'undefined' &&
               todayOffset !== null && (
                 <div
-                  className="absolute top-0 bottom-0 w-[2px] bg-blue-300 pointer-events-none"
+                  className="today-indicator"
                   style={{ left: `${todayOffset}px` }}
                   aria-hidden
                 />

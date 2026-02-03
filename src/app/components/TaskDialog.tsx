@@ -28,6 +28,7 @@ interface TaskDialogProps {
   task?: Task | null;
   defaultStatus?: TaskStatus;
   defaultDate?: Date;
+  defaultEndDate?: Date;
   defaultSwimlaneId?: string;
   swimlanes: TimelineSwimlane[];
 }
@@ -40,6 +41,7 @@ export function TaskDialog({
   task,
   defaultStatus,
   defaultDate,
+  defaultEndDate,
   defaultSwimlaneId,
   swimlanes,
 }: TaskDialogProps) {
@@ -71,8 +73,10 @@ export function TaskDialog({
       if (defaultDate) {
         const dateStr = defaultDate.toISOString().split('T')[0];
         setStartDate(dateStr);
-        const endDateObj = new Date(defaultDate);
-        endDateObj.setDate(endDateObj.getDate() + 2);
+        const endDateObj = defaultEndDate || new Date(defaultDate);
+        if (!defaultEndDate) {
+          endDateObj.setDate(endDateObj.getDate() + 2);
+        }
         setEndDate(endDateObj.toISOString().split('T')[0]);
         setSwimlaneOnly(false);
       } else {
@@ -81,7 +85,7 @@ export function TaskDialog({
         setSwimlaneOnly(true);
       }
     }
-  }, [task, defaultStatus, defaultDate, defaultSwimlaneId, swimlanes, isOpen]);
+  }, [task, defaultStatus, defaultDate, defaultEndDate, defaultSwimlaneId, swimlanes, isOpen]);
 
   const handleSave = () => {
     if (!title.trim()) return;

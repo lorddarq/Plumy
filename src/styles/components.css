@@ -1,0 +1,767 @@
+/* ============================================================================
+   Timeline & Kanban Component Styles
+   ============================================================================ */
+
+/* Timeline View */
+.timeline-container {
+  background-color: white;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background-color: #f9fafb;
+}
+
+.timeline-toolbar-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.timeline-toolbar-button {
+  padding: 0.25rem;
+  border-radius: 0.375rem;
+}
+
+.timeline-toolbar-button:hover {
+  background-color: #e5e7eb;
+}
+
+.timeline-toolbar-button-primary {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.875rem;
+  background-color: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0.375rem;
+}
+
+.timeline-toolbar-button-primary:hover {
+  background-color: #f3f4f6;
+}
+
+.timeline-mode-toggle {
+  margin-left: auto;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.timeline-mode-button {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+}
+
+.timeline-mode-button.active {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.timeline-mode-button.inactive {
+  background-color: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #374151;
+}
+
+.timeline-mode-button.inactive:hover {
+  background-color: #f3f4f6;
+}
+
+/* Timeline Main Layout */
+.timeline-main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.timeline-left-column {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-left-header {
+  border-right: 1px solid #f3f4f6;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  background-color: #f9fafb;
+  position: sticky;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  top: 0;
+  height: fit-content;
+  min-height: 72px;
+}
+
+.timeline-left-header-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.timeline-left-header-button {
+  margin-left: auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4b5563;
+}
+
+.timeline-left-header-button:hover {
+  background-color: #f3f4f6;
+}
+
+.timeline-left-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 0.5rem;
+  cursor: col-resize;
+}
+
+.timeline-left-resize-handle:hover {
+  background-color: #e5e7eb;
+}
+
+.timeline-left-list {
+  flex: 1;
+  overflow: auto;
+  border-right: 1px solid #f3f4f6;
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-swimlane-label-container {
+  flex-shrink: 0;
+}
+
+/* Timeline Right Side */
+.timeline-right-column {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.timeline-grid-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-header-container {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background-color: white;
+  height: fit-content;
+  min-height: 72px;
+  overflow: visible;
+}
+
+.timeline-rows-container {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Timeline Header */
+.timeline-header-inner {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.month-column {
+  border-right: 1px solid #f3f4f6;
+  background-color: white;
+  position: relative;
+}
+
+.month-header {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  background-color: white;
+  position: relative;
+}
+
+.month-header-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.day-row {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  background-color: white;
+  display: flex;
+}
+
+.day-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.day-label {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.day-label.today {
+  border: 2px solid #3b82f6;
+  color: #2563eb;
+  border-radius: 9999px;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.day-label.today.highlight {
+  ring: 2px solid #93c5fd;
+}
+
+/* Today Indicator */
+.today-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #93c5fd;
+  pointer-events: none;
+}
+
+/* Swimlane Row */
+.swimlane-row {
+  display: flex;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.swimlane-row:hover {
+  background-color: rgba(249, 250, 251, 0.5);
+}
+
+.swimlane-row.dragging-over {
+  background-color: rgba(191, 219, 254, 0.5);
+}
+
+.swimlane-row-timeline {
+  position: relative;
+  flex: 1;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.swimlane-row-timeline.drop-target {
+  background-color: #f0fdf4;
+  border: 2px solid #4ade80;
+}
+
+.swimlane-row-timeline.drop-target::after {
+  position: absolute;
+  inset: 0;
+  background-color: #dcfce7;
+  opacity: 0.2;
+  pointer-events: none;
+  z-index: 10;
+  content: '';
+  border-radius: 4px;
+}
+
+.drop-indicator-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0.25rem;
+  background-color: #16a34a;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.month-swimlane-cell {
+  /* No border - actual swimlane rows handle borders */
+}
+
+.day-click-cell {
+  height: 100%;
+  cursor: pointer;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.day-click-cell:hover {
+  background-color: rgba(229, 231, 235, 0.4);
+}
+
+.day-click-cell.selected {
+  background-color: rgba(191, 219, 254, 0.6);
+}
+
+.selection-border {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  border: 2px solid #3b82f6;
+  background-color: rgba(191, 219, 254, 0.2);
+  border-radius: 4px;
+}
+
+/* Swimlane Label */
+.swimlane-label-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  background-color: white;
+}
+
+.swimlane-label-wrapper.hover-target {
+  background-color: rgba(191, 219, 254, 0.5);
+}
+
+.swimlane-label-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+}
+
+.swimlane-label-drag-handle {
+  cursor: move;
+  flex-shrink: 0;
+}
+
+.swimlane-label-drag-handle-icon {
+  width: 1rem;
+  height: 1rem;
+  color: #9ca3af;
+}
+
+.swimlane-label-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  flex: 1;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.swimlane-label-edit-button {
+  height: 1.5rem;
+  width: 1.5rem;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.swimlane-label-wrapper:hover .swimlane-label-edit-button {
+  opacity: 1;
+}
+
+.swimlane-label-edit-button-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+/* Timeline Task */
+.timeline-task {
+  position: absolute;
+  height: 2rem;
+  border-radius: 0.375rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  pointer-events: auto;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.timeline-task.dragging {
+  opacity: 0.5;
+}
+
+.timeline-task.resizing {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.timeline-task-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0.5rem;
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+
+.timeline-task:hover .timeline-task-resize-handle {
+  opacity: 1;
+}
+
+.timeline-task-resize-handle-left {
+  left: 0;
+}
+
+.timeline-task-resize-handle-right {
+  right: 0;
+}
+
+.timeline-task-resize-handle:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.timeline-task-resize-handle-indicator {
+  width: 0.125rem;
+  height: 1rem;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 0.25rem;
+}
+
+.timeline-task-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  text-align: center;
+}
+
+/* Kanban View */
+.kanban-container {
+  height: 100%;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  background-color: #f3f4f6;
+}
+
+.kanban-board {
+  height: 100%;
+  background-color: #f3f4f6;
+  padding: 1.5rem;
+}
+
+.kanban-columns {
+  display: flex;
+  gap: 1rem;
+  min-width: max-content;
+  height: 100%;
+}
+
+.kanban-add-column-button {
+  min-width: 60px;
+  background-color: rgba(243, 244, 246, 0.5);
+  border-radius: 0.5rem;
+  border: 2px dashed #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  cursor: pointer;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.kanban-add-column-button:hover {
+  border-color: #9ca3af;
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+.kanban-add-column-button-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Kanban Column */
+.kanban-column {
+  min-width: 280px;
+  max-width: 320px;
+  background-color: #e5e7eb;
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.kanban-column-header {
+  padding: 0.75rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kanban-column-header.editing {
+  /* Styles applied via inline styles for dynamic color */
+}
+
+.kanban-column-title {
+  font-weight: 500;
+}
+
+.kanban-column-title-input {
+  border-radius: 0.375rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.875rem;
+  width: 100%;
+}
+
+.kanban-column-count {
+  font-size: 0.875rem;
+}
+
+.kanban-column-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kanban-column-edit-button {
+  padding: 0.25rem;
+  margin-left: 0.5rem;
+}
+
+.kanban-column-edit-button-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.kanban-column-color-picker {
+  /* input[type="color"] styles */
+}
+
+.kanban-column-save-button {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.kanban-column-cancel-button {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.kanban-column-delete-button {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  background-color: #dc2626;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  color: white;
+}
+
+.kanban-column-tasks {
+  flex: 1;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.kanban-column-tasks.drag-over {
+  background-color: #dbeafe;
+}
+
+.kanban-add-task-button {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 2px dashed #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+  background-color: transparent;
+}
+
+.kanban-add-task-button:hover {
+  border-color: #9ca3af;
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.kanban-add-task-button-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.kanban-add-task-button-text {
+  font-size: 0.875rem;
+}
+
+/* Kanban Task Card */
+.kanban-task-card {
+  padding: 0.75rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  border-left: 4px solid;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.kanban-task-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.kanban-task-card.dragging {
+  opacity: 0.5;
+}
+
+.kanban-task-title {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #111827;
+}
+
+.kanban-task-description {
+  font-size: 0.75rem;
+  color: #4b5563;
+  margin-top: 0.25rem;
+}
+
+.kanban-task-meta {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 0.5rem;
+}
+
+.kanban-task-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  opacity: 0;
+}
+
+.kanban-task-card:hover .kanban-task-actions {
+  opacity: 1;
+}
+
+.kanban-task-action-button {
+  font-size: 0.75rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.kanban-task-action-button:hover {
+  background-color: #f3f4f6;
+}
+
+/* Shared Utility Classes */
+.hide-scrollbar {
+  overflow-x: visible;
+  overflow-y: visible;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transition-fast {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.transition-normal {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+.pointer-events-none-z {
+  pointer-events: none;
+}
+
+.z-overlay {
+  z-index: 40;
+}
+
+.z-header {
+  z-index: 30;
+}
+
+.z-modal {
+  z-index: 50;
+}

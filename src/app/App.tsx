@@ -72,6 +72,7 @@ function App() {
   const [selectedSwimlane, setSelectedSwimlane] = useState<TimelineSwimlane | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<TaskStatus>('open');
   const [defaultDate, setDefaultDate] = useState<Date | undefined>(undefined);
+  const [defaultEndDate, setDefaultEndDate] = useState<Date | undefined>(undefined);
   const [defaultSwimlaneId, setDefaultSwimlaneId] = useState<string | undefined>(undefined);
 
   const handleTaskClick = (task: Task) => {
@@ -82,10 +83,11 @@ function App() {
     setIsTaskDialogOpen(true);
   };
 
-  const handleAddTaskFromTimeline = (date: Date, swimlaneId: string) => {
+  const handleAddTaskFromTimeline = (date: Date, swimlaneId: string, endDate?: Date) => {
     setSelectedTask(null);
     setDefaultStatus('open');
     setDefaultDate(date);
+    setDefaultEndDate(endDate);
     setDefaultSwimlaneId(swimlaneId);
     setIsTaskDialogOpen(true);
   };
@@ -320,6 +322,7 @@ function App() {
         task={selectedTask}
         defaultStatus={defaultStatus}
         defaultDate={defaultDate}
+        defaultEndDate={defaultEndDate}
         defaultSwimlaneId={defaultSwimlaneId}
         swimlanes={timelineSwimlanes}
       />

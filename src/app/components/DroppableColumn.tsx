@@ -79,7 +79,7 @@ export function DroppableColumn({
 
   return (
     <div
-      className="flex-1 min-w-[280px] bg-gray-100 rounded-lg flex flex-col"
+      className="min-w-[280px] max-w-[320px] bg-gray-100 rounded-lg flex flex-col h-full"
     >
       {/* Swimlane header */}
       {isEditing ? (
@@ -127,7 +127,7 @@ export function DroppableColumn({
       {/* Task cards */}
       <div
         ref={ref}
-        className={`flex-1 p-3 space-y-2 min-h-[400px] transition-colors ${
+        className={`flex-1 p-3 space-y-2 overflow-y-auto transition-colors ${
           isOver && canDrop ? 'bg-blue-50' : ''
         }`}
       >

@@ -1,6 +1,7 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+@import './components.css';
 
 /* Hide native scrollbars for the timeline scroll area while keeping scrolling functional */
 .hide-scrollbar {

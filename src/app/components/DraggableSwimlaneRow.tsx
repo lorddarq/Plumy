@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState } from 'react';
+import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Edit2, GripVertical } from 'lucide-react';
 import { Task, TimelineSwimlane } from '../types';
@@ -21,7 +21,7 @@ interface DraggableSwimlaneRowProps {
   rowHeight?: number;
   scrollContainerRef?: React.RefObject<HTMLDivElement>; // Reference to the scrollable container for accurate drop calculations
   onTaskClick: (task: Task) => void;
-  onAddTask: (date: Date, swimlaneId: string) => void;
+  onAddTask: (date: Date, swimlaneId: string, endDate?: Date) => void;
   ignoreAddTaskUntil?: number | null;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
   onMoveSwimlane: (dragIndex: number, hoverIndex: number) => void;
@@ -69,6 +69,11 @@ export function DraggableSwimlaneRow({
   const ref = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  // Date range selection state
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
+
   // Compute track assignments for tasks in this swimlane (memoized)
   const trackAssignments = useMemo(
     () => allocateTasksToTracks(tasks),
@@ -115,6 +120,49 @@ export function DraggableSwimlaneRow({
     // This is the start of the target day
     return prefix[dayIdx] ?? 0;
   };
+
+  // Handle date range selection via click-drag
+  const handleSelectionStart = useCallback((dayIdx: number) => {
+    setIsSelecting(true);
+    setSelectionStart(dayIdx);
+    setSelectionEnd(dayIdx);
+  }, []);
+
+  const handleSelectionMove = useCallback((dayIdx: number) => {
+    if (isSelecting && selectionStart !== null) {
+      setSelectionEnd(dayIdx);
+    }
+  }, [isSelecting, selectionStart]);
+
+  const handleSelectionEnd = useCallback(() => {
+    if (isSelecting && selectionStart !== null && selectionEnd !== null && dates.length > 0) {
+      const startIdx = Math.min(selectionStart, selectionEnd);
+      const endIdx = Math.max(selectionStart, selectionEnd);
+      
+      if (startIdx >= 0 && startIdx < dates.length && endIdx >= 0 && endIdx < dates.length) {
+        const startDate = dates[startIdx];
+        const endDate = dates[endIdx];
+        onAddTask(startDate, swimlane.id, endDate);
+      }
+    }
+    setIsSelecting(false);
+    setSelectionStart(null);
+    setSelectionEnd(null);
+  }, [isSelecting, selectionStart, selectionEnd, dates, swimlane.id, onAddTask]);
+
+  // Global mouse up listener to end selection
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isSelecting) {
+        handleSelectionEnd();
+      }
+    };
+
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isSelecting, handleSelectionEnd]);
 
   // Drop zone for timeline tasks — row handles task drops and repositioning
   const [{ isOver: isTaskOver, canDrop, dropLinePosition }, dropTask] = useDrop({
@@ -225,7 +273,7 @@ export function DraggableSwimlaneRow({
   return (
     <div
       ref={ref}
-      className={`flex border-b border-gray-100 hover:bg-gray-50/50 group ${isTaskOver && canDrop ? 'bg-blue-100/50' : ''}`}
+      className={`swimlane-row ${isTaskOver && canDrop ? 'dragging-over' : ''}`}
       style={{ height: `${rowHeight || 48}px` }}
     >
     
@@ -233,10 +281,9 @@ export function DraggableSwimlaneRow({
       {/* Timeline grid for this swimlane */}
       <div
         ref={timelineRef}
-        className={`relative flex-1 transition-colors ${
-          isTaskOver && canDrop ? 'bg-green-50 border-2 border-green-400' : ''
+        className={`swimlane-row-timeline ${
+          isTaskOver && canDrop ? 'drop-target' : ''
         }`}
-        style={{ borderRadius: '4px' }}
       >
         {/* Drop indicator line when dragging over - positioned in viewport coordinates */}
         {isTaskOver && canDrop && typeof dropLinePosition === 'number' && scrollContainerRef?.current && (
@@ -252,9 +299,8 @@ export function DraggableSwimlaneRow({
             
             return (
               <>
-                <div className="absolute inset-0 bg-green-100 opacity-20 pointer-events-none z-10" style={{ borderRadius: '4px' }} />
                 <div 
-                  className="absolute top-0 bottom-0 w-1 bg-green-600 pointer-events-none z-20" 
+                  className="drop-indicator-line" 
                   style={{ left: `${viewportLeft}px` }}
                 />
               </>
@@ -300,7 +346,7 @@ export function DraggableSwimlaneRow({
               return (
                 <div
                   key={monthKey}
-                  className="border-r border-gray-100 last:border-r-0 relative flex-shrink-0"
+                  className="month-column"
                   style={{ width: `${monthWidth}px` }}
                 >
                   <div className="h-full relative">
@@ -309,24 +355,71 @@ export function DraggableSwimlaneRow({
                       {(datesByMonth?.[monthKey] ?? []).map((d, di) => {
                         const globalIdx = startIdx + di;
                         const w = dayWidths?.[globalIdx] ?? 60;
+                        
+                        // Check if this day is in the selection range
+                        const isInSelection = isSelecting && selectionStart !== null && selectionEnd !== null &&
+                          globalIdx >= Math.min(selectionStart, selectionEnd) &&
+                          globalIdx <= Math.max(selectionStart, selectionEnd);
+                        
                         return (
                           <div
                             key={`day-${monthKey}-${di}`}
-                            className="day-click-cell hover:bg-gray-100/40 cursor-pointer"
+                            className={`day-click-cell ${
+                              isInSelection ? 'selected' : ''
+                            }`}
                             title={`Add task for ${d.toDateString()}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // ignore clicks that occur immediately after a resize finished
+                            onMouseDown={(e) => {
+                              e.preventDefault();
                               if (ignoreAddTaskUntil && Date.now() < ignoreAddTaskUntil) {
                                 return;
                               }
-                              onAddTask(new Date(d), swimlane.id);
+                              handleSelectionStart(globalIdx);
+                            }}
+                            onMouseEnter={() => {
+                              if (isSelecting) {
+                                handleSelectionMove(globalIdx);
+                              }
+                            }}
+                            onMouseUp={(e) => {
+                              e.stopPropagation();
+                              handleSelectionEnd();
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
                             }}
                             style={{ width: `${w}px`, height: '100%' }}
                           />
                         );
                       })}
                     </div>
+
+                    {/* Selection border overlay */}
+                    {isSelecting && selectionStart !== null && selectionEnd !== null && (() => {
+                      const minIdx = Math.min(selectionStart, selectionEnd);
+                      const maxIdx = Math.max(selectionStart, selectionEnd);
+                      
+                      // Check if selection intersects with this month
+                      const selectionIntersectsMonth = minIdx <= (startIdx + len - 1) && maxIdx >= startIdx;
+                      
+                      if (!selectionIntersectsMonth) return null;
+                      
+                      // Calculate the overlap of selection with this month
+                      const monthSelectionStart = Math.max(minIdx, startIdx);
+                      const monthSelectionEnd = Math.min(maxIdx, startIdx + len - 1);
+                      
+                      const selectionLeft = prefix[monthSelectionStart] - monthLeft;
+                      const selectionWidth = prefix[monthSelectionEnd + 1] - prefix[monthSelectionStart];
+                      
+                      return (
+                        <div
+                          className="selection-border"
+                          style={{
+                            left: `${selectionLeft}px`,
+                            width: `${selectionWidth}px`,
+                          }}
+                        />
+                      );
+                    })()}
 
                     {tasksRanges.map(({ task, startIndex, endIndex }) => {
                       if (startIndex < 0 || endIndex < 0) return null;
