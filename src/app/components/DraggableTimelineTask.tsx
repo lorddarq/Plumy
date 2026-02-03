@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useDrag } from 'react-dnd';
+import { getEmptyImage } from 'react-dnd-html5-backend';
 import { Task } from '../types';
 
 const TIMELINE_TASK_TYPE = 'TIMELINE_TASK';
@@ -23,7 +24,7 @@ export function DraggableTimelineTask({
 }: DraggableTimelineTaskProps) {
   const ref = useRef<HTMLDivElement>(null);
 
-  const [{ isDragging }, drag] = useDrag({
+  const [{ isDragging }, drag, preview] = useDrag({
     type: TIMELINE_TASK_TYPE,
     item: { type: TIMELINE_TASK_TYPE, task },
     canDrag: () => !resizingTaskId, // disable dragging while any task is being resized
@@ -33,6 +34,9 @@ export function DraggableTimelineTask({
   });
 
   drag(ref);
+
+  // Set up drag preview with custom image
+  preview(getEmptyImage(), { captureDraggingState: true });
 
   const color = getTaskColor(task.status);
   const textClass = color.textClass ?? 'text-white';

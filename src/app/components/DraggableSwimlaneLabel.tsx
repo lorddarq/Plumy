@@ -59,24 +59,24 @@ export function DraggableSwimlaneLabel({ swimlane, index, leftColWidth, rowHeigh
   return (
     <div
       ref={ref}
-      className={`border-b border-gray-100 flex items-center justify-between px-5 group bg-white ${isOver ? 'bg-blue-50/50' : ''}`}
-      style={{ width: `${leftColWidth}px`, height: 'var(--row-height)', boxSizing: 'border-box', overflow: 'hidden' }}
+      className={`flex flex-col justify-center px-5 group bg-white ${isOver ? 'bg-blue-50/50' : ''}`}
+      style={{ width: `${leftColWidth}px`, height: `${rowHeight || 48}px`, boxSizing: 'border-box', minHeight: `${rowHeight || 48}px` }}
     >
-      <div className="flex items-center gap-3">
-        <div ref={dragHandleRef} className="cursor-move">
+      <div className="flex items-center justify-between w-full gap-2">
+        <div ref={dragHandleRef} className="cursor-move flex-shrink-0">
           <GripVertical className="w-4 h-4 text-gray-400" />
         </div>
-        <span className="text-sm font-semibold text-gray-700 break-words whitespace-normal">{swimlane.name}</span>
-      </div>
+        <span className="text-sm font-semibold text-gray-700 flex-1 break-words line-clamp-3">{swimlane.name}</span>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 opacity-0 group-hover:opacity-100"
-        onClick={() => onEditSwimlane(swimlane)}
-      >
-        <Edit2 className="w-3 h-3" />
-      </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
+          onClick={() => onEditSwimlane(swimlane)}
+        >
+          <Edit2 className="w-3 h-3" />
+        </Button>
+      </div>
     </div>
   );
 }

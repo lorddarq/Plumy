@@ -997,8 +997,424 @@ src/app/
 
 ---
 
-## Sign-Off
+## Sign-Off (Original Plan)
 
 This plan is comprehensive and actionable. Implementation should follow phases sequentially, with testing and validation at each phase.
 
 **Next step:** User review and feedback. Once approved, create feature branch and begin Phase 1.
+
+---
+
+---
+
+# CONSOLIDATED MASTER PLAN ✅ (Updated 2026-02-03)
+
+**Author:** GitHub Copilot  
+**Date:** 2026-02-03  
+**Status:** In Progress  
+**Confidence:** 0.85
+
+## Executive Summary
+
+This **consolidated master plan** merges three previous planning documents and incorporates three new feature requirements:
+
+1. **IMPROVEMENTS.md** — Timeline interaction refinements (out-of-range drops, auto-scroll, snapping)
+2. **Timeline-Infinite-Scroll-Plan.md** — Virtualization design (windowed date extension)
+3. **Architecture-Refactor-Plan.md** — Modular refactor (5 phases, component extraction)
+4. **NEW: Dynamic Swimlane Tracks** — Tasks stack vertically within swimlanes (no visual overlap), swimlane height grows dynamically
+5. **NEW: Separate Kanban View** — Full-page kanban board with independent scroll, toggled via segmented control
+6. **NEW: View State Preservation** — Separate scroll position + UI state per view; instant restoration on switch (virtual rendering principle applied to view switching)
+
+**Total Estimated Effort:** 14–16 days (single developer, includes testing & polish)  
+**Phases:** 8 (Foundation → Modularize → Virtualization → Tracks → Kanban → View Toggle → Mode Toggle → Polish)
+
+---
+
+## Key Insights
+
+### Dynamic Swimlane Tracks (Visual)
+- Tasks on same swimlane but different date ranges: **no overlap**
+- Each task assigned to a track slot (0, 1, 2, ...) within swimlane
+- Swimlane height: `baseHeight + (trackCount - 1) * trackHeight`
+- Track allocation: first-fit algorithm (simple, O(n×m), memoized to avoid thrash)
+
+### Separate Kanban View
+- TimelineView + KanbanView are **separate full-page views**, not vertically stacked
+- Users toggle between them via segmented control in top bar
+- Kanban scrolls **independently** (horizontal for cards, not synced with timeline calendar days)
+- Responsive flex layout: kanban columns flex to fill or overflow-scroll
+
+### View State Preservation (Virtual Rendering Principle)
+- Apply virtual rendering principle from Upscalix article to view switching:
+  - **Only render the active view** (saves DOM/memory)
+  - **Preserve previous view's state in memory** (context/App state)
+  - **Instant restoration on switch** (no re-fetch, no lag)
+- Store per-view session data: `viewState = { timeline: {...}, kanban: {...} }`
+- On switch: unmount current view, restore previous view's scroll/UI state
+
+---
+
+## Implementation Phases
+
+### Phase 1: Foundation & Shared State (Days 1–2)
+**Effort:** 2 days | **ROI:** Very High | **Blockers:** None
+
+✅ **Tasks:**
+- Add `TIMELINE_CONFIG` constant with `DAY_SLOT_WIDTH = 60px`, `HEADER_HEIGHT`, `ROW_HEIGHT`, `EPOCH_DATE`
+- Implement `useSharedHorizontalScroll()` hook (scroll sync placeholder)
+- Implement `useVirtualizedTimeline()` hook (window state, `dateToIndex`, `indexToDate`, `indexToOffset`)
+- Implement `useViewHeights()` hook (for future vertical resize)
+- Implement `useTimelineMode()` hook (projects vs people mode)
+- Implement `useViewState()` hook (preserve scroll/UI state per view)
+- Update [App.tsx](App.tsx) to use new hooks and render view toggle
+- Create `ViewToggle` segmented control component
+
+**Deliverable:** App renders top-level view toggle (buttons visible), hooks functional, shared state ready
+
+**Testing:** No errors on mount, view toggle renders without crash
+
+---
+
+### Phase 2: Extract & Modularize TimelineView (Days 3–5)
+**Effort:** 3 days | **ROI:** High | **Blockers:** Phase 1
+
+✅ **Tasks:**
+- Extract [TimelineHeader.tsx](src/app/components/TimelineHeader.tsx) (month/day labels, fixed positioning)
+- Extract [SwimlaneRowsView.tsx](src/app/components/SwimlaneRowsView.tsx) (swimlane rows, Projects mode)
+- Extract [ResizeHandle.tsx](src/app/components/ResizeHandle.tsx) (vertical divider, future use)
+- Refactor [DraggableSwimlaneRow.tsx](src/app/components/DraggableSwimlaneRow.tsx):
+  - Replace `dayWidths` calculations with `indexToOffset()`
+  - Add track allocation logic (compute overlapping tasks)
+  - Update task positioning: `top = trackIndex * trackHeight`, `left = indexToOffset(startIdx)`
+  - Snap drag/resize to 60px grid
+  - Add memoization: `React.memo` + `useCallback` to prevent cascading re-renders
+- Reduce [TimelineView.tsx](src/app/components/TimelineView.tsx) to ~150 lines (orchestrator only)
+- Remove `dates`, `monthWidths`, `dayWidths` state; use `useVirtualizedTimeline()` instead
+- Remove auto-sizing logic and cascading updates
+
+**Deliverable:** TimelineView modularized, tasks render at correct positions, grid snap works, swimlane rows memoized
+
+**Testing:** Tasks positioned correctly, drag/resize snaps to 60px grid, no visual glitches, memoization prevents unnecessary re-renders
+
+---
+
+### Phase 3: Virtualization & Infinite Scroll (Days 6–7)
+**Effort:** 2 days | **ROI:** Very High | **Blockers:** Phase 2
+
+✅ **Tasks:**
+- Implement scroll handler in `useVirtualizedTimeline()`:
+  - Detect edge proximity (< 20% of viewport width)
+  - Extend window left/right by chunks (60 days)
+  - Compute pixel delta and adjust `scrollLeft` for seamless transition
+- Render only visible days + 1-day buffer (compute from `scrollLeft` + viewport width)
+- Benchmark `WINDOW_CHUNK_SIZE` and `WINDOW_BUFFER_DAYS` for optimal performance
+- Test with empty timeline, tasks far in past/future
+
+**Deliverable:** Infinite horizontal scroll working, seamless window extension, no visual gaps
+
+**Testing:** Scroll left/right → window extends, rapid scroll chains work, performance benchmarked (target: 60fps)
+
+---
+
+### Phase 4: Dynamic Swimlane Tracks (Days 7–8)
+**Effort:** 2 days | **ROI:** High | **Blockers:** Phase 2
+
+✅ **Tasks:**
+- Implement track allocation algorithm in `DraggableSwimlaneRow`:
+  - For each task in swimlane, compute overlapping ranges
+  - Assign to first available track using first-fit strategy
+  - Memoize computation: `useCallback([tasks, dates])`
+- Update swimlane row height: `containerStyle = { height: (trackCount) * trackHeight + padding }`
+- Update task drag/drop to preserve/reassign track after drop
+- Throttle re-renders via `rAF` during drag operations (prevent layout thrash)
+- Add unit test: track allocation algorithm correctness
+
+**Deliverable:** Swimlanes dynamically size based on overlapping tasks, no visual overlap, drag/drop works across tracks
+
+**Testing:** Multiple overlapping tasks → auto-stack into tracks, swimlane height grows/shrinks, drag/drop preserves track assignment
+
+---
+
+### Phase 5: Separate Kanban View (Days 8–9)
+**Effort:** 2 days | **ROI:** High | **Blockers:** Phase 1
+
+✅ **Tasks:**
+- Move [KanbanView.tsx](src/app/components/KanbanView.tsx) to full-page layout (remove vertical split)
+- Kanban scrolls **independently** (horizontal for cards, no sync with timeline)
+- Responsive flex layout: kanban columns flex to fill or overflow-scroll if total width > viewport
+- Update [App.tsx](App.tsx) to render TimelineView or KanbanView based on `currentView` state
+- Preserve kanban scroll position in `useViewState()` context
+
+**Deliverable:** KanbanView renders full-page when selected, scrolls independently, responsive columns
+
+**Testing:** Toggle between timeline/kanban, scroll position preserved, columns flex responsively
+
+---
+
+### Phase 6: View State Preservation (Days 9–10)
+**Effort:** 2 days | **ROI:** Very High | **Blockers:** Phase 5
+
+✅ **Tasks:**
+- Enhance `useViewState()` hook:
+  - Store per-view session data: `viewState = { timeline: { scrollLeft, collapsedSwimlanes, selectedTaskId }, kanban: { scrollLeft, selectedTaskId } }`
+  - On view switch: save current state to context, restore previous view's state
+  - Optionally persist to localStorage after 2s debounce for session recovery
+- Update [App.tsx](App.tsx) to restore state on view remount
+- Add unit test: state preservation and restoration
+
+**Deliverable:** Switching views restores previous view's state instantly (scroll, selections, etc.)
+
+**Testing:** Switch views repeatedly → scroll positions and selections preserved, instant restoration
+
+---
+
+### Phase 7: Mode Toggle & High-Priority Improvements (Days 10–11)
+**Effort:** 2 days | **ROI:** Medium-High | **Blockers:** Phase 2
+
+✅ **Tasks:**
+- Implement Projects mode (refactored current swimlanes with dynamic tracks)
+- Scaffold PeopleView (placeholder, person groups)
+- Projects/People toggle is **within TimelineView** only (not global view toggle)
+- Implement high-priority IMPROVEMENTS from IMPROVEMENTS.md:
+  - Refine out-of-range drop extrapolation: use per-day widths at timeline edges
+  - Auto-scroll + highlight newly created out-of-range tasks
+  - Add visual drop hints (ghost placeholder during drag)
+- Add unit tests: snapping behavior, out-of-range drop logic
+
+**Deliverable:** Projects mode fully functional, People mode scaffolded, out-of-range drops handled gracefully
+
+**Testing:** Toggle Projects/People, drag tasks out of range → auto-scroll + highlight, visual feedback clear
+
+---
+
+### Phase 8: Testing, Polish & Validation (Days 12–14)
+**Effort:** 3 days | **ROI:** High | **Blockers:** All prior phases
+
+✅ **Tasks:**
+- Unit tests: `dateToIndex()`, `indexToDate()`, `indexToOffset()`, track allocation, swimlane height calc, view state preservation
+- E2E tests: scroll extension chains, drag/resize across window boundaries, rapid view switching, multi-track drag, out-of-range drops
+- Performance profiling:
+  - Apply article recommendations: lazy-load kanban detail, memoize swimlane rows, `React.memo` on task cards
+  - Measure: 60fps scrolling (timeline) + 60fps card scroll (kanban) with 500+ tasks, 50 swimlanes
+  - Measure: fast view switching (< 100ms mount + state restore)
+- Pixel-perfect positioning audits (window extension edge cases)
+- Accessibility audit (keyboard nav, ARIA labels)
+- Cross-browser testing (Chrome, Firefox, Safari)
+- Update [CLAUDE.md](CLAUDE.md) with new patterns and architecture
+- Code cleanup, comments, remove debug overlays
+
+**Deliverable:** Production-ready, well-tested, documented, performant
+
+**Testing:** All unit + E2E tests passing, performance benchmarks met, accessibility compliant
+
+---
+
+## Technical Details
+
+### Track Allocation Algorithm (Swimlane Row)
+```ts
+// Pseudo-code
+function computeTracks(tasks: Task[]): TrackAssignment[] {
+  const tracks: Task[][] = [[]];
+  
+  for (const task of sortedByStartDate(tasks)) {
+    for (let trackIdx = 0; trackIdx < tracks.length; trackIdx++) {
+      if (!hasOverlap(task, tracks[trackIdx])) {
+        tracks[trackIdx].push(task);
+        assignment[task.id] = trackIdx;
+        break;
+      }
+    }
+    if (!assigned) {
+      tracks.push([task]);
+      assignment[task.id] = tracks.length - 1;
+    }
+  }
+  
+  return assignment; // memoized, recompute only on task/date change
+}
+```
+
+### Swimlane Height Calculation
+```ts
+const trackCount = Math.max(...Object.values(trackAssignment)) + 1;
+const swimlaneHeight = BASE_ROW_HEIGHT + (trackCount - 1) * TRACK_HEIGHT;
+
+// CSS
+<div style={{ height: `${swimlaneHeight}px` }}>
+  {/* tasks positioned by track */}
+</div>
+```
+
+### View State Preservation
+```ts
+interface ViewState {
+  timeline: {
+    scrollLeft: number;
+    collapsedSwimlanes: string[];
+    selectedTaskId?: string;
+    mode: 'projects' | 'people';
+  };
+  kanban: {
+    scrollLeft: number;
+    selectedTaskId?: string;
+    filterStatus?: TaskStatus;
+  };
+}
+
+// On view switch
+function switchView(newView: 'timeline' | 'kanban') {
+  saveViewState(currentView, { scrollLeft: scrollRef.current.scrollLeft, ... });
+  setCurrentView(newView);
+  restoreViewState(newView); // instant restore
+}
+```
+
+---
+
+## Risk Assessment
+
+### High Risk
+- **Pixel-perfect window extension**: Off-by-one errors on scroll adjustment
+  - Mitigation: Unit tests for indexing, E2E tests for drag across boundaries, visual QA
+- **Track allocation + overlapping tasks**: Incorrect overlap detection
+  - Mitigation: Unit tests with edge cases (same start/end dates, single-day tasks, etc.)
+- **View state restoration**: State pollution or stale references on rapid switching
+  - Mitigation: Clear state management, test rapid switching (5+ toggles)
+
+### Medium Risk
+- **Performance with many tasks + tracks**: Memoization not aggressive enough
+  - Mitigation: Benchmark early (Phase 8), profile with React DevTools
+- **Kanban column flex layout**: Responsive behavior inconsistent across browsers
+  - Mitigation: Simple flex + minWidth, cross-browser testing
+- **Scroll sync complexity**: Any remaining legacy sync code interferes with new virtual rendering
+  - Mitigation: Complete removal of old scroll sync logic in Phase 2
+
+### Low Risk
+- **Track allocation first-fit strategy**: Visual tightness suboptimal
+  - Mitigation: Use first-fit initially, best-fit as future UX polish
+- **Fixed 60px day slots**: Feels constrained for some UX flows
+  - Mitigation: Keep slots reasonable, zoom levels as future feature
+
+---
+
+## Success Criteria (Unified)
+
+### Functionality ✅
+- ✅ Infinite horizontal scroll (left & right) @ 60fps with 500+ tasks
+- ✅ Dynamic swimlane tracks: tasks stack vertically, no overlap
+- ✅ Separate full-page KanbanView with independent scroll + responsive columns
+- ✅ View toggle with state preservation (instant restoration on switch)
+- ✅ Projects mode fully functional; People mode scaffolded
+- ✅ Out-of-range drops refined: precise extrapolation, auto-scroll, visual hints
+- ✅ All existing CRUD + drag/reorder features work
+
+### Performance ✅
+- ✅ 60fps scrolling (timeline) with 500+ tasks, 50 swimlanes, dynamic tracks
+- ✅ 60fps card scroll (kanban) with responsive columns
+- ✅ Fast view switching (< 100ms mount + state restore)
+- ✅ No memory bloat (virtual rendering + view state preservation)
+
+### Code Quality ✅
+- ✅ TimelineView < 200 lines (was 984)
+- ✅ Clear separation of concerns (hooks, components, utils)
+- ✅ Reusable hooks for virtualization, shared scroll, view state
+- ✅ Unit tests: indexing, track allocation, view state
+- ✅ E2E tests: scroll chains, drag/resize, view switching, out-of-range drops
+- ✅ Updated documentation (CLAUDE.md, code comments)
+
+### User Experience ✅
+- ✅ Seamless infinite scroll (no visual discontinuities)
+- ✅ Task snapping feels natural (60px grid)
+- ✅ Swimlane height grows/shrinks dynamically (no jarring layout shifts)
+- ✅ View toggle instant (state restored, no lag)
+- ✅ Kanban scrolls smoothly (flex columns, no jank)
+- ✅ Keyboard accessible, responsive on small screens
+
+---
+
+## Effort Summary
+
+| Phase | Tasks | Days | ROI | Blocker |
+|-------|-------|------|-----|---------|
+| 1: Foundation | Hooks, config, App state | 2 | Very High | None |
+| 2: Modularize | Extract components, refactor rows, memoize | 3 | High | Phase 1 |
+| 3: Virtualization | Scroll handler, window extension | 2 | Very High | Phase 2 |
+| 4: Tracks | Overlap detection, height calc, memoize | 2 | High | Phase 2 |
+| 5: Kanban | Full-page view, flex layout | 2 | High | Phase 1 |
+| 6: View State | Preserve/restore scroll + UI | 2 | Very High | Phase 5 |
+| 7: Mode Toggle | Projects/People, IMPROVEMENTS | 2 | Medium-High | Phase 2 |
+| 8: Testing | Unit + E2E + perf + polish | 3 | High | All |
+| **TOTAL** | | **14–16 days** | | |
+
+---
+
+## Priorities (Ordered by ROI / Effort)
+
+1. **Phase 1: Foundation** — Unblocks everything, quick wins, immediate value
+2. **Phase 5: Kanban View** — Visible feature, independent from timeline work, enables parallel development
+3. **Phase 2: Modularize** — Foundation for all timeline improvements
+4. **Phase 6: View State** — Smooth UX, small effort, high perceived quality
+5. **Phase 3: Virtualization** — Performance critical, enables large datasets
+6. **Phase 4: Tracks** — Core feature, medium effort, high UX impact
+7. **Phase 7: Mode Toggle** — Future-proofing, lower immediate ROI
+8. **Phase 8: Testing** — Validates all phases, ensures quality
+
+---
+
+## Next Actions
+
+- [ ] Create feature branch: `feat/unified-refactor-2026`
+- [ ] Begin Phase 1: Foundation & Shared State (Days 1–2)
+- [ ] Track progress via consolidated TODO list (in CLAUDE.md or separate file)
+- [ ] Commit after each phase with descriptive messages
+- [ ] Code review after Phase 2 and Phase 6 (high-impact changes)
+
+---
+
+**Confidence:** 0.85  
+**Last Updated:** 2026-02-03  
+**Status:** In Progress (Phases 1, 5 Complete; Phase 2 in Progress)
+
+---
+
+## Implementation Progress 📊
+
+### Completed ✅
+- **Phase 1: Foundation & Shared State** (2 days) — All tasks complete
+  - Timeline config constants
+  - All shared hooks (useSharedHorizontalScroll, useVirtualizedTimeline, useViewHeights, useTimelineMode, useViewState)
+  - ViewToggle component
+  - App.tsx updated with view orchestration
+  - Type-checked and error-free
+
+- **Phase 5: Separate Kanban View** (2 days) — All tasks complete
+  - KanbanView full-page component created
+  - Integrated with SwimlanesView for rendering
+  - View state preservation implemented (scroll position + UI state saved/restored on switch)
+  - Responsive flex layout for kanban columns
+  - Integrated with DndProvider for drag/drop
+
+- **Phase 2 (Partial): Modularization** (~1 day completed)
+  - TimelineHeader component created (month/day headers, visual indicators)
+  - SwimlaneRowsView component created (swimlane rows container)
+  - Track allocation utility created (first-fit algorithm for task overlap avoidance)
+  - All components type-checked and error-free
+
+### In Progress 🔄
+- Remaining Phase 2 tasks:
+  - Complete refactoring of DraggableSwimlaneRow to use fixed 60px slots
+  - Grid snapping for task drag/resize
+  - Full refactor of TimelineView to ~150 lines (currently 984 lines)
+  - Testing modularization phase
+
+### Next Priority
+- Complete remaining Phase 2 tasks (hours 1-3)
+- Begin Phase 3: Virtualization & Infinite Scroll (days 6-7)
+- Phase 4: Dynamic Track Height Calculation (days 7-8)
+- Phase 6: View State Restoration & Edge Cases (days 9-10)
+- Phase 7: Mode Toggle & High-Priority Improvements (days 10-11)
+- Phase 8: Testing, Polish & Validation (days 12-14)
+
+**Current Total Days Used:** ~5 days (Phases 1, 5, partial 2)  
+**Estimated Remaining:** ~9-11 days to production-ready state

@@ -1,9 +1,10 @@
-import { useRef } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Edit2, GripVertical } from 'lucide-react';
 import { Task, TimelineSwimlane } from '../types';
 import { Button } from '../components/ui/button';
 import { DraggableTimelineTask, TIMELINE_TASK_TYPE } from '../components/DraggableTimelineTask';
+import { allocateTasksToTracks } from '../utils/trackAllocation';
 
 const ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -18,6 +19,7 @@ interface DraggableSwimlaneRowProps {
   datesByMonth?: Record<string, Date[]>;
   totalTimelineWidth?: number;
   rowHeight?: number;
+  scrollContainerRef?: React.RefObject<HTMLDivElement>; // Reference to the scrollable container for accurate drop calculations
   onTaskClick: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string) => void;
   ignoreAddTaskUntil?: number | null;
@@ -62,17 +64,64 @@ export function DraggableSwimlaneRow({
   resizingTaskId,
   rowHeight,
   ignoreAddTaskUntil,
+  scrollContainerRef,
 }: DraggableSwimlaneRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  // Compute track assignments for tasks in this swimlane (memoized)
+  const trackAssignments = useMemo(
+    () => allocateTasksToTracks(tasks),
+    [tasks]
+  );
+
+  // Helper function to calculate drop line position from client coordinates
+  const calculateDropPosition = (clientOffset: { x: number; y: number } | null) => {
+    if (!clientOffset || !scrollContainerRef?.current) return null;
+
+    const scrollContainer = scrollContainerRef.current;
+    const scrollLeft = scrollContainer.scrollLeft;
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const localX = clientOffset.x - containerRect.left + scrollLeft;
+
+    if (localX < 0) return null;
+
+    // Compute prefix sums for day widths
+    const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
+    const prefix: number[] = [0];
+    for (let i = 0; i < dayWidthsLocal.length; i++) {
+      prefix.push(prefix[i] + (dayWidthsLocal[i] ?? 60));
+    }
+
+    // Find which day index the drop position corresponds to
+    let dayIdx = 0;
+    for (let i = 0; i < prefix.length - 1; i++) {
+      if (localX >= prefix[i] && localX < prefix[i + 1]) {
+        dayIdx = i;
+        const dayCenter = prefix[i] + (dayWidthsLocal[i] ?? 60) / 2;
+        if (localX > dayCenter && i < prefix.length - 2) {
+          dayIdx = i + 1;
+        }
+        break;
+      }
+    }
+    if (localX >= prefix[prefix.length - 1] && dates.length > 0) {
+      dayIdx = dates.length - 1;
+    }
+
+    dayIdx = Math.max(0, Math.min(dayIdx, Math.max(0, dates.length - 1)));
+
+    // Return the pixel position where the drop line should be
+    // This is the start of the target day
+    return prefix[dayIdx] ?? 0;
+  };
+
   // Drop zone for timeline tasks — row handles task drops and repositioning
-  const [{ isOver: isTaskOver, canDrop }, dropTask] = useDrop({
+  const [{ isOver: isTaskOver, canDrop, dropLinePosition }, dropTask] = useDrop({
     accept: TIMELINE_TASK_TYPE,
     drop: (item: TaskDragItem, monitor) => {
       const task = item.task;
       if (!timelineRef.current) {
-        // fallback: just move swimlane
         onMoveTaskToSwimlane(task.id, swimlane.id);
         return;
       }
@@ -83,75 +132,62 @@ export function DraggableSwimlaneRow({
         return;
       }
 
-      // Determine horizontal scroller (prefer headerRef if provided) and compute x relative to timeline start
-      let scrollAncestor: HTMLElement | null = null;
-      let rect: DOMRect | null = null;
-      let scrollLeft = 0;
-
-      if (typeof (timelineRef as any).current !== 'undefined' && (timelineRef as any).current) {
-        // If parent provided a headerRef via props, prefer that for consistent scrolling
-        const headerEl = (arguments[0] && (arguments[0] as any).headerRef) || undefined; // no-op to hint TS
+      // Get scroll offset and position from the scroll container ref
+      if (!scrollContainerRef?.current) {
+        onMoveTaskToSwimlane(task.id, swimlane.id);
+        return;
       }
 
-      // If caller provided headerRef prop, use it (accessed via closure)
-      const providedHeader = (typeof (arguments as any)[0] === 'object' && (arguments as any)[0]?.headerRef) ? (arguments as any)[0].headerRef : undefined;
+      const scrollContainer = scrollContainerRef.current;
+      const scrollLeft = scrollContainer.scrollLeft;
+      const containerRect = scrollContainer.getBoundingClientRect();
+      
+      // Calculate position within the scrolled content:
+      // clientOffset.x - containerRect.left = position within the visible container
+      // + scrollLeft = position within the entire scrolled content
+      const localX = clientOffset.x - containerRect.left + scrollLeft;
 
-      // Pragmatic: if a headerRef prop was passed to the component, use that
-      // (we add headerRef prop in TimelineView when rendering rows). Fallback to walk-up ancestor.
-      // We access it via the component prop 'headerRef' closed over by the function.
-      const headerProp = (typeof ({} as any) !== 'undefined') ? (undefined as any) : undefined; // placeholder to satisfy linter
-
-      // proper approach: try to find an ancestor with overflowX and scrollWidth>clientWidth starting from timelineRef
-      const getScrollAncestor = (el: HTMLElement | null): HTMLElement | null => {
-        let cur = el as HTMLElement | null;
-        while (cur) {
-          const style = getComputedStyle(cur);
-          const overflowX = style.overflowX;
-          if ((overflowX === 'auto' || overflowX === 'scroll') && cur.scrollWidth > cur.clientWidth) return cur;
-          cur = cur.parentElement;
-        }
-        return null;
-      };
-
-      // Prefer headerRef if it's reachable via document query (class on header) — try to find element with class hide-scrollbar (our header)
-      const possibleHeader = document.querySelector('.hide-scrollbar') as HTMLElement | null;
-      if (possibleHeader && possibleHeader.scrollWidth > possibleHeader.clientWidth) {
-        scrollAncestor = possibleHeader;
-        rect = scrollAncestor.getBoundingClientRect();
-        scrollLeft = scrollAncestor.scrollLeft;
-      } else {
-        const rectTimeline = timelineRef.current.getBoundingClientRect();
-        const ancestor = getScrollAncestor(timelineRef.current);
-        scrollAncestor = ancestor;
-        rect = rectTimeline;
-        scrollLeft = ancestor ? ancestor.scrollLeft : 0;
+      // Validate localX is reasonable
+      if (localX < 0) {
+        onMoveTaskToSwimlane(task.id, swimlane.id);
+        return;
       }
 
-      // x relative to the entire timeline content
-      const localX = clientOffset.x - (rect ? rect.left : 0) + scrollLeft;
-
-      // compute prefix sums for day widths
+      // Compute prefix sums for day widths to find which day slot the drop is over
       const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
       const prefix: number[] = [0];
-      for (let i = 0; i < dayWidthsLocal.length; i++) prefix.push(prefix[i] + (dayWidthsLocal[i] ?? 60));
+      for (let i = 0; i < dayWidthsLocal.length; i++) {
+        prefix.push(prefix[i] + (dayWidthsLocal[i] ?? 60));
+      }
 
-      // compute total timeline width and average day width
-      const totalContentWidth = prefix[prefix.length - 1] || 1;
-      const avgDayWidth = totalContentWidth / Math.max(1, dates.length);
+      // Find which day index the drop position corresponds to
+      let dayIdx = 0;
+      for (let i = 0; i < prefix.length - 1; i++) {
+        if (localX >= prefix[i] && localX < prefix[i + 1]) {
+          dayIdx = i;
+          // Snap to nearest day center
+          const dayCenter = prefix[i] + (dayWidthsLocal[i] ?? 60) / 2;
+          if (localX > dayCenter && i < prefix.length - 2) {
+            dayIdx = i + 1;
+          }
+          break;
+        }
+      }
+      // Handle drops beyond last day
+      if (localX >= prefix[prefix.length - 1] && dates.length > 0) {
+        dayIdx = dates.length - 1;
+      }
+      
+      // Clamp dayIdx to valid range
+      dayIdx = Math.max(0, Math.min(dayIdx, Math.max(0, dates.length - 1)));
 
-      // derive a day index that can be outside [0, dates.length-1] to allow past/future drops
-      let rawIdx = Math.floor(localX / Math.max(1, avgDayWidth));
+      // If no valid dates, don't proceed with drop
+      if (dates.length === 0 || !dates[dayIdx]) {
+        onMoveTaskToSwimlane(task.id, swimlane.id);
+        return;
+      }
 
-      // snap to nearest day (center) by checking offset within that day
-      const dayStart = rawIdx * avgDayWidth;
-      const offsetInDay = localX - dayStart;
-      if (offsetInDay > avgDayWidth / 2) rawIdx += 1;
-
-      // don't clamp here: allow negative (past) or >last (future) indices
-      let idx = Math.max(-10000, Math.min(10000, rawIdx)); // sanity clamp to avoid runaway values
-
-
-      // compute original duration
+      // Compute original task duration to preserve it
       const MS_PER_DAY = 1000 * 60 * 60 * 24;
       const origStart = task.startDate ? new Date(task.startDate) : null;
       const origEnd = task.endDate ? new Date(task.endDate) : null;
@@ -160,8 +196,8 @@ export function DraggableSwimlaneRow({
         durationDays = Math.floor((origEnd.getTime() - origStart.getTime()) / MS_PER_DAY) + 1;
       }
 
-      const newStart = new Date(dates[0]);
-      newStart.setDate(newStart.getDate() + idx);
+      // Calculate new dates based on the dropped day index
+      const newStart = new Date(dates[dayIdx]);
       const newEnd = new Date(newStart);
       newEnd.setDate(newStart.getDate() + durationDays - 1);
 
@@ -170,10 +206,15 @@ export function DraggableSwimlaneRow({
 
       onMoveTaskToSwimlane(task.id, swimlane.id, newStartISO, newEndISO);
     },
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-      canDrop: monitor.canDrop(),
-    }),
+    collect: (monitor) => {
+      const offset = calculateDropPosition(monitor.getClientOffset());
+      return {
+        isOver: monitor.isOver(),
+        canDrop: monitor.canDrop(),
+        dropLinePosition: offset,
+        clientOffset: monitor.getClientOffset(),
+      };
+    },
   });
 
   // Apply task drop to timeline area
@@ -185,7 +226,7 @@ export function DraggableSwimlaneRow({
     <div
       ref={ref}
       className={`flex border-b border-gray-100 hover:bg-gray-50/50 group ${isTaskOver && canDrop ? 'bg-blue-100/50' : ''}`}
-      style={{ height: 'var(--row-height)' }}
+      style={{ height: `${rowHeight || 48}px` }}
     >
     
 
@@ -193,11 +234,35 @@ export function DraggableSwimlaneRow({
       <div
         ref={timelineRef}
         className={`relative flex-1 transition-colors ${
-          isTaskOver && canDrop ? 'bg-blue-100/50' : ''
+          isTaskOver && canDrop ? 'bg-green-50 border-2 border-green-400' : ''
         }`}
+        style={{ borderRadius: '4px' }}
       >
+        {/* Drop indicator line when dragging over - positioned in viewport coordinates */}
+        {isTaskOver && canDrop && typeof dropLinePosition === 'number' && scrollContainerRef?.current && (
+          (() => {
+            const scrollLeft = scrollContainerRef.current?.scrollLeft ?? 0;
+            const containerRect = scrollContainerRef.current?.getBoundingClientRect();
+            const timelineRect = timelineRef.current?.getBoundingClientRect();
+            
+            // Convert from content space to viewport space
+            // dropLinePosition is in content coords, subtract scrollLeft to get viewport offset
+            // then add container's left position to get absolute viewport position
+            const viewportLeft = dropLinePosition - scrollLeft;
+            
+            return (
+              <>
+                <div className="absolute inset-0 bg-green-100 opacity-20 pointer-events-none z-10" style={{ borderRadius: '4px' }} />
+                <div 
+                  className="absolute top-0 bottom-0 w-1 bg-green-600 pointer-events-none z-20" 
+                  style={{ left: `${viewportLeft}px` }}
+                />
+              </>
+            );
+          })()
+        )}
         {/* Month containers; each contains the swimlane cell for that month and any task fragments that overlap it. */}
-        <div className="flex" style={{ height: 'var(--row-height)' }}>
+        <div className="flex" style={{ height: '100%', width: '100%' }}>
           {/* Precompute prefix sums for date widths to make slicing easier */}
           {(() => {
             const dayWidths = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
@@ -235,7 +300,7 @@ export function DraggableSwimlaneRow({
               return (
                 <div
                   key={monthKey}
-                  className="border-r last:border-r-0 relative flex-shrink-0"
+                  className="border-r border-gray-100 last:border-r-0 relative flex-shrink-0"
                   style={{ width: `${monthWidth}px` }}
                 >
                   <div className="h-full relative">
@@ -253,8 +318,6 @@ export function DraggableSwimlaneRow({
                               e.stopPropagation();
                               // ignore clicks that occur immediately after a resize finished
                               if (ignoreAddTaskUntil && Date.now() < ignoreAddTaskUntil) {
-                                // eslint-disable-next-line no-console
-                                console.debug('[Timeline] ignored add-task click due to recent resize');
                                 return;
                               }
                               onAddTask(new Date(d), swimlane.id);
@@ -276,9 +339,11 @@ export function DraggableSwimlaneRow({
                       let widthWithin = prefix[overlapEnd + 1] - prefix[overlapStart];
                       widthWithin = Math.max(8, widthWithin - 8); // small padding like before
 
-                      // vertically center using CSS calc against the --row-height variable
+                      // Use track index for vertical positioning
                       const TASK_RENDER_HEIGHT = 32; // matches h-8 in tailwind (8 * 4px)
-                      const topCalc = `calc((var(--row-height) - ${TASK_RENDER_HEIGHT}px) / 2)`;
+                      const TRACK_HEIGHT = 40; // height per track (task height + gap)
+                      const trackIndex = trackAssignments[task.id] || 0;
+                      const topCalc = `calc(${trackIndex * TRACK_HEIGHT}px + (${TRACK_HEIGHT}px - ${TASK_RENDER_HEIGHT}px) / 2)`;
 
                       return (
                         <div

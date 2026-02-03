@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Task, TaskStatus, TimelineSwimlane } from './types';
 import { initialTasks, initialTimelineSwimlanes } from './data/sampleData';
 import { TimelineView } from './components/TimelineView';
+import { KanbanView } from './components/KanbanView';
+import { ViewToggle } from './components/ViewToggle';
+import { useViewState } from './hooks/useViewState';
+import { useSharedHorizontalScroll } from './hooks/useSharedHorizontalScroll';
+import { useVirtualizedTimeline } from './hooks/useVirtualizedTimeline';
 
 // LocalStorage keys
 const TASKS_KEY = 'plumy.tasks.v1';
@@ -35,7 +40,15 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
 function App() {
-  
+  // Initialize hooks for view management
+  const viewState = useViewState('timeline');
+  const scroll = useSharedHorizontalScroll();
+  const timeline = useVirtualizedTimeline();
+
+  // Refs for view containers (to capture scroll position)
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
+  const kanbanContainerRef = useRef<HTMLDivElement>(null);
+
   const [tasks, setTasks] = useState<Task[]>(() => safeReadJSON<Task[]>(TASKS_KEY, initialTasks));
   const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes));
 
@@ -195,7 +208,7 @@ function App() {
   };
 
   const handleAddStatusColumn = (col: { id?: string; title: string; color?: string }) => {
-    const newCol = { id: col.id || Date.now().toString(), title: col.title, color: col.color || 'bg-gray-400' };
+    const newCol = { id: col.id || Date.now().toString(), title: col.title, color: col.color || '#9ca3af' };
     setStatusColumns((cols: any[]) => [...cols, newCol]);
   };
 
@@ -211,53 +224,92 @@ function App() {
           <div className="flex items-center gap-2">
             <h1 className="font-semibold text-gray-900">plumy</h1>
           </div>
+          {/* View Toggle */}
+          <ViewToggle
+            currentView={viewState.currentView}
+            onViewChange={(view) => {
+              // Save current view state before switching
+              if (viewState.currentView === 'timeline') {
+                viewState.saveViewState('timeline', {
+                  scrollLeft: timelineContainerRef.current?.scrollLeft || 0,
+                  collapsedSwimlanes: [],
+                  mode: 'projects',
+                });
+              } else if (viewState.currentView === 'kanban') {
+                viewState.saveViewState('kanban', {
+                  scrollLeft: kanbanContainerRef.current?.scrollLeft || 0,
+                  scrollTop: kanbanContainerRef.current?.scrollTop || 0,
+                });
+              }
+              // Switch to new view
+              viewState.switchView(view);
+
+              // Restore scroll position for the new view
+              setTimeout(() => {
+                const savedState = viewState.getViewState(view);
+                if (view === 'timeline' && timelineContainerRef.current) {
+                  timelineContainerRef.current.scrollLeft = savedState.scrollLeft || 0;
+                } else if (view === 'kanban' && kanbanContainerRef.current) {
+                  kanbanContainerRef.current.scrollLeft = savedState.scrollLeft || 0;
+                  kanbanContainerRef.current.scrollTop = savedState.scrollTop || 0;
+                }
+              }, 0);
+            }}
+          />
         </div>
 
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon">
             <CheckCircle className="w-5 h-5" />
           </Button>
-          {/* <Button variant="ghost" size="icon" className="relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </Button> */}
           <Button variant="ghost" size="icon">
             <User className="w-5 h-5" />
           </Button>
         </div>
       </header>
 
-      {/* Timeline View */}
-      <TimelineView
-        tasks={tasks}
-        swimlanes={timelineSwimlanes}
-        statusColumns={statusColumns}
-        onTaskClick={handleTaskClick}
-        onAddTask={handleAddTaskFromTimeline}
-        onUpdateTaskDates={handleUpdateTaskDates}
-        onEditSwimlane={handleEditSwimlane}
-        onAddSwimlane={handleAddSwimlane}
-        onReorderSwimlanes={handleReorderSwimlanes}
-        onReorderTasks={handleReorderTasks}
-      />
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-hidden">
+        {/* Timeline View */}
+        {viewState.currentView === 'timeline' && (
+          <div ref={timelineContainerRef} className="h-full w-full">
+            <TimelineView
+              tasks={tasks}
+              swimlanes={timelineSwimlanes}
+              statusColumns={statusColumns}
+              onTaskClick={handleTaskClick}
+              onAddTask={handleAddTaskFromTimeline}
+              onUpdateTaskDates={handleUpdateTaskDates}
+              onEditSwimlane={handleEditSwimlane}
+              onAddSwimlane={handleAddSwimlane}
+              onReorderSwimlanes={handleReorderSwimlanes}
+              onReorderTasks={handleReorderTasks}
+            />
+          </div>
+        )}
 
-      {/* Swimlanes View */}
-      <DndProvider backend={HTML5Backend}>
-        <SwimlanesView
-          tasks={tasks}
-          swimlanes={statusColumns}
-          onTaskClick={handleTaskClick}
-          onAddTask={handleAddTaskFromSwimlane}
-          onMoveTask={handleMoveTask}
-          onReorderTasks={handleReorderTasks}
-          onReorderColumns={handleReorderStatusColumns}
-          onRenameTask={handleRenameTask}
-          onRenameColumn={handleRenameStatusColumn}
-          onChangeColumnColor={handleChangeStatusColumnColor}
-          onAddColumn={handleAddStatusColumn}
-          onDeleteColumn={handleDeleteStatusColumn}
-        />
-      </DndProvider>
+        {/* Kanban View */}
+        {viewState.currentView === 'kanban' && (
+          <div ref={kanbanContainerRef} className="h-full w-full">
+            <DndProvider backend={HTML5Backend}>
+              <KanbanView
+                tasks={tasks}
+                swimlanes={statusColumns}
+                onTaskClick={handleTaskClick}
+                onAddTask={handleAddTaskFromSwimlane}
+                onMoveTask={handleMoveTask}
+                onReorderTasks={handleReorderTasks}
+                onReorderColumns={handleReorderStatusColumns}
+                onRenameTask={handleRenameTask}
+                onRenameColumn={handleRenameStatusColumn}
+                onChangeColumnColor={handleChangeStatusColumnColor}
+                onAddColumn={handleAddStatusColumn}
+                onDeleteColumn={handleDeleteStatusColumn}
+              />
+            </DndProvider>
+          </div>
+        )}
+      </div>
 
       {/* Task Dialog */}
       <TaskDialog
