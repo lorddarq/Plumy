@@ -26,13 +26,23 @@ export interface TaskTrackAssignment {
  * @returns true if tasks overlap, false otherwise
  */
 function tasksOverlap(task1: Task, task2: Task): boolean {
-  const start1 = task1.startDate ? new Date(task1.startDate).getTime() : 0;
-  const end1 = task1.endDate ? new Date(task1.endDate).getTime() : Number.MAX_VALUE;
-  const start2 = task2.startDate ? new Date(task2.startDate).getTime() : 0;
-  const end2 = task2.endDate ? new Date(task2.endDate).getTime() : Number.MAX_VALUE;
+  if (!task1.startDate || !task2.startDate) return false;
+  
+  // Normalize dates to midnight local time for accurate comparison
+  const s1 = new Date(task1.startDate);
+  const start1 = new Date(s1.getFullYear(), s1.getMonth(), s1.getDate()).getTime();
+  
+  const e1 = task1.endDate ? new Date(task1.endDate) : s1;
+  const end1 = new Date(e1.getFullYear(), e1.getMonth(), e1.getDate()).getTime();
+  
+  const s2 = new Date(task2.startDate);
+  const start2 = new Date(s2.getFullYear(), s2.getMonth(), s2.getDate()).getTime();
+  
+  const e2 = task2.endDate ? new Date(task2.endDate) : s2;
+  const end2 = new Date(e2.getFullYear(), e2.getMonth(), e2.getDate()).getTime();
 
-  // Tasks overlap if: task1.start < task2.end AND task1.end > task2.start
-  return start1 < end2 && end1 > start2;
+  // Tasks overlap if: task1.start <= task2.end AND task1.end >= task2.start
+  return start1 <= end2 && end1 >= start2;
 }
 
 /**
@@ -58,8 +68,15 @@ export function allocateTasksToTracks(
 
   // Sort tasks by start date
   const sortedTasks = [...tasks].sort((a, b) => {
-    const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
-    const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
+    if (!a.startDate) return 1;
+    if (!b.startDate) return -1;
+    
+    const da = new Date(a.startDate);
+    const dateA = new Date(da.getFullYear(), da.getMonth(), da.getDate()).getTime();
+    
+    const db = new Date(b.startDate);
+    const dateB = new Date(db.getFullYear(), db.getMonth(), db.getDate()).getTime();
+    
     return dateA - dateB;
   });
 

@@ -107,8 +107,14 @@ export function TimelineView({
     const taskDates = tasks
       .flatMap(t => {
         const dates: Date[] = [];
-        if (t.startDate) dates.push(new Date(t.startDate));
-        if (t.endDate) dates.push(new Date(t.endDate));
+        if (t.startDate) {
+          const d = new Date(t.startDate);
+          dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+        }
+        if (t.endDate) {
+          const d = new Date(t.endDate);
+          dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+        }
         return dates;
       })
       .filter(d => !isNaN(d.getTime()));
@@ -305,8 +311,10 @@ export function TimelineView({
       const task = tasks.find(t => t.id === resizingTask.taskId);
       if (!task) return;
 
-      const startDate = new Date(task.startDate || '');
-      const endDate = new Date(task.endDate || startDate);
+      const sd = new Date(task.startDate || '');
+      const startDate = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate());
+      const ed = task.endDate ? new Date(task.endDate) : startDate;
+      const endDate = task.endDate ? new Date(ed.getFullYear(), ed.getMonth(), ed.getDate()) : startDate;
       const startIdx = dates.findIndex(d => d.getTime() === startDate.getTime());
       const endIdx = dates.findIndex(d => d.getTime() === endDate.getTime());
 
@@ -357,6 +365,7 @@ export function TimelineView({
 
     const handleMouseUp = () => {
       setResizingTask(null);
+      setIgnoreAddTaskUntil(Date.now() + 300);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -486,14 +495,20 @@ export function TimelineView({
     (task: Task): { left: number; width: number } | null => {
       if (!task.startDate) return null;
 
-      const startDate = new Date(task.startDate);
+      const sd = new Date(task.startDate);
+      const startDate = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate());
       const startIdx = dates.findIndex(d => d.getTime() === startDate.getTime());
       if (startIdx < 0) return null;
 
       // Adjust position for window offset
       const windowOffset = (timeline.windowStartIndex - Math.max(0, timeline.windowStartIndex)) * TIMELINE_CONFIG.DAY_SLOT_WIDTH;
       const left = dayWidths.slice(0, startIdx).reduce((a, b) => a + b, 0) - windowOffset;
-      const endDate = task.endDate ? new Date(task.endDate) : startDate;
+      
+      let endDate = startDate;
+      if (task.endDate) {
+        const ed = new Date(task.endDate);
+        endDate = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+      }
       const endIdx = dates.findIndex(d => d.getTime() === endDate.getTime());
       const endIdx2 = endIdx >= 0 ? endIdx : startIdx;
       const width = dayWidths.slice(startIdx, endIdx2 + 1).reduce((a, b) => a + b, dayWidths[startIdx] || DEFAULT_DAY_WIDTH);
