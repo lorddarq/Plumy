@@ -120,16 +120,21 @@ export function TimelineHeader({
                       today.getDate()
                     );
                     const isToday = isSameDate(d, todayNoTime);
+                    
+                    // Check if this is a weekend or week start
+                    const dayOfWeek = d.getDay();
+                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                    const isWeekStart = dayOfWeek === 1; // Monday
 
                     return (
                       <div
                         key={i}
-                        className="day-cell"
+                        className={`day-cell ${isWeekend ? 'weekend' : ''} ${isWeekStart ? 'week-start' : ''}`}
                         style={{ width: `${w}px` }}
                       >
                         <div
-                          title={isToday ? 'Today' : undefined}
-                          aria-label={isToday ? 'Today' : undefined}
+                          title={isToday ? 'Today' : isWeekend ? 'Weekend' : undefined}
+                          aria-label={isToday ? 'Today' : isWeekend ? 'Weekend' : undefined}
                           className={`day-label ${
                             isToday ? 'today' : ''
                           } ${

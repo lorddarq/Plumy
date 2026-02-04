@@ -63,3 +63,18 @@
   -webkit-mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 18px), transparent 100%);
   mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 18px), transparent 100%);
 }
+
+/* Weekend styling - pink background for unavailable days */
+.day-click-cell.weekend {
+  background-color: rgba(255, 192, 203, 0.2);
+  cursor: not-allowed;
+}
+
+.day-click-cell.weekend:hover {
+  background-color: rgba(255, 192, 203, 0.3);
+}
+
+/* Week separator - subtle line at the start of each week (Monday) */
+.day-click-cell.week-start {
+  border-left: 2px solid rgba(156, 163, 175, 0.3);
+}

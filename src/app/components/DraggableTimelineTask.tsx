@@ -22,6 +22,7 @@ export function DraggableTimelineTask({
   resizingTaskId,
 }: DraggableTimelineTaskProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
   const [{ isDragging }, drag] = useDrag({
     type: TIMELINE_TASK_TYPE,
@@ -37,6 +38,24 @@ export function DraggableTimelineTask({
   const color = getTaskColor(task.status);
   const textClass = color.textClass ?? 'text-white';
 
+  function handleMouseDown(e: React.MouseEvent) {
+    mouseDownPos.current = { x: e.clientX, y: e.clientY };
+  }
+
+  function handleMouseUp(e: React.MouseEvent) {
+    if (!mouseDownPos.current) return;
+    
+    const dx = Math.abs(e.clientX - mouseDownPos.current.x);
+    const dy = Math.abs(e.clientY - mouseDownPos.current.y);
+    
+    // If mouse didn't move much (< 5px), treat it as a click
+    if (dx < 5 && dy < 5) {
+      onTaskClick(task);
+    }
+    
+    mouseDownPos.current = null;
+  }
+
   return (
     <div
       ref={ref}
@@ -48,7 +67,8 @@ export function DraggableTimelineTask({
         width: `${position.width}px`,
         ...(color.style || {}),
       }}
-      onClick={() => onTaskClick(task)}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
     >
       {/* Left resize handle */}
       <div

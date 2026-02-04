@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
-import { Task, TaskStatus, TimelineSwimlane } from './types';
+import { Task, TaskStatus, TimelineSwimlane, Person } from './types';
 import { initialTasks, initialTimelineSwimlanes } from './data/sampleData';
+import { initialPeople } from './data/samplePeople';
 import { TimelineView } from './components/TimelineView';
 import { KanbanView } from './components/KanbanView';
 import { ViewToggle } from './components/ViewToggle';
@@ -11,6 +12,7 @@ import { useVirtualizedTimeline } from './hooks/useVirtualizedTimeline';
 // LocalStorage keys
 const TASKS_KEY = 'plumy.tasks.v1';
 const SWIMLANES_KEY = 'plumy.swimlanes.v1';
+const PEOPLE_KEY = 'plumy.people.v1';
 
 function safeReadJSON<T>(key: string, fallback: T): T {
   try {
@@ -33,6 +35,7 @@ function safeWriteJSON<T>(key: string, value: T) {
 import { SwimlanesView } from './components/SwimlanesView';
 import { TaskDialog } from './components/TaskDialog';
 import { SwimlaneDialog } from './components/SwimlaneDialog';
+import { PeoplePanel } from './components/PeoplePanel';
 import { Button } from './components/ui/button';
 import { Menu, Plus, Bell, CheckCircle, User } from 'lucide-react';
 import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
@@ -51,6 +54,7 @@ function App() {
 
   const [tasks, setTasks] = useState<Task[]>(() => safeReadJSON<Task[]>(TASKS_KEY, initialTasks));
   const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes));
+  const [people, setPeople] = useState<Person[]>(() => safeReadJSON<Person[]>(PEOPLE_KEY, initialPeople));
 
   // Status columns (swimlane columns for the kanban view) — persisted separately
   const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
@@ -66,14 +70,21 @@ function App() {
   useEffect(() => {
     safeWriteJSON(SWIMLANES_KEY, timelineSwimlanes);
   }, [timelineSwimlanes]);
+
+  useEffect(() => {
+    safeWriteJSON(PEOPLE_KEY, people);
+  }, [people]);
+
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isSwimlaneDialogOpen, setIsSwimlaneDialogOpen] = useState(false);
+  const [isPeoplePanelOpen, setIsPeoplePanelOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedSwimlane, setSelectedSwimlane] = useState<TimelineSwimlane | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<TaskStatus>('open');
   const [defaultDate, setDefaultDate] = useState<Date | undefined>(undefined);
   const [defaultEndDate, setDefaultEndDate] = useState<Date | undefined>(undefined);
   const [defaultSwimlaneId, setDefaultSwimlaneId] = useState<string | undefined>(undefined);
+  const [defaultAssigneeId, setDefaultAssigneeId] = useState<string | undefined>(undefined);
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -83,12 +94,18 @@ function App() {
     setIsTaskDialogOpen(true);
   };
 
-  const handleAddTaskFromTimeline = (date: Date, swimlaneId: string, endDate?: Date) => {
+  const handleAddTaskFromTimeline = (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => {
     setSelectedTask(null);
     setDefaultStatus('open');
     setDefaultDate(date);
     setDefaultEndDate(endDate);
-    setDefaultSwimlaneId(swimlaneId);
+    if (mode === 'people') {
+      setDefaultSwimlaneId(undefined);
+      setDefaultAssigneeId(swimlaneId);
+    } else {
+      setDefaultSwimlaneId(swimlaneId);
+      setDefaultAssigneeId(undefined);
+    }
     setIsTaskDialogOpen(true);
   };
 
@@ -115,6 +132,7 @@ function App() {
         endDate: taskData.endDate,
         swimlaneOnly: taskData.swimlaneOnly,
         swimlaneId: taskData.swimlaneId,
+        assigneeId: taskData.assigneeId,
       };
       setTasks([...tasks, newTask]);
     }
@@ -141,6 +159,7 @@ function App() {
     setSelectedTask(null);
     setDefaultDate(undefined);
     setDefaultSwimlaneId(undefined);
+    setDefaultAssigneeId(undefined);
   };
 
   const handleEditSwimlane = (swimlane: TimelineSwimlane) => {
@@ -183,8 +202,27 @@ function App() {
     setSelectedSwimlane(null);
   };
 
+  const handleAddPerson = (personData: Omit<Person, 'id'>) => {
+    const newPerson: Person = {
+      id: Date.now().toString(),
+      name: personData.name,
+      role: personData.role,
+      avatar: personData.avatar,
+    };
+    setPeople([...people, newPerson]);
+  };
+
+  const handleDeletePerson = (personId: string) => {
+    setPeople(people.filter(p => p.id !== personId));
+    setTasks(tasks.map(t => (t.assigneeId === personId ? { ...t, assigneeId: undefined } : t)));
+  };
+
   const handleReorderSwimlanes = (reorderedSwimlanes: TimelineSwimlane[]) => {
     setTimelineSwimlanes(reorderedSwimlanes);
+  };
+
+  const handleReorderPeople = (reorderedPeople: Person[]) => {
+    setPeople(reorderedPeople);
   };
 
   const handleReorderTasks = (reorderedTasks: Task[]) => {
@@ -215,6 +253,18 @@ function App() {
   };
 
   const handleDeleteStatusColumn = (colId: string) => {
+    // Check if any tasks use this status
+    const tasksUsingStatus = tasks.filter(t => t.status === colId);
+    if (tasksUsingStatus.length > 0) {
+      // Move tasks to first remaining column, or mark as 'open'
+      const remainingCols = statusColumns.filter(c => c.id !== colId);
+      const fallbackStatus = remainingCols.length > 0 ? remainingCols[0].id : 'open';
+      setTasks(prevTasks =>
+        prevTasks.map(t =>
+          t.status === colId ? { ...t, status: fallbackStatus as TaskStatus } : t
+        )
+      );
+    }
     setStatusColumns((cols: any[]) => cols.filter(c => c.id !== colId));
   };
 
@@ -264,7 +314,7 @@ function App() {
           <Button variant="ghost" size="icon">
             <CheckCircle className="w-5 h-5" />
           </Button>
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" onClick={() => setIsPeoplePanelOpen(true)}>
             <User className="w-5 h-5" />
           </Button>
         </div>
@@ -278,6 +328,7 @@ function App() {
             <TimelineView
               tasks={tasks}
               swimlanes={timelineSwimlanes}
+              people={people}
               statusColumns={statusColumns}
               onTaskClick={handleTaskClick}
               onAddTask={handleAddTaskFromTimeline}
@@ -285,6 +336,7 @@ function App() {
               onEditSwimlane={handleEditSwimlane}
               onAddSwimlane={handleAddSwimlane}
               onReorderSwimlanes={handleReorderSwimlanes}
+              onReorderPeople={handleReorderPeople}
               onReorderTasks={handleReorderTasks}
             />
           </div>
@@ -324,7 +376,10 @@ function App() {
         defaultDate={defaultDate}
         defaultEndDate={defaultEndDate}
         defaultSwimlaneId={defaultSwimlaneId}
+        defaultAssigneeId={defaultAssigneeId}
         swimlanes={timelineSwimlanes}
+        statusColumns={statusColumns}
+        people={people}
       />
 
       {/* Swimlane Dialog */}
@@ -334,6 +389,17 @@ function App() {
         onSave={handleSaveSwimlane}
         onDelete={handleDeleteSwimlane}
         swimlane={selectedSwimlane}
+      />
+
+      {/* People Panel */}
+      <PeoplePanel
+        isOpen={isPeoplePanelOpen}
+        onClose={() => setIsPeoplePanelOpen(false)}
+        people={people}
+        tasks={tasks}
+        statusColumns={statusColumns}
+        onAddPerson={handleAddPerson}
+        onDeletePerson={handleDeletePerson}
       />
     </div>
   );

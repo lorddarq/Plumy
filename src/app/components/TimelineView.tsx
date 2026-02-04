@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
-import { Task, TimelineSwimlane, TaskStatus } from '../types';
+import { Task, TimelineSwimlane, TaskStatus, Person } from '../types';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Plus } from 'lucide-react';
@@ -32,19 +32,22 @@ const DEFAULT_DAY_WIDTH = 60;
 interface TimelineViewProps {
   tasks: Task[];
   swimlanes: TimelineSwimlane[];
+  people?: Person[];
   statusColumns?: Array<{ id: TaskStatus; title: string; color?: string }>;
   onTaskClick: (task: Task) => void;
-  onAddTask: (date: Date, swimlaneId: string, endDate?: Date) => void;
+  onAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
   onUpdateTaskDates: (taskId: string, startDate: string, endDate: string) => void;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
   onAddSwimlane: () => void;
   onReorderSwimlanes: (swimlanes: TimelineSwimlane[]) => void;
+  onReorderPeople?: (people: Person[]) => void;
   onReorderTasks: (tasks: Task[]) => void;
 }
 
 export function TimelineView({
   tasks,
   swimlanes,
+  people = [],
   statusColumns,
   onTaskClick,
   onAddTask,
@@ -52,6 +55,7 @@ export function TimelineView({
   onEditSwimlane,
   onAddSwimlane,
   onReorderSwimlanes,
+  onReorderPeople,
   onReorderTasks,
 }: TimelineViewProps) {
   // Left column width state
@@ -62,6 +66,17 @@ export function TimelineView({
 
   // Mode state: Projects or People
   const [mode, setMode] = useState<'projects' | 'people'>('projects');
+
+  // Display swimlanes based on mode
+  const displaySwimlanes = useMemo<TimelineSwimlane[]>(() => {
+    if (mode === 'people') {
+      return people.map(person => ({
+        id: person.id,
+        name: `${person.name} - ${person.role}`,
+      }));
+    }
+    return swimlanes;
+  }, [mode, people, swimlanes]);
 
   // Refs
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -199,18 +214,22 @@ export function TimelineView({
   // Compute track assignments for each swimlane
   const swimlaneTrackAssignments = useMemo(() => {
     const assignments: Record<string, Record<string, number>> = {};
-    swimlanes.forEach(swimlane => {
-      const swimlaneTasks = tasks.filter(t => t.swimlaneId === swimlane.id);
+    displaySwimlanes.forEach(swimlane => {
+      const swimlaneTasks = mode === 'people'
+        ? tasks.filter(t => t.assigneeId === swimlane.id)
+        : tasks.filter(t => t.swimlaneId === swimlane.id);
       assignments[swimlane.id] = allocateTasksToTracks(swimlaneTasks);
     });
     return assignments;
-  }, [tasks, swimlanes]);
+  }, [tasks, displaySwimlanes, mode]);
 
   // Compute dynamic heights for swimlanes
   const swimlaneHeights = useMemo(() => {
     const heights: Record<string, number> = {};
-    swimlanes.forEach(swimlane => {
-      const swimlaneTasks = tasks.filter(t => t.swimlaneId === swimlane.id);
+    displaySwimlanes.forEach(swimlane => {
+      const swimlaneTasks = mode === 'people'
+        ? tasks.filter(t => t.assigneeId === swimlane.id)
+        : tasks.filter(t => t.swimlaneId === swimlane.id);
       // Each track is 40px (task render height 32px + gap 8px), with at least DEFAULT_ROW_HEIGHT
       const TRACK_HEIGHT = 40;
       const trackAssignments = allocateTasksToTracks(swimlaneTasks);
@@ -218,7 +237,7 @@ export function TimelineView({
       heights[swimlane.id] = Math.max(DEFAULT_ROW_HEIGHT, trackCount * TRACK_HEIGHT);
     });
     return heights;
-  }, [tasks, swimlanes]);
+  }, [tasks, displaySwimlanes, mode]);
 
   // Sync left column header height with timeline header actual height
   const [syncedHeaderHeight, setSyncedHeaderHeight] = useState<number | null>(null);
@@ -234,7 +253,7 @@ export function TimelineView({
         leftHeaderEl.style.height = `${actualHeight}px`;
       }
     }
-  }, [swimlanes, tasks]);
+  }, [displaySwimlanes, tasks]);
 
   // Today marker
   const today = useMemo(() => {
@@ -451,11 +470,18 @@ export function TimelineView({
 
   // Swimlane reordering
   const handleMoveSwimlane = useCallback((dragIndex: number, hoverIndex: number) => {
-    const newSwimlanes = [...swimlanes];
-    const [draggedSwim] = newSwimlanes.splice(dragIndex, 1);
-    newSwimlanes.splice(hoverIndex, 0, draggedSwim);
-    onReorderSwimlanes(newSwimlanes);
-  }, [swimlanes, onReorderSwimlanes]);
+    if (mode === 'people') {
+      const newPeople = [...people];
+      const [draggedPerson] = newPeople.splice(dragIndex, 1);
+      newPeople.splice(hoverIndex, 0, draggedPerson);
+      onReorderPeople?.(newPeople);
+    } else {
+      const newSwimlanes = [...swimlanes];
+      const [draggedSwim] = newSwimlanes.splice(dragIndex, 1);
+      newSwimlanes.splice(hoverIndex, 0, draggedSwim);
+      onReorderSwimlanes(newSwimlanes);
+    }
+  }, [mode, people, swimlanes, onReorderPeople, onReorderSwimlanes]);
 
   // Sync vertical scroll between left column and rows container
   const handleLeftScroll = useCallback(() => {
@@ -518,16 +544,34 @@ export function TimelineView({
     [dates, dayWidths, timeline.windowStartIndex]
   );
 
-  // Get task color helper
+  // Get task color helper with fallback for orphaned statuses
   const getTaskColor = useCallback(
     (status: string): { className?: string; style?: React.CSSProperties } => {
       const col = statusColumns?.find(c => c.id === status);
-      if (!col) return {};
-      const bgColor = col.color || '#e5e7eb';
-      const textClass = getReadableTextClassFor(bgColor);
+      if (col) {
+        const bgColor = col.color || '#e5e7eb';
+        const textClass = getReadableTextClassFor(bgColor);
+        return {
+          className: textClass,
+          style: { backgroundColor: bgColor },
+        };
+      }
+      // Fallback for orphaned statuses (use first available column or gray)
+      if (statusColumns && statusColumns.length > 0) {
+        const fallbackCol = statusColumns[0];
+        const bgColor = fallbackCol.color || '#e5e7eb';
+        const textClass = getReadableTextClassFor(bgColor);
+        return {
+          className: textClass,
+          style: { backgroundColor: bgColor },
+        };
+      }
+      // Last resort fallback
+      const defaultColor = '#e5e7eb';
+      const textClass = getReadableTextClassFor(defaultColor);
       return {
         className: textClass,
-        style: { backgroundColor: bgColor },
+        style: { backgroundColor: defaultColor },
       };
     },
     [statusColumns]
@@ -578,11 +622,16 @@ export function TimelineView({
         <div className="timeline-main-content">
           {/* Left column: swimlane labels */}
           <div className="timeline-left-column" style={{ width: `${leftColWidth}px` }}>
-            <div className="timeline-left-header" style={{ height: 'fit-content', minHeight: `${HEADER_HEIGHT}px` }}>
-              <span className="timeline-left-header-title">Swimlanes</span>
-              <button onClick={onAddSwimlane} className="timeline-left-header-button">
-                <Plus className="w-4 h-4" />
-              </button>
+            {/* Combined header matching month + day header height */}
+            <div className="timeline-left-header">
+              <span className="timeline-left-header-title">
+                {mode === 'people' ? 'People' : 'Swimlanes'}
+              </span>
+              {mode === 'projects' && (
+                <button onClick={onAddSwimlane} className="timeline-left-header-button">
+                  <Plus className="w-4 h-4" />
+                </button>
+              )}
               <div
                 role="separator"
                 aria-orientation="vertical"
@@ -592,8 +641,12 @@ export function TimelineView({
             </div>
 
             <div className="timeline-left-list" ref={leftListRef}>
-              {swimlanes.map((swimlane, index) => {
+              {displaySwimlanes.map((swimlane, index) => {
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
+                const taskCount = mode === 'people'
+                  ? tasks.filter(t => t.assigneeId === swimlane.id).length
+                  : tasks.filter(t => t.swimlaneId === swimlane.id).length;
+                
                 return (
                   <div key={swimlane.id} className="timeline-swimlane-label-container" style={{ height: `${height}px`, minHeight: `${height}px` }}>
                     <DraggableSwimlaneLabel
@@ -601,8 +654,10 @@ export function TimelineView({
                       index={index}
                       leftColWidth={leftColWidth}
                       rowHeight={height}
-                      onEditSwimlane={onEditSwimlane}
+                      onEditSwimlane={mode === 'projects' ? onEditSwimlane : () => {}}
                       onMoveSwimlane={handleMoveSwimlane}
+                      mode={mode}
+                      taskCount={taskCount}
                     />
                   </div>
                 );
@@ -623,7 +678,7 @@ export function TimelineView({
                 totalTimelineWidth={totalTimelineWidth}
                 endPadding={endPadding}
                 rowHeight={DEFAULT_ROW_HEIGHT}
-                swimlaneCount={swimlanes.length}
+                swimlaneCount={displaySwimlanes.length}
                 todayOffset={todayOffset}
                 highlightToday={true}
                 headerRef={headerRef}
@@ -632,8 +687,10 @@ export function TimelineView({
 
             {/* Swimlane rows: tasks */}
             <div className="timeline-rows-container">
-              {swimlanes.map((swimlane, idx) => {
-                const swimlaneTasks = tasks.filter(t => t.swimlaneId === swimlane.id);
+              {displaySwimlanes.map((swimlane, idx) => {
+                const swimlaneTasks = mode === 'people'
+                  ? tasks.filter(t => t.assigneeId === swimlane.id)
+                  : tasks.filter(t => t.swimlaneId === swimlane.id);
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
 
                 return (
@@ -654,14 +711,19 @@ export function TimelineView({
                       totalTimelineWidth={totalTimelineWidth}
                       rowHeight={height}
                       onTaskClick={onTaskClick}
-                      onAddTask={onAddTask}
+                      onAddTask={(date, swimlaneId, endDate) => onAddTask(date, swimlaneId, endDate, mode)}
                       onEditSwimlane={onEditSwimlane}
                       onMoveSwimlane={handleMoveSwimlane}
                       onMoveTaskToSwimlane={(taskId, swimlaneId, newStartDate, newEndDate) => {
                         const task = tasks.find(t => t.id === taskId);
                         if (task) {
-                          // Update swimlane and dates if provided
-                          const updated = { ...task, swimlaneId };
+                          // Update swimlane/assignee and dates if provided
+                          const updated = { ...task };
+                          if (mode === 'people') {
+                            updated.assigneeId = swimlaneId;
+                          } else {
+                            updated.swimlaneId = swimlaneId;
+                          }
                           if (newStartDate) updated.startDate = newStartDate;
                           if (newEndDate) updated.endDate = newEndDate;
                           

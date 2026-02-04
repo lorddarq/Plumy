@@ -96,6 +96,7 @@
 
 .timeline-left-header {
   border-right: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f3f4f6;
   padding-left: 0.75rem;
   padding-right: 0.75rem;
   padding-top: 0.5rem;
@@ -104,11 +105,12 @@
   position: sticky;
   z-index: 40;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   top: 0;
-  height: fit-content;
-  min-height: 72px;
+  /* Month header: 41px + Day row: 48px = 89px total */
+  height: 89px;
+  box-sizing: border-box;
 }
 
 .timeline-left-header-title {

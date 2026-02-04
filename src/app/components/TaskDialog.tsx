@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Task, TaskStatus, TimelineSwimlane } from '../types';
+import { Task, TaskStatus, TimelineSwimlane, Person } from '../types';
 import {
   Dialog,
   DialogContent,
@@ -30,7 +30,10 @@ interface TaskDialogProps {
   defaultDate?: Date;
   defaultEndDate?: Date;
   defaultSwimlaneId?: string;
+  defaultAssigneeId?: string;
   swimlanes: TimelineSwimlane[];
+  statusColumns?: Array<{ id: TaskStatus; title: string; color?: string }>;
+  people?: Person[];
 }
 
 export function TaskDialog({
@@ -43,7 +46,10 @@ export function TaskDialog({
   defaultDate,
   defaultEndDate,
   defaultSwimlaneId,
+  defaultAssigneeId,
   swimlanes,
+  statusColumns,
+  people = [],
 }: TaskDialogProps) {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<TaskStatus>('open');
@@ -52,6 +58,7 @@ export function TaskDialog({
   const [endDate, setEndDate] = useState('');
   const [swimlaneOnly, setSwimlaneOnly] = useState(false);
   const [swimlaneId, setSwimlaneId] = useState('');
+  const [assigneeId, setAssigneeId] = useState('unassigned');
   const [color, setColor] = useState('');
 
   useEffect(() => {
@@ -63,11 +70,14 @@ export function TaskDialog({
       setEndDate(task.endDate || '');
       setSwimlaneOnly(task.swimlaneOnly || false);
       setSwimlaneId(task.swimlaneId || '');
+      setAssigneeId(task.assigneeId || 'unassigned');
     } else {
       setTitle('');
       setStatus(defaultStatus || 'open');
       setNotes('');
-      setSwimlaneId(defaultSwimlaneId || (swimlanes[0]?.id || ''));
+      // Only set default swimlaneId if not creating a people-assigned task
+      setSwimlaneId(defaultSwimlaneId || (defaultAssigneeId ? '' : (swimlanes[0]?.id || '')));
+      setAssigneeId(defaultAssigneeId || 'unassigned');
       setColor('');
       
       if (defaultDate) {
@@ -85,7 +95,7 @@ export function TaskDialog({
         setSwimlaneOnly(true);
       }
     }
-  }, [task, defaultStatus, defaultDate, defaultEndDate, defaultSwimlaneId, swimlanes, isOpen]);
+  }, [task, defaultStatus, defaultDate, defaultEndDate, defaultSwimlaneId, defaultAssigneeId, swimlanes, isOpen]);
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -97,7 +107,8 @@ export function TaskDialog({
       notes: notes.trim(),
       color: color || undefined,
       swimlaneOnly,
-      swimlaneId: swimlaneOnly ? undefined : swimlaneId,
+      swimlaneId: swimlaneOnly ? undefined : (swimlaneId || undefined),
+      assigneeId: assigneeId === 'unassigned' ? undefined : assigneeId,
     };
 
     if (!swimlaneOnly && startDate && endDate) {
@@ -147,10 +158,20 @@ export function TaskDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="under-review">Under Review</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
+                {statusColumns && statusColumns.length > 0 ? (
+                  statusColumns.map(col => (
+                    <SelectItem key={col.id} value={col.id}>
+                      {col.title}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="under-review">Under Review</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -159,7 +180,7 @@ export function TaskDialog({
           <div className="space-y-2">
             <Label htmlFor="color">Accent Color</Label>
             <div className="flex items-center gap-2">
-              <input id="color" type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+              <input id="color" type="color" value={color || '#3b82f6'} onChange={(e) => setColor(e.target.value)} />
               <Input id="color-hex" value={color} onChange={(e) => setColor(e.target.value)} placeholder="#aabbcc" />
             </div>
           </div>
@@ -190,6 +211,26 @@ export function TaskDialog({
                   {swimlanes.map(swimlane => (
                     <SelectItem key={swimlane.id} value={swimlane.id}>
                       {swimlane.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Assignee selection */}
+          {people.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="assignee">Assign to Person (Optional)</Label>
+              <Select value={assigneeId} onValueChange={setAssigneeId}>
+                <SelectTrigger id="assignee">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {people.map(person => (
+                    <SelectItem key={person.id} value={person.id}>
+                      {person.name} - {person.role}
                     </SelectItem>
                   ))}
                 </SelectContent>

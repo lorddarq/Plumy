@@ -21,7 +21,7 @@ interface DraggableSwimlaneRowProps {
   rowHeight?: number;
   scrollContainerRef?: React.RefObject<HTMLDivElement>; // Reference to the scrollable container for accurate drop calculations
   onTaskClick: (task: Task) => void;
-  onAddTask: (date: Date, swimlaneId: string, endDate?: Date) => void;
+  onAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
   ignoreAddTaskUntil?: number | null;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
   onMoveSwimlane: (dragIndex: number, hoverIndex: number) => void;
@@ -142,7 +142,7 @@ export function DraggableSwimlaneRow({
       if (startIdx >= 0 && startIdx < dates.length && endIdx >= 0 && endIdx < dates.length) {
         const startDate = dates[startIdx];
         const endDate = dates[endIdx];
-        onAddTask(startDate, swimlane.id, endDate);
+        onAddTask(startDate, swimlane.id, endDate, 'people');
       }
     }
     setIsSelecting(false);
@@ -268,7 +268,8 @@ export function DraggableSwimlaneRow({
   // Apply task drop to timeline area
   dropTask(timelineRef);
 
-  const timelineTasks = tasks.filter(task => task.swimlaneId === swimlane.id);
+  // Tasks are already filtered by the parent (TimelineView) based on mode
+  const timelineTasks = tasks;
 
   return (
     <div
@@ -356,6 +357,11 @@ export function DraggableSwimlaneRow({
                         const globalIdx = startIdx + di;
                         const w = dayWidths?.[globalIdx] ?? 60;
                         
+                        // Check if this is a weekend (Saturday = 6, Sunday = 0)
+                        const dayOfWeek = d.getDay();
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                        const isWeekStart = dayOfWeek === 1; // Monday
+                        
                         // Check if this day is in the selection range
                         const isInSelection = isSelecting && selectionStart !== null && selectionEnd !== null &&
                           globalIdx >= Math.min(selectionStart, selectionEnd) &&
@@ -366,17 +372,17 @@ export function DraggableSwimlaneRow({
                             key={`day-${monthKey}-${di}`}
                             className={`day-click-cell ${
                               isInSelection ? 'selected' : ''
-                            }`}
-                            title={`Add task for ${d.toDateString()}`}
+                            } ${isWeekend ? 'weekend' : ''} ${isWeekStart ? 'week-start' : ''}`}
+                            title={isWeekend ? 'Weekend (unavailable)' : `Add task for ${d.toDateString()}`}
                             onMouseDown={(e) => {
                               e.preventDefault();
-                              if (ignoreAddTaskUntil && Date.now() < ignoreAddTaskUntil) {
+                              if (isWeekend || (ignoreAddTaskUntil && Date.now() < ignoreAddTaskUntil)) {
                                 return;
                               }
                               handleSelectionStart(globalIdx);
                             }}
                             onMouseEnter={() => {
-                              if (isSelecting) {
+                              if (isSelecting && !isWeekend) {
                                 handleSelectionMove(globalIdx);
                               }
                             }}
