@@ -95,12 +95,11 @@ jobs:
         with:
           files: |
             ./artifacts/macos/*.dmg
-            ./artifacts/macos/*.zip
             ./artifacts/windows/*.exe
             ./artifacts/linux/*.AppImage
-            ./artifacts/linux/*.deb
-            ./artifacts/linux/*.rpm
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
