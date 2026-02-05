@@ -64,6 +64,7 @@
     "icon": "electron/assets/icon",
     "appId": "com.plumy.app",
     "productName": "Plumy",
+    "publish": null,
     "files": [
       "dist/**",
       "electron/**",
