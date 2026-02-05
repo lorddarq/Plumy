@@ -10,7 +10,6 @@ jobs:
   build:
     name: Build and Package
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +56,7 @@ jobs:
         run: npm run build:electron
 
       - name: Upload artifacts
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: electron-artifacts-${{ matrix.os }}
@@ -65,7 +65,7 @@ jobs:
   release:
     name: Create Release
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest && always()
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
