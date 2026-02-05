@@ -4,6 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "main": "electron/main.cjs",
+  "description": "A modern task management and planning tool",
+  "author": "lorddarq",
   "scripts": {
     "dev:vite": "vite --port 5173",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
