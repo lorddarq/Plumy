@@ -1,9 +1,9 @@
 import { Task, TimelineSwimlane } from '../types';
 
 export const initialTimelineSwimlanes: TimelineSwimlane[] = [
-  { id: '1', name: 'Rocket Engineering Team' },
-  { id: '2', name: 'Launch Operations' },
-  { id: '3', name: 'Mission Control' },
+  { id: '1', name: 'Rocket Engineering Team', color: '#3b82f6' }, // blue
+  { id: '2', name: 'Launch Operations', color: '#10b981' }, // green
+  { id: '3', name: 'Mission Control', color: '#8b5cf6' }, // purple
 ];
 
 export const initialTasks: Task[] = [
@@ -15,6 +15,7 @@ export const initialTasks: Task[] = [
     startDate: '2026-02-22',
     endDate: '2026-02-26',
     swimlaneId: '1',
+    project: 'Rocket Engineering Team',
   },
   {
     id: '2',
@@ -24,6 +25,7 @@ export const initialTasks: Task[] = [
     startDate: '2026-02-24',
     endDate: '2026-02-28',
     swimlaneId: '3',
+    project: 'Mission Control',
   },
   {
     id: '3',
@@ -33,6 +35,7 @@ export const initialTasks: Task[] = [
     startDate: '2026-02-25',
     endDate: '2026-02-27',
     swimlaneId: '3',
+    project: 'Mission Control',
   },
   {
     id: '4',
@@ -42,6 +45,7 @@ export const initialTasks: Task[] = [
     startDate: '2026-03-01',
     endDate: '2026-03-02',
     swimlaneId: '1',
+    project: 'Rocket Engineering Team',
   },
   {
     id: '5',
@@ -51,6 +55,7 @@ export const initialTasks: Task[] = [
     startDate: '2026-03-03',
     endDate: '2026-03-05',
     swimlaneId: '2',
+    project: 'Launch Operations',
   },
   {
     id: '6',
@@ -60,6 +65,7 @@ export const initialTasks: Task[] = [
     startDate: '2026-03-05',
     endDate: '2026-03-07',
     swimlaneId: '1',
+    project: 'Rocket Engineering Team',
   },
   {
     id: '7',
@@ -69,6 +75,7 @@ export const initialTasks: Task[] = [
     startDate: '2026-03-02',
     endDate: '2026-03-03',
     swimlaneId: '2',
+    project: 'Launch Operations',
   },
   {
     id: '8',
@@ -76,6 +83,7 @@ export const initialTasks: Task[] = [
     status: 'open',
     notes: 'Initial planning for launch pad',
     swimlaneOnly: true,
+    project: 'Launch Operations',
   },
   {
     id: '9',
@@ -83,6 +91,7 @@ export const initialTasks: Task[] = [
     status: 'open',
     notes: 'Brainstorm spacesuit design ideas',
     swimlaneOnly: true,
+    project: 'Rocket Engineering Team',
   },
   {
     id: '10',
@@ -90,6 +99,7 @@ export const initialTasks: Task[] = [
     status: 'open',
     notes: 'Set up telescope observation sessions',
     swimlaneOnly: true,
+    project: 'Mission Control',
   },
   {
     id: '11',
@@ -97,6 +107,7 @@ export const initialTasks: Task[] = [
     status: 'under-review',
     notes: 'Compile learning resources',
     swimlaneOnly: true,
+    project: 'Rocket Engineering Team',
   },
   {
     id: '12',

@@ -61,7 +61,13 @@ export function DraggableSwimlaneLabel({ swimlane, index, leftColWidth, rowHeigh
     <div
       ref={ref}
       className={`flex flex-col justify-center px-5 py-3 group bg-white ${isOver ? 'bg-blue-50/50' : ''}`}
-      style={{ width: `${leftColWidth}px`, height: `${rowHeight || 48}px`, boxSizing: 'border-box', minHeight: `${rowHeight || 48}px` }}
+      style={{ 
+        width: `${leftColWidth}px`, 
+        height: `${rowHeight || 48}px`, 
+        boxSizing: 'border-box', 
+        minHeight: `${rowHeight || 48}px`,
+        borderLeft: swimlane.color ? `4px solid ${swimlane.color}` : undefined
+      }}
     >
       <div className="flex items-center justify-between w-full gap-2">
         <div ref={dragHandleRef} className="cursor-move flex-shrink-0">

@@ -1,9 +1,10 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { useDrop } from 'react-dnd';
 import { Plus, Edit2 } from 'lucide-react';
 import { Task, TaskStatus, Swimlane } from '../types';
 import { DraggableTaskCard } from '../components/DraggableTaskCard';
 import { getReadableTextClassFor } from '../utils/contrast';
+import { ColumnDialog } from '../components/ColumnDialog';
 
 interface DroppableColumnProps {
   swimlane: Swimlane;
@@ -49,15 +50,8 @@ export function DroppableColumn({
 
   drop(ref);
 
-  // Column header editing state
-  const [isEditing, setIsEditing] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(swimlane.title || '');
-  const [colorDraft, setColorDraft] = useState<string>(swimlane.color || '#9CA3AF');
-
-  useEffect(() => {
-    setTitleDraft(swimlane.title || '');
-    setColorDraft(swimlane.color || '#9CA3AF');
-  }, [swimlane.id]);
+  // Column dialog state
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const headerStyle = (color: string | undefined) => {
     if (!color) return undefined;
@@ -65,16 +59,13 @@ export function DroppableColumn({
     return undefined;
   };
 
-  const saveColumnEdits = () => {
-    if (onRenameColumn && titleDraft.trim()) onRenameColumn(swimlane.id, titleDraft.trim());
-    if (onChangeColumnColor && colorDraft) onChangeColumnColor(swimlane.id, colorDraft);
-    setIsEditing(false);
+  const handleSaveColumn = (title: string, color: string) => {
+    if (onRenameColumn && title.trim()) onRenameColumn(swimlane.id, title.trim());
+    if (onChangeColumnColor && color) onChangeColumnColor(swimlane.id, color);
   };
 
-  const cancelEdits = () => {
-    setTitleDraft(swimlane.title || '');
-    setColorDraft(swimlane.color || '#9CA3AF');
-    setIsEditing(false);
+  const handleDeleteColumn = () => {
+    if (onDeleteColumn) onDeleteColumn(swimlane.id);
   };
 
   return (
@@ -82,47 +73,29 @@ export function DroppableColumn({
       className="min-w-[280px] max-w-[320px] bg-gray-100 rounded-lg flex flex-col h-full"
     >
       {/* Swimlane header */}
-      {isEditing ? (
-        (() => {
-          const headerTextClass = getReadableTextClassFor(colorDraft || '#9CA3AF', colorDraft?.startsWith('#') ? colorDraft : undefined);
-          return (
-            <div className={`${headerTextClass} p-3 rounded-t-lg flex items-center justify-between space-x-2`} style={headerStyle(colorDraft)}>
-              <div className="flex items-center gap-2 flex-1">
-                <input
-                  value={titleDraft}
-                  onChange={(e) => setTitleDraft(e.target.value)}
-                  className="rounded px-2 py-1 text-sm w-full"
-                  aria-label="Edit column title"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="color" value={colorDraft?.startsWith('#') ? colorDraft : '#9CA3AF'} onChange={(e) => setColorDraft(e.target.value)} aria-label="Pick color" />
-                <button className={`${headerTextClass} px-2 py-1 bg-white/10 rounded`} onClick={saveColumnEdits}>Save</button>
-                <button className={`${headerTextClass} px-2 py-1 bg-white/10 rounded`} onClick={cancelEdits}>Cancel</button>
-                <button className={`${headerTextClass} px-2 py-1 bg-red-600 rounded`} onClick={() => onDeleteColumn && onDeleteColumn(swimlane.id)}>Delete</button>
-              </div>
-            </div>
-          );
-        })()
-      ) : (
-        (() => {
-          const key = swimlane.color || '';
-          const headerTextClass = key ? getReadableTextClassFor(key, key.startsWith('#') ? key : undefined) : 'text-white';
-          return (
-            <div className={`${!swimlane.color?.startsWith('#') ? swimlane.color : ''} ${headerTextClass} p-3 rounded-t-lg flex items-center justify-between`} style={headerStyle(swimlane.color)}>
-              <div className="flex items-center gap-2">
-                <span className="font-medium" onDoubleClick={() => setIsEditing(true)}>{swimlane.title}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`${headerTextClass} text-sm`}>{swimlaneTasks.length}</span>
-                <button className={`${headerTextClass} p-1 ml-2`} onClick={() => setIsEditing(true)} aria-label="Edit column">
-                  <Edit2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          );
-        })()
-      )}
+      <div className={`${!swimlane.color?.startsWith('#') ? swimlane.color : ''} ${(() => {
+        const key = swimlane.color || '';
+        return key ? getReadableTextClassFor(key, key.startsWith('#') ? key : undefined) : 'text-white';
+      })()} p-3 rounded-t-lg flex items-center justify-between`} style={headerStyle(swimlane.color)}>
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{swimlane.title}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{swimlaneTasks.length}</span>
+          <button className="p-1 ml-2 hover:bg-white/10 rounded" onClick={() => setIsDialogOpen(true)} aria-label="Edit column">
+            <Edit2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Column Dialog */}
+      <ColumnDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onSave={handleSaveColumn}
+        onDelete={onDeleteColumn ? handleDeleteColumn : undefined}
+        column={swimlane}
+      />
 
       {/* Task cards */}
       <div

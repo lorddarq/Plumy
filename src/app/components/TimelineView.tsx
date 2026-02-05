@@ -67,12 +67,16 @@ export function TimelineView({
   // Mode state: Projects or People
   const [mode, setMode] = useState<'projects' | 'people'>('projects');
 
+  // Weekend visibility toggle
+  const [showWeekends, setShowWeekends] = useState<boolean>(true);
+
   // Display swimlanes based on mode
   const displaySwimlanes = useMemo<TimelineSwimlane[]>(() => {
     if (mode === 'people') {
       return people.map(person => ({
         id: person.id,
         name: `${person.name} - ${person.role}`,
+        color: person.color || '#3b82f6', // Default blue if no color
       }));
     }
     return swimlanes;
@@ -157,12 +161,16 @@ export function TimelineView({
     const arr: Date[] = [];
     const d = new Date(start);
     while (d <= end) {
-      arr.push(new Date(d));
+      // Filter weekends if toggle is off (0 = Sunday, 6 = Saturday)
+      const dayOfWeek = d.getDay();
+      if (showWeekends || (dayOfWeek !== 0 && dayOfWeek !== 6)) {
+        arr.push(new Date(d));
+      }
       d.setDate(d.getDate() + 1);
     }
 
     return arr;
-  }, [tasks]);
+  }, [tasks, showWeekends]);
 
   // Calculate virtualized dates: only render window + buffer
   // TODO: Fix virtualization window indexing (currently disabled to show all dates)
@@ -591,6 +599,19 @@ export function TimelineView({
           </button>
           <button onClick={handleScrollRight} className="timeline-toolbar-button">
             ▶
+          </button>
+
+          {/* Weekend toggle */}
+          <button
+            onClick={() => setShowWeekends(!showWeekends)}
+            className={`px-3 py-1 text-sm rounded font-medium transition-all ${
+              showWeekends
+                ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+            }`}
+            title={showWeekends ? 'Hide weekends' : 'Show weekends'}
+          >
+            {showWeekends ? '7 days' : '5 days'}
           </button>
           
           {/* Mode toggle */}

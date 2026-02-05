@@ -196,7 +196,6 @@
 
 .month-column {
   border-right: 1px solid #f3f4f6;
-  background-color: white;
   position: relative;
 }
 
@@ -268,24 +267,17 @@
   border-bottom: 1px solid #f3f4f6;
 }
 
-.swimlane-row:hover {
-  background-color: rgba(249, 250, 251, 0.5);
-}
-
 .swimlane-row.dragging-over {
-  background-color: rgba(191, 219, 254, 0.5);
+  background-color: rgba(191, 219, 254, 0.5) !important;
 }
 
 .swimlane-row-timeline {
   position: relative;
   flex: 1;
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
 }
 
 .swimlane-row-timeline.drop-target {
-  background-color: #f0fdf4;
+  background-color: #f0fdf4 !important;
   border: 2px solid #4ade80;
 }
 

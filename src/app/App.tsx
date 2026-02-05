@@ -52,9 +52,40 @@ function App() {
   const timelineContainerRef = useRef<HTMLDivElement>(null);
   const kanbanContainerRef = useRef<HTMLDivElement>(null);
 
-  const [tasks, setTasks] = useState<Task[]>(() => safeReadJSON<Task[]>(TASKS_KEY, initialTasks));
-  const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes));
-  const [people, setPeople] = useState<Person[]>(() => safeReadJSON<Person[]>(PEOPLE_KEY, initialPeople));
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const stored = safeReadJSON<Task[]>(TASKS_KEY, initialTasks);
+    const swimlanes = safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
+    
+    // Migrate: Update task.project to match swimlane name
+    return stored.map(task => {
+      const swimlane = swimlanes.find(s => s.id === task.swimlaneId);
+      return {
+        ...task,
+        project: swimlane?.name || task.project
+      };
+    });
+  });
+  
+  const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => {
+    const stored = safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
+    
+    // Migrate: Ensure all swimlanes have colors
+    return stored.map(swimlane => ({
+      ...swimlane,
+      color: swimlane.color || '#3b82f6' // Default blue if no color
+    }));
+  });
+  
+  const [people, setPeople] = useState<Person[]>(() => {
+    const stored = safeReadJSON<Person[]>(PEOPLE_KEY, initialPeople);
+    
+    // Migrate: Ensure all people have colors
+    const defaultColors = ['#ec4899', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#10b981'];
+    return stored.map((person, index) => ({
+      ...person,
+      color: person.color || defaultColors[index % defaultColors.length]
+    }));
+  });
 
   // Status columns (swimlane columns for the kanban view) — persisted separately
   const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';

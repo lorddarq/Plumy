@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TimelineSwimlane } from '../types';
+import { Swimlane } from '../types';
 import {
   Dialog,
   DialogContent,
@@ -12,86 +12,76 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
-interface SwimlaneDialogProps {
+interface ColumnDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (swimlane: Partial<TimelineSwimlane>) => void;
-  onDelete?: (swimlaneId: string) => void;
-  swimlane?: TimelineSwimlane | null;
+  onSave: (title: string, color: string) => void;
+  onDelete?: () => void;
+  column?: Swimlane | null;
 }
 
-export function SwimlaneDialog({
+export function ColumnDialog({
   isOpen,
   onClose,
   onSave,
   onDelete,
-  swimlane,
-}: SwimlaneDialogProps) {
-  const [name, setName] = useState('');
-  const [color, setColor] = useState('#3b82f6');
+  column,
+}: ColumnDialogProps) {
+  const [title, setTitle] = useState('');
+  const [color, setColor] = useState('#9CA3AF');
 
   useEffect(() => {
-    if (swimlane) {
-      setName(swimlane.name);
-      setColor(swimlane.color || '#3b82f6');
+    if (column) {
+      setTitle(column.title || '');
+      setColor(column.color || '#9CA3AF');
     } else {
-      setName('');
-      setColor('#3b82f6');
+      setTitle('');
+      setColor('#9CA3AF');
     }
-  }, [swimlane, isOpen]);
+  }, [column, isOpen]);
 
   const handleSave = () => {
-    if (!name.trim()) return;
-
-    const swimlaneData: Partial<TimelineSwimlane> = {
-      ...(swimlane && { id: swimlane.id }),
-      name: name.trim(),
-      color: color || '#3b82f6',
-    };
-
-    onSave(swimlaneData);
+    if (!title.trim()) return;
+    onSave(title.trim(), color);
     onClose();
   };
 
   const handleDelete = () => {
-    if (swimlane && onDelete) {
-      onDelete(swimlane.id);
+    if (onDelete) {
+      onDelete();
       onClose();
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{swimlane ? 'Edit Swimlane' : 'Create Swimlane'}</DialogTitle>
+          <DialogTitle>{column ? 'Edit Column' : 'Create Column'}</DialogTitle>
           <DialogDescription>
-            {swimlane ? 'Edit the swimlane details' : 'Create a new swimlane'}
+            {column ? 'Edit the column details below' : 'Create a new column for your board'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Swimlane Name</Label>
+            <Label htmlFor="title">Column Title</Label>
             <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Frontend Team, Project Alpha, John Doe"
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g., In Progress, Review, Done"
               autoFocus
             />
-            <p className="text-xs text-gray-500">
-              Name this swimlane by project, team, or person
-            </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="color">Swimlane Color</Label>
+            <Label htmlFor="color">Column Color</Label>
             <div className="flex items-center gap-3">
               <Input
                 id="color"
                 type="color"
-                value={color}
+                value={color.startsWith('#') ? color : '#9CA3AF'}
                 onChange={(e) => setColor(e.target.value)}
                 className="h-10 w-20 cursor-pointer"
               />
@@ -99,27 +89,27 @@ export function SwimlaneDialog({
                 type="text"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                placeholder="#3b82f6"
+                placeholder="#9CA3AF"
                 className="flex-1 font-mono text-sm"
               />
             </div>
             <p className="text-xs text-gray-500">
-              Color for swimlane label and timeline row background
+              Choose a color to help identify this column
             </p>
           </div>
         </div>
 
         <DialogFooter className="gap-2">
-          {swimlane && onDelete && (
+          {column && onDelete && (
             <Button variant="destructive" onClick={handleDelete} className="mr-auto">
-              Delete
+              Delete Column
             </Button>
           )}
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim()}>
-            {swimlane ? 'Update' : 'Create'}
+          <Button onClick={handleSave} disabled={!title.trim()}>
+            {column ? 'Update' : 'Create'}
           </Button>
         </DialogFooter>
       </DialogContent>

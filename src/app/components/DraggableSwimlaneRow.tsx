@@ -271,11 +271,31 @@ export function DraggableSwimlaneRow({
   // Tasks are already filtered by the parent (TimelineView) based on mode
   const timelineTasks = tasks;
 
+  // Helper to convert hex color to rgba with opacity
+  const getRowBackgroundColor = (color?: string) => {
+    if (!color) {
+      console.log('No color for swimlane:', swimlane.name);
+      return undefined;
+    }
+    
+    // Parse hex color to RGB
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    const rgba = `rgba(${r}, ${g}, ${b}, 0.08)`;
+    console.log(`Swimlane ${swimlane.name} color:`, color, '→', rgba);
+    return rgba;
+  };
+
   return (
     <div
       ref={ref}
       className={`swimlane-row ${isTaskOver && canDrop ? 'dragging-over' : ''}`}
-      style={{ height: `${rowHeight || 48}px` }}
+      style={{ 
+        height: `${rowHeight || 48}px`
+      }}
     >
     
 
@@ -285,6 +305,9 @@ export function DraggableSwimlaneRow({
         className={`swimlane-row-timeline ${
           isTaskOver && canDrop ? 'drop-target' : ''
         }`}
+        style={{
+          backgroundColor: getRowBackgroundColor(swimlane.color)
+        }}
       >
         {/* Drop indicator line when dragging over - positioned in viewport coordinates */}
         {isTaskOver && canDrop && typeof dropLinePosition === 'number' && scrollContainerRef?.current && (

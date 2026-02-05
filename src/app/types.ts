@@ -5,6 +5,7 @@ export interface Person {
   name: string;
   role: string;
   avatar?: string;
+  color?: string;
 }
 
 export interface Task {
@@ -18,6 +19,7 @@ export interface Task {
   swimlaneOnly?: boolean; // Tasks that only appear in swimlanes
   swimlaneId?: string; // Which timeline swimlane row this task belongs to
   assigneeId?: string; // Person assigned to this task
+  project?: string; // Project this task belongs to
 }
 
 export interface Swimlane {

@@ -6,12 +6,12 @@ interface TaskCardProps {
   title: string;
   notes?: string;
   color?: string;
-  swimlane?: string;
+  project?: string;
   onClick?: () => void;
   onRename?: (newTitle: string) => void;
 }
 
-export function TaskCard({ title, notes, color, swimlane, onClick, onRename }: TaskCardProps) {
+export function TaskCard({ title, notes, color, project, onClick, onRename }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -54,7 +54,7 @@ export function TaskCard({ title, notes, color, swimlane, onClick, onRename }: T
               </p>
             )}
 
-            {swimlane && <div className="mt-1"><Badge variant="secondary">{swimlane}</Badge></div>}
+            {project && <div className="mt-1"><Badge variant="outline">{project}</Badge></div>}
             {notes && <p className="text-xs text-gray-500 mt-1 line-clamp-3">{notes}</p>}
           </div>
         </div>

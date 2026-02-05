@@ -17,7 +17,7 @@
 .timeline-scroll-btn:disabled { opacity: 0.5; pointer-events: none; }
 
 /* Paint-hints to reduce rendering artifacts when resizing */
-.timeline-viewport, .month-column, .day-row, .swimlane-rows, .swimlane-row {
+.timeline-viewport, .month-column, .day-row, .swimlane-rows {
   will-change: transform, opacity;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
