@@ -13,7 +13,7 @@ const Download = () => {
           <div className="flex flex-col items-center gap-6">
             <a 
               href="https://github.com/lorddarq/Plumy/releases/latest" 
-              className="inline-flex items-center gap-3 px-8 py-4 bg-nordic-blue text-white rounded-lg hover:bg-nordic-blue/90 transition-all shadow-md hover:shadow-lg font-light text-lg"
+              className="inline-flex items-center gap-3 px-8 py-4 bg-nordic-blue text-black rounded-lg hover:bg-nordic-blue/90 transition-all shadow-md hover:shadow-lg font-light text-lg"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
