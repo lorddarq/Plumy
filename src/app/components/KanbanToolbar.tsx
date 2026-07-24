@@ -13,6 +13,7 @@ import { Input } from './ui/input';
 import { UNASSIGNED_ASSIGNEE_FILTER_VALUE, type KanbanTaskFilterKey } from '../utils/taskFilters';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { MagnifierIcon } from './icons/MagnifierIcon';
+import type { KanbanTaskOrder } from '../utils/taskOrdering';
 
 const ALL_FILTER_VALUE = '__omvra_all__';
 
@@ -28,6 +29,7 @@ interface KanbanToolbarProps {
   projectFilterValue: string;
   priorityFilterValue: string;
   assigneeFilterValue: string;
+  order: KanbanTaskOrder;
   condensedUI: boolean;
   hasActiveFilters: boolean;
   activeProjectId?: string;
@@ -36,6 +38,7 @@ interface KanbanToolbarProps {
   projects: TimelineSwimlane[];
   people: Person[];
   onSearchQueryChange: (value: string) => void;
+  onOrderChange: (value: KanbanTaskOrder) => void;
   onFilterValueChange: (key: KanbanTaskFilterKey, value: string) => void;
   onClearFilter: (key: KanbanTaskFilterKey) => void;
   onClearAllFilters: () => void;
@@ -47,6 +50,7 @@ export function KanbanToolbar({
   projectFilterValue,
   priorityFilterValue,
   assigneeFilterValue,
+  order,
   condensedUI,
   hasActiveFilters,
   activeProjectId,
@@ -55,6 +59,7 @@ export function KanbanToolbar({
   projects,
   people,
   onSearchQueryChange,
+  onOrderChange,
   onFilterValueChange,
   onClearFilter,
   onClearAllFilters,
@@ -87,6 +92,25 @@ export function KanbanToolbar({
             </SelectItem>
           ))}
         </KanbanFilterSelect>
+
+        <Select value={order} onValueChange={(value) => onOrderChange(value as KanbanTaskOrder)}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <SelectTrigger size="sm" className="kanban-filter-trigger">
+                <SelectValue placeholder="Order" />
+              </SelectTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Order cards</TooltipContent>
+          </Tooltip>
+          <SelectContent className="omvra-filter-select-content">
+            <SelectItem value="manual">Manual order</SelectItem>
+            <SelectItem value="urgency">Urgency</SelectItem>
+            <SelectItem value="project">Project</SelectItem>
+            <SelectItem value="complexity">Complexity</SelectItem>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+          </SelectContent>
+        </Select>
 
         <KanbanFilterSelect
           value={priorityFilterValue}

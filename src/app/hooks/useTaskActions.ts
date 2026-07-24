@@ -16,6 +16,7 @@ interface UseTaskActionsOptions {
 export function createDuplicatedTask(source: Task, taskId = `${Date.now()}-copy`): Task {
   return {
     id: taskId,
+    createdAt: new Date().toISOString(),
     title: `${source.title} (copy)`,
     status: source.status,
     notes: source.notes,
@@ -60,6 +61,7 @@ export function useTaskActions({
     const taskId = Date.now().toString();
     const newTask: Task = {
       id: taskId,
+      createdAt: new Date().toISOString(),
       title: taskData.title!,
       status: taskData.status || 'open',
       notes: taskData.notes,

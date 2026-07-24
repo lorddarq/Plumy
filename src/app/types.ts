@@ -56,6 +56,7 @@ export interface Person {
 export interface Task {
   id: string;
   title: string;
+  createdAt?: string;
   status: TaskStatus;
   notes?: string;
   startDate?: string;

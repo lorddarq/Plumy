@@ -23,6 +23,7 @@ import {
   type KanbanTaskFilterKey,
   type KanbanTaskFilters,
 } from '../../utils/taskFilters';
+import { orderKanbanTasks, type KanbanTaskOrder } from '../../utils/taskOrdering';
 
 const COLUMN_DRAG_EDGE_SCROLL_ZONE = 96;
 const COLUMN_DRAG_EDGE_SCROLL_STEP = 28;
@@ -74,6 +75,7 @@ export function KanbanView({
   const containerRef = scrollContainerRef ?? fallbackContainerRef;
   const didRestoreInitialScrollRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [order, setOrder] = useState<KanbanTaskOrder>('manual');
   const [filters, setFilters] = useState<KanbanTaskFilters>(() =>
     sanitizeKanbanTaskFilters(initialFilters, projects, people)
   );
@@ -89,7 +91,7 @@ export function KanbanView({
   const isBoardFiltered = isSearchActive || hasActiveFilters;
 
   const filteredTasks = useMemo(() => {
-    return filterKanbanTasks(tasks, activeFilters).filter(task => {
+    const matchingTasks = filterKanbanTasks(tasks, activeFilters).filter(task => {
       if (isSearchActive) {
         const haystack = `${task.title} ${task.notes || ''}`.toLowerCase();
         if (!haystack.includes(trimmedSearchQuery)) return false;
@@ -97,7 +99,8 @@ export function KanbanView({
 
       return true;
     });
-  }, [activeFilters, isSearchActive, tasks, trimmedSearchQuery]);
+    return orderKanbanTasks(matchingTasks, order, projects);
+  }, [activeFilters, isSearchActive, order, projects, tasks, trimmedSearchQuery]);
 
   useEffect(() => {
     persistKanbanTaskFilters(activeFilters);
@@ -197,6 +200,7 @@ export function KanbanView({
         projectFilterValue={projectFilterValue}
         priorityFilterValue={priorityFilterValue}
         assigneeFilterValue={assigneeFilterValue}
+        order={order}
         condensedUI={condensedUI}
         hasActiveFilters={hasActiveFilters}
         activeProjectId={activeFilters.projectId}
@@ -205,6 +209,7 @@ export function KanbanView({
         projects={projects}
         people={people}
         onSearchQueryChange={setSearchQuery}
+        onOrderChange={setOrder}
         onFilterValueChange={setFilterValue}
         onClearFilter={clearFilter}
         onClearAllFilters={clearAllFilters}
