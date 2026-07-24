@@ -1,12 +1,25 @@
 # Omvra
 
-Omvra is an Electron desktop project-management app with synchronized planning surfaces:
+[![Packaging CI](https://github.com/lorddarq/omvra/actions/workflows/packaging.yml/badge.svg)](https://github.com/lorddarq/omvra/actions/workflows/packaging.yml)
+[![Pages deployment](https://github.com/lorddarq/omvra/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/lorddarq/omvra/actions/workflows/deploy-pages.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Electron](https://img.shields.io/badge/Electron-desktop-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=20232A)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![MCP](https://img.shields.io/badge/MCP-enabled-6f42c1)](#mcp-integration-desktop)
 
-- Timeline view: calendar-like scheduling across project swimlanes
-- Kanban view: status-column workflow management
-- Roadmap view: milestones, linked tasks, and intertask dependencies
+Omvra is an Electron desktop project-management app for planning work, coordinating tasks, and connecting human and agent workflows through synchronized UI and MCP surfaces.
 
-The app is designed so contributors and agents can reason about the same task dataset through UI and MCP projections.
+## Features
+
+- **Synchronized planning views** — move between Timeline scheduling, Kanban status workflow, and Roadmap milestones without splitting the underlying task data.
+- **Task coordination** — manage descriptions, markdown previews, comments, attachments, assignees, dependencies, and approximate effort.
+- **Workspace portability** — create full backups/imports covering tasks, people, projects, roadmap data, preferences, and UI state.
+- **Agent-aware workflows** — assign work to agentic people, configure board watchers, and hand tasks off for human review.
+- **MCP integration** — expose workspace projections and revision-protected task, roadmap, attachment, effort, and review workflow tools to MCP clients.
+- **Secure desktop boundaries** — Electron main/preload separation, context isolation, local MCP binding, capability profiles, and audited writes.
+
+The detailed architecture, setup commands, and MCP surface are documented below.
 
 ## Tech Stack
 
