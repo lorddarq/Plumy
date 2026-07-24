@@ -38,7 +38,7 @@ The detailed architecture, setup commands, and MCP surface are documented below.
 - `.github/workflows/`: CI for packaging and Pages deployment
 - `specs/`: product/architecture specs for major initiatives
 
-## Setup
+## Getting started
 
 ```bash
 npm install
@@ -119,8 +119,12 @@ This runs `electron/scripts/generate-icons.cjs` and:
   - exposes safe `window.electron` APIs
   - keeps context isolation enabled
 - `src/app/App.tsx`
-  - source-of-truth UI state orchestration
-  - passes handlers and state to Timeline/Kanban components
+  - composes the workspace and UI-layout store providers
+  - connects the app shell to the main views, panels, dialogs, and status surfaces
+- `src/app/store/`
+  - owns workspace data and UI-layout state providers
+- `src/app/hooks/useAppShell.ts`
+  - coordinates actions, projections, persistence, diagnostics, and panel state
 
 ### Data model and persistence
 
@@ -161,7 +165,7 @@ Tasks can also carry roadmap and approximate effort metadata:
 
 These fields are preserved by workspace sanitizers, backup/import, app restarts, task reads, and the MCP workspace snapshot. Time logging is intentionally estimate-based; Omvra does not provide a stopwatch or billing workflow.
 
-Desktop persistence is now canonical-store aware:
+Desktop persistence:
 
 - renderer state is mirrored through storage helpers
 - Electron process uses `electron-store` as the canonical desktop persistence surface
@@ -330,7 +334,7 @@ npm run build:pages
 Workflow: `.github/workflows/deploy-pages.yml`
 
 - triggers on pushes to `main` when files under `pages/**` change
-- builds with Node 20
+- builds with Node 24
 - uploads `dist-pages` as Pages artifact
 - deploys with `actions/deploy-pages`
 
@@ -347,7 +351,7 @@ Workflow: `.github/workflows/packaging.yml`
 - uploads platform artifacts
 - creates GitHub Release and attaches `.dmg`, `.exe`, `.AppImage` outputs when available
 
-## Useful Checks
+## Tests and operational checks
 
 ```bash
 npm run test:mcp
@@ -356,41 +360,7 @@ npm run mcp:smoke
 npm run mcp:stdio
 ```
 
-These commands cover:
-
-- MCP/workspace contract tests
-- shared MCP/UI/backup contract tests
-- a local MCP smoke test
-- local stdio MCP server startup
-
-## Current Agent Workflow Support
-
-Omvra now supports an agent-oriented desktop workflow:
-
-- people can be marked as `human` or `agentic`
-- tasks can be assigned to agentic people
-- agentic people can be configured to watch a specific kanban board/status
-- watcher settings live in the People panel and include:
-  - watched board
-  - action mode
-  - optional project filter
-  - optional search filter
-  - poll interval
-- watcher state keeps duplicate processing suppression on the MCP side
-- agents can move work into human-review boards and leave structured comments/activity entries
-- agents can discover assigned work through MCP resources/templates and use a single review-handoff workflow tool
-
-## Comments and Task Context
-
-Tasks now support:
-
-- markdown description/details
-- structured comments
-- structured MCP activity entries
-- brief agent completion blocks for review handoff
-- parsed project/repo hints from the task description for agent routing
-
-Comments are part of the task payload and are included in backup/import flows.
+These cover MCP/workspace contracts, shared UI and backup/import contracts, a local MCP smoke test, and the stdio server entrypoint.
 
 ## Contributor Notes
 
