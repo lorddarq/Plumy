@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { getGoalScopedRequirements } = require('./goal-state-service.cjs');
 
 const GOAL_POLICY_KEY = 'omvra.goalPolicy.v1';
 const GOAL_POLICY_IMPACTS_KEY = 'omvra.goalPolicyImpacts.v1';
@@ -118,7 +119,7 @@ function resolveGoalPolicy({ workspacePolicy, goal, targetElementId } = {}) {
   };
 }
 
-function buildGoalContractPacket({ goal, effectivePolicy, executionAttempt = 1, now = () => new Date().toISOString() } = {}) {
+function buildGoalContractPacket({ goal, effectivePolicy, executionAttempt = 1, now = () => new Date().toISOString(), inputResolution, capabilityResolution } = {}) {
   const elements = Array.isArray(goal?.elements) ? goal.elements : [];
   const deliverables = elements
     .filter(item => item?.type === 'deliverable')
@@ -129,11 +130,23 @@ function buildGoalContractPacket({ goal, effectivePolicy, executionAttempt = 1, 
       deliverySpec: item.deliverySpec,
       deliverableStatus: item.deliverableStatus,
     }));
+  const artifactContributions = elements
+    .filter(item => ['goal', 'subgoal'].includes(item?.type))
+    .flatMap(item => (Array.isArray(item.artifactReferences) ? item.artifactReferences : []).filter(reference => ['dependency', 'evidence'].includes(reference?.contribution)).map(reference => ({
+      ...reference,
+      elementId: item.id,
+    })));
+  const requirements = getGoalScopedRequirements(goal);
   const references = {
     objective: goal?.title,
     scope: goal?.scope ?? goal?.scopedInstructions ?? goal?.description,
     instructions: goal?.instructions ?? elements.filter(item => item?.type === 'instructions').map(item => item.instructions || item.content || item.title).filter(Boolean),
     outputs: goal?.outputs ?? goal?.expectedOutputs ?? deliverables,
+    artifactContributions,
+    inputs: requirements.inputs,
+    capabilities: requirements.capabilities,
+    inputResolution,
+    capabilityResolution,
     constraints: goal?.constraints,
     permissions: effectivePolicy?.permissions ?? goal?.permissions,
     acceptance: goal?.acceptance ?? effectivePolicy?.acceptance,
@@ -160,6 +173,8 @@ function buildGoalContractPacket({ goal, effectivePolicy, executionAttempt = 1, 
     goalId: goal?.id,
     objective: goal?.title,
     references,
+    inputResolution,
+    capabilityResolution,
     effectivePolicy,
     policyRevision: stable.policyRevision,
     executionAttempt,

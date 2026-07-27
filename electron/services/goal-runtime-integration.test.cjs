@@ -4,6 +4,7 @@ const { createRequestDispatcher } = require('./mcp-http-server.cjs');
 const { createGoalLifecycleService } = require('./goal-lifecycle-service.cjs');
 const { createGoalRuntimeService } = require('./goal-runtime-service.cjs');
 const { updateGoal } = require('./workspace-service.cjs');
+const { EVIDENCE_KEY } = require('./goal-state-service.cjs');
 const { makeStoreFromFixture, GOALS_KEY } = require('./test-fixtures.cjs');
 
 function request(name, argumentsValue) {
@@ -112,4 +113,37 @@ test('Goal artifact links project canonical task and milestone state without mut
   }), req());
   assert.equal(stale.error.data.error, 'REVISION_MISMATCH');
   assert.equal(store.get('omvra.goalArtifactAudit.v1').length, 1);
+});
+
+test('dependency and evidence contributions expose typed projection state and gate lifecycle operations', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [GOALS_KEY]: [{
+      id: 'goal-contribution-gates',
+      title: 'Contribution gates',
+      revision: 0,
+      elements: [{
+        id: 'subgoal-1',
+        type: 'subgoal',
+        title: 'Validate sources',
+        x: 0,
+        y: 0,
+        artifactReferences: [
+          { id: 'dependency-1', artifactType: 'task', artifactId: 'task-1', contribution: 'dependency', sourceRevision: 2 },
+          { id: 'evidence-1', artifactType: 'evidence', artifactId: 'evidence-1', contribution: 'evidence', contentHash: 'sha256-proof' },
+        ],
+      }],
+    }],
+    'omvra.tasks.v1': [{ id: 'task-1', title: 'Prepare source', status: 'open', __mcpRevision: 2 }],
+    [EVIDENCE_KEY]: [{ id: 'evidence-1', goalId: 'goal-contribution-gates', executionId: 'source-execution', ref: 'proof-1', immutable: true, metadata: { contentHash: 'sha256-proof', contractRevision: 1 } }],
+  });
+  const dispatch = createRequestDispatcher(store);
+  const projected = dispatch(request('goals.get', { goalId: 'goal-contribution-gates' }), req()).result.structuredContent;
+  const references = projected.elements[0].artifactReferences;
+  assert.equal(references[0].projection.contributionState, 'blocked-dependency');
+  assert.equal(references[1].projection.contributionState, 'verified-evidence');
+
+  const lifecycle = createGoalLifecycleService({ store, now: () => '2026-07-27T10:00:00.000Z' });
+  const blocked = lifecycle.execute({ goalId: 'goal-contribution-gates', command: 'start', expectedRevision: 0, commandId: 'contribution-start-blocked' });
+  assert.equal(blocked.error, 'DEPENDENCY_CONTRIBUTION_BLOCKED');
+  assert.equal(store.get('omvra.tasks.v1')[0].status, 'open');
 });

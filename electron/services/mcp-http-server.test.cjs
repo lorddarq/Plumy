@@ -615,6 +615,8 @@ test('MCP Goal writes round-trip versioned agent configuration and dispatch meta
     goalId: 'goal-agent-mcp', expectedRevision: 0,
     humanConfirmed: true,
     title: 'Agent MCP',
+    inputs: [{ id: 'secret-brief', kind: 'inline', sensitive: true, value: 'must not persist', valueRef: 'vault://brief' }],
+    capabilities: [{ id: 'read-files', capabilityId: 'files.read', source: 'local', version: '1.0.0', permission: 'allowed' }],
     elements: [{ id: 'agent-node', type: 'agent', title: 'Research', x: 0, y: 0, agentConfiguration: configuration }],
   });
   assert.equal(updated.result.structuredContent.goal.elements[0].agentConfiguration.mode, 'ephemeral');
@@ -622,6 +624,48 @@ test('MCP Goal writes round-trip versioned agent configuration and dispatch meta
   assert.deepEqual(read.agents[0].agentConfiguration, configuration);
   assert.equal(read.agents[0].agentDispatch.status, 'recruitment-requested');
   assert.equal(read.agents[0].agentDispatch.profileSource, 'none');
+  assert.equal(read.inputs[0].value, undefined);
+  assert.equal(read.inputs[0].valueRef, 'vault://brief');
+  assert.equal(read.capabilities[0].capabilityId, 'files.read');
+});
+
+test('Goal project bindings are revision-protected, projected, audited, and non-mutating', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [GOALS_KEY]: [{ id: 'goal-project-bindings', title: 'Route work', revision: 0, elements: [] }],
+  });
+  store.set('omvra.preferences.v1', { mcpAgentAccessEnabled: true, mcpCapabilityProfile: 'task_write' });
+  const dispatch = createRequestDispatcher(store);
+  const call = (name, argumentsValue) => dispatch({
+    jsonrpc: '2.0', id: `project-bindings-${name}`, method: 'tools/call', params: { name, arguments: argumentsValue },
+  }, makeReq());
+  const originalProject = JSON.parse(JSON.stringify(store.get('omvra.swimlanes.v1')[0]));
+  const updated = call('goals.update_project_bindings', {
+    goalId: 'goal-project-bindings',
+    projectBindings: [
+      { id: 'primary-binding', projectId: 'lane-1', role: 'primary' },
+      { id: 'missing-binding', projectId: 'deleted-project', role: 'dependency' },
+    ],
+    expectedRevision: 0,
+    idempotencyKey: 'project-bindings-1',
+    humanConfirmed: true,
+  });
+  assert.equal(updated.result.structuredContent.revision, 1);
+  assert.equal(updated.result.structuredContent.goal.projectBindings[0].projectId, 'lane-1');
+  const read = call('goals.get', { goalId: 'goal-project-bindings' }).result.structuredContent;
+  assert.equal(read.projectBindingState, 'stale');
+  assert.equal(read.projectBindings.find(binding => binding.projectId === 'lane-1').projection.state, 'active');
+  assert.equal(read.projectBindings.find(binding => binding.projectId === 'deleted-project').projection.state, 'stale-project');
+  assert.deepEqual(store.get('omvra.swimlanes.v1')[0], originalProject);
+  assert.equal(store.get('omvra.goalProjectBindingAudit.v1').at(-1).projectIds.length, 2);
+  const duplicate = call('goals.update_project_bindings', {
+    goalId: 'goal-project-bindings', projectBindings: [], expectedRevision: 0, idempotencyKey: 'project-bindings-1', humanConfirmed: true,
+  });
+  assert.equal(duplicate.result.structuredContent.idempotent, true);
+  const removed = call('goals.update_project_bindings', {
+    goalId: 'goal-project-bindings', projectBindings: [], expectedRevision: 1, idempotencyKey: 'project-bindings-2', humanConfirmed: true,
+  });
+  assert.equal(removed.result.structuredContent.goal.projectBindings?.length ?? 0, 0);
+  assert.equal(call('goals.update_project_bindings', { goalId: 'goal-project-bindings', projectBindings: [], expectedRevision: 0, idempotencyKey: 'stale-bindings', humanConfirmed: true }).error.code, -32602);
 });
 
 test('focused Goal element and connector writes are revision-checked and idempotent', () => {

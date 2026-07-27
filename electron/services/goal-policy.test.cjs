@@ -56,7 +56,7 @@ test('contract packets carry the effective policy and revision', () => {
   assert.equal(packet.contractRevision, 3);
   assert.equal(packet.policyRevision, 9);
   assert.equal(packet.effectivePolicy.acceptance.actor, 'human');
-  assert.deepEqual(Object.keys(packet.references), ['objective', 'scope', 'instructions', 'outputs', 'constraints', 'permissions', 'acceptance', 'evidence', 'handoff', 'sequence', 'budget', 'project', 'roster']);
+  assert.deepEqual(Object.keys(packet.references), ['objective', 'scope', 'instructions', 'outputs', 'artifactContributions', 'inputs', 'capabilities', 'inputResolution', 'capabilityResolution', 'constraints', 'permissions', 'acceptance', 'evidence', 'handoff', 'sequence', 'budget', 'project', 'roster']);
   assert.match(packet.contractHash, /^sha256-/);
 });
 

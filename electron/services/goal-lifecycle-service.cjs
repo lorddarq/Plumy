@@ -9,6 +9,8 @@ const {
   EVIDENCE_KEY,
   createEvidenceRecord,
   normalizeAgentConfiguration,
+  resolveGoalInputs,
+  resolveGoalCapabilities,
 } = require('./goal-state-service.cjs');
 const { GOAL_POLICY_KEY, buildGoalContractPacket, getPendingGoalPolicyImpact, resolveGoalPolicy, resolveGoalPolicyImpact } = require('./goal-policy.cjs');
 const { collectSkillRequirements, resolveRequiredSkills } = require('./skill-service.cjs');
@@ -230,7 +232,15 @@ function buildAgentDelegations(store, goal) {
 }
 
 function buildContractPacket(store, goal, effectivePolicy, executionAttempt, now, options = {}) {
-  const packet = buildGoalContractPacket({ goal, effectivePolicy, executionAttempt, now });
+  const inputResolution = resolveGoalInputs(store, goal, {
+    targetElementId: options.targetElementId,
+    availableResources: options.availableResources,
+  });
+  const capabilityResolution = resolveGoalCapabilities(store, goal, {
+    targetElementId: options.targetElementId,
+    availableCapabilities: options.availableCapabilities,
+  });
+  const packet = buildGoalContractPacket({ goal, effectivePolicy, executionAttempt, now, inputResolution, capabilityResolution });
   const agentDelegations = buildAgentDelegations(store, goal);
   const skillRequirements = collectSkillRequirements(goal);
   const preferences = store.get(PREFERENCES_KEY) || {};
@@ -284,6 +294,70 @@ function validateAgentDispatch({ store, goal, targetElementId }) {
   return failure('AGENT_UNAVAILABLE', 'The configured canonical agent is unavailable and temporary recruitment fallback is disabled.', { targetElementId, assigneeId: configuration.assigneeId });
 }
 
+function getGoalArtifactContributions(goal, targetElementId) {
+  const elements = Array.isArray(goal?.elements) ? goal.elements : [];
+  const selected = targetElementId ? elements.find(element => element?.id === targetElementId) : null;
+  const owners = elements.filter(element => element?.type === 'goal' || (!targetElementId && element?.type === 'subgoal') || element?.id === selected?.id);
+  return owners.flatMap(element => (Array.isArray(element.artifactReferences) ? element.artifactReferences : []).map(reference => ({ ...reference, elementId: element.id })));
+}
+
+function validateArtifactContributions({ store, goal, execution, command, targetElementId }) {
+  const contributions = getGoalArtifactContributions(goal, targetElementId);
+  const dependencies = contributions.filter(reference => reference.contribution === 'dependency');
+  if (['start', 'dispatch'].includes(command) && dependencies.length) {
+    const tasks = readArray(store, 'omvra.tasks.v1');
+    const milestones = readArray(store, 'omvra.milestones.v1');
+    const executions = readArray(store, EXECUTIONS_KEY);
+    const blocked = dependencies.filter(reference => {
+      if (reference.artifactType === 'task') return !tasks.some(task => task?.id === reference.artifactId && task.status === 'done');
+      if (reference.artifactType === 'milestone') {
+        const milestone = milestones.find(candidate => candidate?.id === reference.artifactId);
+        return !milestone || !Array.isArray(milestone.linkedTaskIds) || milestone.linkedTaskIds.length === 0
+          || milestone.linkedTaskIds.some(taskId => !tasks.some(task => task?.id === taskId && task.status === 'done'));
+      }
+      if (reference.artifactType === 'goal') return !executions.some(candidate => candidate?.goalId === reference.artifactId && candidate.state === 'complete');
+      return true;
+    });
+    if (blocked.length) return failure('DEPENDENCY_CONTRIBUTION_BLOCKED', 'A dependency contribution is missing or not complete.', { blockedContributions: blocked.map(reference => ({ elementId: reference.elementId, artifactType: reference.artifactType, artifactId: reference.artifactId })) });
+  }
+  const evidence = contributions.filter(reference => reference.contribution === 'evidence');
+  if (['request-handoff', 'accept', 'complete'].includes(command) && evidence.length) {
+    const records = readArray(store, EVIDENCE_KEY);
+    const tasks = readArray(store, 'omvra.tasks.v1');
+    const milestones = readArray(store, 'omvra.milestones.v1');
+    const goals = readArray(store, GOALS_KEY);
+    const currentRevisionFor = reference => {
+      if (reference.artifactType === 'evidence') {
+        const record = records.find(candidate => candidate?.id === reference.artifactId || candidate?.ref === reference.artifactId);
+        return record?.metadata?.contractRevision ?? record?.metadata?.sourceRevision;
+      }
+      if (reference.artifactType === 'task') return tasks.find(task => task?.id === reference.artifactId)?.__mcpRevision;
+      if (reference.artifactType === 'milestone') return milestones.find(milestone => milestone?.id === reference.artifactId)?.__mcpRevision;
+      if (reference.artifactType === 'goal') return goals.find(candidate => candidate?.id === reference.artifactId)?.revision ?? goals.find(candidate => candidate?.id === reference.artifactId)?.__mcpRevision;
+      return undefined;
+    };
+    const missing = evidence.filter(reference => {
+      if (reference.artifactType === 'evidence') {
+        const record = records.find(candidate => candidate?.id === reference.artifactId || candidate?.ref === reference.artifactId);
+        return !record || record.immutable !== true
+          || record.goalId !== goal.id
+          || (execution?.id && record.executionId !== execution.id)
+          || (reference.sourceRevision !== undefined && Number(reference.sourceRevision) !== Number(currentRevisionFor(reference)))
+          || (reference.contentHash && reference.contentHash !== record.metadata?.contentHash && reference.contentHash !== record.metadata?.hash);
+      }
+      if (reference.artifactType === 'task') return !tasks.some(task => task?.id === reference.artifactId)
+        || (reference.sourceRevision !== undefined && Number(reference.sourceRevision) !== Number(currentRevisionFor(reference)));
+      if (reference.artifactType === 'milestone') return !milestones.some(milestone => milestone?.id === reference.artifactId)
+        || (reference.sourceRevision !== undefined && Number(reference.sourceRevision) !== Number(currentRevisionFor(reference)));
+      if (reference.artifactType === 'goal') return !findGoal(store, reference.artifactId)
+        || (reference.sourceRevision !== undefined && Number(reference.sourceRevision) !== Number(currentRevisionFor(reference)));
+      return true;
+    });
+    if (missing.length) return failure('EVIDENCE_CONTRIBUTION_MISSING', 'An evidence contribution is missing, stale, or not immutable.', { missingContributions: missing.map(reference => ({ elementId: reference.elementId, artifactType: reference.artifactType, artifactId: reference.artifactId })) });
+  }
+  return { ok: true };
+}
+
 function appendCleanupAudit(store, record, payload = {}) {
   const directory = getAuditArchiveDirectory(store, payload);
   if (!directory) return { status: 'unconfigured' };
@@ -299,6 +373,20 @@ function appendCleanupAudit(store, record, payload = {}) {
 }
 
 function validateControlInputs({ store, goal, execution, command, payload }) {
+  const contributionValidation = validateArtifactContributions({ store, goal, execution, command, targetElementId: payload.targetElementId });
+  if (!contributionValidation.ok) return contributionValidation;
+  if (['start', 'dispatch'].includes(command) && payload.contractPacket?.inputResolution?.ok === false) {
+    return failure('GOAL_INPUTS_BLOCKED', 'Required Goal inputs must resolve before setup or dispatch.', {
+      inputResolution: payload.contractPacket.inputResolution,
+    });
+  }
+  if (['start', 'dispatch'].includes(command) && payload.contractPacket?.capabilityResolution?.ok === false) {
+    const states = payload.contractPacket.capabilityResolution.blockingResults.map(result => result.state);
+    const error = states.includes('denied') ? 'GOAL_CAPABILITY_DENIED' : states.includes('incompatible') ? 'GOAL_CAPABILITY_INCOMPATIBLE' : 'GOAL_CAPABILITIES_BLOCKED';
+    return failure(error, 'Required Goal capabilities must be available and permitted before setup or dispatch.', {
+      capabilityResolution: payload.contractPacket.capabilityResolution,
+    });
+  }
   if (['start', 'dispatch'].includes(command) && payload.contractPacket?.skillResolution?.ok === false) {
     return failure('SKILL_PREFLIGHT_BLOCKED', 'Required skills must resolve before Goal setup or dispatch.', {
       skillResolution: payload.contractPacket.skillResolution,

@@ -12,6 +12,7 @@ const {
   listGoals,
   getGoalById,
   updateGoal,
+  updateGoalProjectBindings,
   updateGoalElement,
   updateGoalArtifactReferences,
   listMilestones,
@@ -254,11 +255,41 @@ const WRITE_TOOL_DEFINITIONS = [
         goalId: { type: 'string' },
         title: { type: 'string' },
         elements: { type: 'array', items: { type: 'object' } },
+        inputs: { type: 'array', items: { type: 'object' } },
+        capabilities: { type: 'array', items: { type: 'object' } },
+        projectBindings: { type: 'array', items: { type: 'object' } },
         overseerAgentId: { type: 'string' },
         humanConfirmed: { type: 'boolean' },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['goalId', 'elements', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'goals.update_project_bindings',
+    description: 'Replaces a Goal project-binding relation with optimistic revision and idempotency protection. Bindings are references only; project source records are not copied or mutated.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        goalId: { type: 'string' },
+        projectBindings: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              projectId: { type: 'string' },
+              role: { enum: ['primary', 'contributor', 'dependency'] },
+            },
+            required: ['projectId', 'role'],
+          },
+        },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        idempotencyKey: { type: 'string' },
+        humanConfirmed: { type: 'boolean' },
+      },
+      required: ['goalId', 'projectBindings', 'expectedRevision', 'idempotencyKey'],
     },
   },
   {
@@ -280,14 +311,28 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'goals.update_artifacts',
-    description: 'Replaces the additive execution-artifact links for one Goal, Subgoal, or Supporting Artifact node with optimistic Goal revision protection. Deliverable nodes own output contracts and terminal handoffs; task and milestone records remain canonical and are projected read-only.',
+    description: 'Replaces additive execution-artifact links for one Goal, Subgoal, or Supporting Artifact node with optimistic Goal revision protection. Contributions may be supporting, dependency, or evidence; dependency/evidence projection state is derived read-only from canonical sources. Deliverable nodes own output contracts and terminal handoffs.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       properties: {
         goalId: { type: 'string' },
         elementId: { type: 'string' },
-        artifactReferences: { type: 'array', items: { type: 'object' } },
+        artifactReferences: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              artifactType: { enum: ['task', 'milestone', 'goal', 'evidence', 'document', 'file', 'url', 'user-defined'] },
+              artifactId: { type: 'string' },
+              contribution: { enum: ['supporting', 'dependency', 'evidence', 'deliverable'] },
+              sourceRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+              contentHash: { type: 'string' },
+            },
+            required: ['artifactType', 'artifactId'],
+          },
+        },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
         idempotencyKey: { type: 'string' },
         humanConfirmed: { type: 'boolean' },
@@ -783,6 +828,7 @@ const TOOL_NAME_ALIASES = new Map([
   ['goals_update', 'goals.update'],
   ['goals_update_element', 'goals.update_element'],
   ['goals_update_artifacts', 'goals.update_artifacts'],
+  ['goals_update_project_bindings', 'goals.update_project_bindings'],
   ['goals_update_connector', 'goals.update_connector'],
   ['goals_lifecycle', 'goals.lifecycle'],
   ['goals_gc', 'goals.gc'],
@@ -1687,6 +1733,9 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
         goalId,
         title: args.title,
         elements: args.elements,
+        inputs: args.inputs,
+        capabilities: args.capabilities,
+        projectBindings: args.projectBindings,
         overseerAgentId: args.overseerAgentId,
         expectedRevision: args.expectedRevision,
         actor: 'mcp-agent',
@@ -1719,6 +1768,26 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
           revision: result.revision,
         }),
       };
+    }
+
+    case 'goals.update_project_bindings': {
+      const goalId = parseGoalId(args);
+      if (!goalId) return { error: invalidParams('Invalid params: "goalId" (or "id") is required.') };
+      const result = updateGoalProjectBindings(store, {
+        goalId,
+        projectBindings: args.projectBindings,
+        expectedRevision: args.expectedRevision,
+        idempotencyKey: args.idempotencyKey,
+        actor: 'mcp-agent',
+        humanConfirmed: args.humanConfirmed === true,
+        emitRuntimeChange,
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, { outcome: 'denied', reason: result.error, toolName: name, entityId: goalId });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, { outcome: 'allowed', toolName: name, entityId: goalId, fields: ['projectBindings'], nextRevision: result.revision });
+      return { result: makeWriteToolResult(name, { changed: result.changed, idempotent: result.idempotent === true, auditId: audit?.auditId, goal: result.goal, revision: result.revision, bindingAudit: result.audit }) };
     }
 
     case 'goals.update_element':

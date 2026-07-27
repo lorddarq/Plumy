@@ -1,7 +1,7 @@
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { LinkIcon as Link2 } from '../icons/LinkIcon';
-import type { GoalAgentConfiguration, GoalAgentMode, GoalElement, GoalRetryExhaustionPolicy, Person } from '../../types.ts';
+import type { GoalAgentConfiguration, GoalAgentMode, GoalElement, GoalRecord, GoalRetryExhaustionPolicy, Person, TimelineSwimlane } from '../../types.ts';
 import type { GoalSchedule } from '../../types.ts';
 import { scheduleStatus } from '../../utils/goalSchedules.ts';
 
@@ -77,6 +77,36 @@ export function GoalsControlFlowSection({ element, retryTargetTitle, onUpdateEle
       </Select>
     </label>
     <div className="mt-3 rounded-md border border-cyan-100 bg-cyan-50/60 px-2.5 py-2 text-[11px] text-cyan-800"><span className="font-semibold">Retry target:</span> {retryTargetTitle ?? 'Connect this node to an earlier step.'}</div>
+  </section>;
+}
+
+export function GoalsRequirementsSection({ goal, element }: { goal?: GoalRecord; element?: GoalElement }) {
+  const inputs = [...(goal?.inputs ?? []), ...(element?.inputs ?? [])];
+  const capabilities = [...(goal?.capabilities ?? []), ...(element?.capabilities ?? [])];
+  if (inputs.length === 0 && capabilities.length === 0) return null;
+  return <section className="mt-5 border-t border-slate-100 pt-4">
+    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Contract requirements</p>
+    <p className="mt-1 text-[11px] text-slate-400">Typed references are resolved before setup. Contents and secrets are never copied into this inspector.</p>
+    <div className="mt-3 space-y-2">
+      {inputs.map(input => <div key={`input-${input.id}`} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"><p className="text-xs font-medium text-slate-700">Input · {input.label ?? input.id}</p><p className="mt-0.5 text-[11px] capitalize text-slate-400">{input.kind.replace('-', ' ')} · {input.scope}{input.required === false ? ' · optional' : ''}</p></div>)}
+      {capabilities.map(capability => <div key={`capability-${capability.id}`} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"><p className="text-xs font-medium text-slate-700">Capability · {capability.label ?? capability.capabilityId}</p><p className="mt-0.5 text-[11px] text-slate-400">{capability.source ?? 'any source'}{capability.version ? ` · ${capability.version}` : ''} · {capability.permission ?? 'permission unknown'}</p></div>)}
+    </div>
+  </section>;
+}
+
+export function GoalsProjectBindingsSection({ goal, projects }: { goal?: GoalRecord; projects: TimelineSwimlane[] }) {
+  const bindings = goal?.projectBindings ?? [];
+  const projectById = new Map(projects.map(project => [project.id, project]));
+  return <section className="mt-5 border-t border-slate-100 pt-4">
+    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Project bindings</p>
+    {bindings.length === 0 ? <p className="mt-2 rounded-md border border-dashed border-slate-200 px-2.5 py-2 text-[11px] text-slate-400">Projectless Goal · no synthetic project assigned.</p> : <div className="mt-3 space-y-2">{bindings.map(binding => {
+      const project = projectById.get(binding.projectId);
+      const state = binding.projection?.state ?? (project ? 'active' : 'stale-project');
+      return <div key={binding.id} className={`rounded-md border px-2.5 py-2 ${state === 'active' ? 'border-slate-200 bg-slate-50' : 'border-amber-200 bg-amber-50'}`}>
+        <p className="text-xs font-medium text-slate-700">{project?.name ?? binding.projection?.name ?? binding.projectId}</p>
+        <p className="mt-0.5 text-[11px] capitalize text-slate-400">{binding.role} · {state.replace('-', ' ')}{project?.description ? ` · ${project.description}` : ''}</p>
+      </div>;
+    })}</div>}
   </section>;
 }
 

@@ -610,6 +610,22 @@ Projects are optional contributor bindings, not the canonical owner of the Goal:
 
 The first relationship model should support an optional `primaryProjectId` plus zero or more explicit project bindings. These binding/reference collections are empty for a projectless Goal; they must not contain synthetic project ids.
 
+The implemented Goal binding relation is stored inline as versioned
+`projectBindings` on `omvra.goals.v1`. Each binding contains only a stable
+`projectId` and one role: `primary`, `contributor`, or `dependency`. A Goal may
+have zero bindings or at most one primary; repeated primary declarations are
+normalized to contributor references. Replace/remove is an atomic,
+revision-protected operation, and an empty replacement returns the Goal to a
+projectless state.
+
+Binding reads add a derived projection without copying the source project:
+`active` when the canonical project exists, `archived-project` when it is
+archived, and `stale-project` when the reference no longer resolves. These
+states are descriptive routing metadata only; they do not gate Goal
+execution. The source project, task, and milestone records remain unchanged.
+MCP and backup surfaces expose the reference and projection, while audit
+records capture binding replacement metadata without raw source contents.
+
 ```ts
 interface GoalRecord {
   id: string;
@@ -630,7 +646,7 @@ interface GoalProjectBinding {
 interface GoalArtifactReference {
   goalId: string;
   projectId?: string; // Required for project-owned task/milestone artifacts; omitted for projectless Goals.
-  artifactType: 'task' | 'milestone' | 'goal' | 'document' | 'file' | 'url' | 'user-defined';
+  artifactType: 'task' | 'milestone' | 'goal' | 'evidence' | 'document' | 'file' | 'url' | 'user-defined';
   artifactId: string;
   contribution?: 'deliverable' | 'dependency' | 'evidence';
   label?: string;
@@ -662,12 +678,60 @@ task, milestone, or Goal revision changes, projections expose stale references
 and the affected contract is re-evaluated rather than silently treating the
 old source as current.
 
+Dependency and evidence contributions are non-deliverable relation semantics:
+
+- A `dependency` contribution is an eligibility gate. A task dependency is
+  satisfied only when the source task is `done`; a milestone dependency is
+  satisfied only when all of its linked tasks are `done`; a Goal dependency is
+  satisfied only after a source Goal has a completed execution. Missing or
+  incomplete sources return a typed blocked result at Goal start/dispatch.
+- An `evidence` contribution identifies current supporting proof. It may point
+  to a task, milestone, Goal, or immutable evidence record. Native evidence
+  records must remain immutable; task/milestone/Goal references must still
+  resolve at the recorded source revision. Missing, changed, or unverifiable
+  evidence blocks handoff, acceptance, and completion.
+- Contribution state is a projection (`satisfied`, `blocked-dependency`,
+  `missing-evidence`, `verified-evidence`, or `stale-source`). It is derived
+  from canonical source records and never becomes a second status authority.
+- Replacing links is scoped to one Goal/Subgoal node; removing a link is
+  explicit. Source changes do not mutate or delete the relation or its audit
+  history. A later Goal revision or explicit relink is required to update a
+  stale contribution.
+
 Once execution begins, the resolved Goal contract/revision snapshot and its
 artifact references are immutable for that execution. Future edits create or
 target a later revision and cannot rewrite the historical decision basis used
 for downstream evaluation.
 
 A projectless Goal must still be executable when its inputs, capabilities, acceptance policy, and evidence requirements are defined. A recurring multi-source briefing may reference sources or MCP capabilities directly without creating project bindings or project-owned artifact references.
+
+### Typed Goal inputs and capabilities
+
+Inputs and capabilities are explicit contract data. They are never inferred
+from task or milestone contents, and declaring one never downloads, installs,
+executes, or grants access to anything.
+
+- Inputs use one of `inline`, `file`, `task`, `milestone`, `mcp-resource`, or
+  `external` kinds. Each reference carries a stable id, `scope`
+  (`goal`, `subgoal`, `agent`, or `contract`), required/optional state, and
+  only the locator or revision metadata needed to resolve it.
+- Capabilities carry a stable `capabilityId`, optional version/source
+  constraints, `trust`, and `permission` fields. Availability is derived from
+  the runtime capability inventory rather than persisted as an assertion.
+- Goal-level requirements are valid without project bindings. A selected
+  subgoal or agent may add scoped requirements; the contract packet contains
+  the normalized union and its resolution results.
+- Resolution is typed as `resolved`, `missing`, `stale`, or `unavailable` for
+  inputs, and `available`, `unavailable`, `incompatible`, or `denied` for
+  capabilities. Required non-resolved entries block setup before execution
+  persistence and dispatch.
+- Sensitive inputs retain a reference such as `valueRef`, locator, or resource
+  URI but discard inline content and secret-like fields. Contract packets and
+  audit records therefore preserve stable references without copying secrets.
+
+Changing these references or their resolution invalidates the contract hash
+and acknowledgement. Active execution keeps its captured packet immutable;
+later edits apply to a later Goal revision.
 
 ### Artifact node roles
 

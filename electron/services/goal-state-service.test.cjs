@@ -6,6 +6,11 @@ const {
   normalizeGoal,
   normalizeAgentConfiguration,
   createEvidenceRecord,
+  normalizeGoalInputs,
+  normalizeGoalCapabilities,
+  resolveGoalInputs,
+  resolveGoalCapabilities,
+  normalizeGoalProjectBindings,
 } = require('./goal-state-service.cjs');
 
 test('goal normalization preserves unknown fields and initializes revisions', () => {
@@ -94,6 +99,30 @@ test('supporting artifact nodes normalize their role and references', () => {
   assert.equal(goal.elements[0].artifactReferences[0].copiedContents, undefined);
 });
 
+test('dependency and evidence contributions remain typed and discard unknown contribution values', () => {
+  const goal = normalizeGoal({
+    id: 'goal-contributions',
+    title: 'Contribution contract',
+    elements: [{
+      id: 'subgoal-1',
+      type: 'subgoal',
+      title: 'Validate sources',
+      artifactReferences: [
+        { id: 'dependency-1', artifactType: 'task', artifactId: 'task-1', contribution: 'dependency', sourceRevision: 3 },
+        { id: 'evidence-1', artifactType: 'evidence', artifactId: 'evidence-1', contribution: 'evidence', contentHash: 'sha256-test' },
+        { id: 'unknown-1', artifactType: 'task', artifactId: 'task-2', contribution: 'other' },
+      ],
+    }],
+  });
+
+  const references = goal.elements[0].artifactReferences;
+  assert.equal(references.length, 3);
+  assert.equal(references[0].contribution, 'dependency');
+  assert.equal(references[1].artifactType, 'evidence');
+  assert.equal(references[1].contribution, 'evidence');
+  assert.equal(references[2].contribution, undefined);
+});
+
 test('agent configuration migrates legacy assignees and rejects incomplete ephemeral nodes', () => {
   const goal = normalizeGoal({
     id: 'goal-agent-contract',
@@ -119,4 +148,52 @@ test('evidence records are immutable, prefixed, and separate from execution stat
   assert.equal(evidence.immutable, true);
   assert.equal(evidence.ref, 'file:///tmp/result.json');
   assert.notEqual(EVIDENCE_KEY, 'omvra.goalExecutions.v1');
+});
+
+test('typed Goal inputs normalize references and never persist secret-like content', () => {
+  const inputs = normalizeGoalInputs([
+    { id: 'source', kind: 'file', locator: '/tmp/source.md', sensitive: true, value: 'secret', token: 'token', content: 'copied' },
+    { kind: 'inline', value: { answer: 42 }, valueType: 'json' },
+    { kind: 'unknown' },
+  ]);
+  assert.equal(inputs.length, 2);
+  assert.equal(inputs[0].sensitive, true);
+  assert.equal(inputs[0].value, undefined);
+  assert.equal(inputs[0].token, undefined);
+  assert.equal(inputs[0].content, undefined);
+  assert.deepEqual(inputs[1].value, { answer: 42 });
+  assert.equal(inputs[1].id, 'input-2');
+});
+
+test('typed Goal requirements resolve without project ownership and report capability failures', () => {
+  const goal = normalizeGoal({
+    id: 'projectless-goal',
+    title: 'Projectless',
+    inputs: [{ id: 'brief', kind: 'inline', value: 'brief' }],
+    capabilities: [{ id: 'write', capabilityId: 'files.write', source: 'mcp', version: '^1.0.0', trust: 'trusted' }],
+    elements: [],
+  });
+  const store = { get: key => key === 'omvra.preferences.v1' ? { mcpCapabilityProfile: 'read_only' } : [] };
+  assert.equal(resolveGoalInputs(store, goal).ok, true);
+  const resolved = resolveGoalCapabilities(store, goal, { availableCapabilities: [{ capabilityId: 'files.write', version: '2.0.0', source: 'mcp', trust: 'trusted' }] });
+  assert.equal(resolved.ok, false);
+  assert.equal(resolved.results[0].state, 'incompatible');
+  const denied = resolveGoalCapabilities(store, goal, { availableCapabilities: [{ capabilityId: 'files.write', version: '1.2.0', source: 'mcp', trust: 'trusted' }] });
+  assert.equal(denied.results[0].state, 'available');
+});
+
+test('Goal project bindings normalize to one primary reference without copying project data', () => {
+  const bindings = normalizeGoalProjectBindings([
+    { projectId: 'project-1', role: 'primary', name: 'must not be copied' },
+    { projectId: 'project-2', role: 'primary' },
+    { projectId: 'project-1', role: 'primary' },
+    { projectId: 'project-3', role: 'dependency' },
+  ]);
+  assert.deepEqual(bindings.map(binding => [binding.projectId, binding.role]), [
+    ['project-1', 'primary'],
+    ['project-2', 'contributor'],
+    ['project-1', 'contributor'],
+    ['project-3', 'dependency'],
+  ]);
+  assert.equal(bindings[0].name, 'must not be copied');
 });

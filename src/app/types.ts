@@ -105,8 +105,14 @@ export type GoalAcceptanceActor = 'human' | 'agentic' | 'both';
 export type GoalBudgetMode = 'hard-cap' | 'goal-pool' | 'approval-required' | 'unbounded';
 export type GoalPolicyDimension = 'financial' | 'tokens' | 'concurrency' | 'attempts' | 'retries';
 export type GoalPolicyUnit = 'USD' | 'tokens' | 'loops' | 'attempts' | 'retries';
+export type GoalInputKind = 'inline' | 'file' | 'task' | 'milestone' | 'mcp-resource' | 'external';
+export type GoalScope = 'goal' | 'subgoal' | 'agent' | 'contract';
+export type GoalCapabilityTrust = 'trusted' | 'untrusted' | 'unknown';
+export type GoalCapabilityPermission = 'allowed' | 'denied' | 'approval-required' | 'unknown';
+export type GoalProjectBindingRole = 'primary' | 'contributor' | 'dependency';
+export type GoalProjectBindingState = 'active' | 'stale-project' | 'archived-project';
 
-export type GoalArtifactType = 'task' | 'milestone' | 'goal' | 'document' | 'file' | 'url' | 'user-defined';
+export type GoalArtifactType = 'task' | 'milestone' | 'goal' | 'evidence' | 'document' | 'file' | 'url' | 'user-defined';
 export type GoalArtifactRole = 'supporting' | 'deliverable';
 export type GoalDeliverableStatus = 'planned' | 'in-progress' | 'ready-for-review' | 'accepted' | 'rejected';
 export type SupportingArtifactType = 'document' | 'file' | 'url' | 'user-defined';
@@ -121,6 +127,52 @@ export interface GoalRuntimeProjection {
   agentAvailability?: Array<{ elementId: string; available: boolean; errorCode?: string | null }>;
   policyImpacts?: Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>;
   lastChange?: { scope?: string; errorCode?: string; changeType?: string } | null;
+}
+
+export interface GoalInputReference {
+  id: string;
+  kind: GoalInputKind;
+  scope: GoalScope;
+  ownerId?: string;
+  required?: boolean;
+  label?: string;
+  valueType?: string;
+  value?: unknown;
+  valueRef?: string;
+  locator?: string;
+  resourceUri?: string;
+  artifactId?: string;
+  sourceRevision?: number;
+  contentHash?: string;
+  sensitive?: boolean;
+  state?: 'resolved' | 'missing' | 'stale' | 'unavailable';
+}
+
+export interface GoalCapabilityReference {
+  id: string;
+  capabilityId: string;
+  scope: GoalScope;
+  ownerId?: string;
+  required?: boolean;
+  version?: string;
+  source?: string;
+  sourceConstraint?: string;
+  trust?: GoalCapabilityTrust;
+  permission?: GoalCapabilityPermission;
+  label?: string;
+  state?: 'available' | 'missing' | 'unavailable' | 'incompatible' | 'denied';
+}
+
+export interface GoalProjectBinding {
+  id: string;
+  projectId: string;
+  role: GoalProjectBindingRole;
+  projection?: {
+    state: GoalProjectBindingState;
+    exists: boolean;
+    name?: string;
+    description?: string;
+  };
 }
 
 export interface GoalDeliverySpec {
@@ -141,7 +193,7 @@ export interface GoalArtifactReference {
   linkedAt?: string;
   linkedBy?: string;
   sourceRevision?: number;
-  contribution?: 'supporting' | 'deliverable';
+  contribution?: 'supporting' | 'deliverable' | 'dependency' | 'evidence';
   label?: string;
   kind?: string;
   format?: string;
@@ -160,6 +212,8 @@ export interface GoalArtifactReference {
     endDate?: string;
     milestoneId?: string;
     evidence?: unknown[];
+    contribution?: 'supporting' | 'deliverable' | 'dependency' | 'evidence';
+    contributionState?: 'satisfied' | 'blocked-dependency' | 'missing-evidence' | 'verified-evidence' | 'stale-source';
     sourceRevision?: number;
   };
 }
@@ -234,6 +288,8 @@ export interface GoalElement {
   artifactRole?: 'supporting';
   approvalEvidenceRequired?: boolean;
   policy?: GoalPolicy;
+  inputs?: GoalInputReference[];
+  capabilities?: GoalCapabilityReference[];
   artifactReferences?: GoalArtifactReference[];
   deliverySpec?: GoalDeliverySpec;
   deliverableStatus?: GoalDeliverableStatus;
@@ -247,6 +303,11 @@ export interface GoalRecord {
   elements: GoalElement[];
   overseerAgentId?: string;
   policy?: GoalPolicy;
+  inputs?: GoalInputReference[];
+  capabilities?: GoalCapabilityReference[];
+  projectBindings?: GoalProjectBinding[];
+  projectless?: boolean;
+  projectBindingState?: 'projectless' | 'bound' | 'stale';
 }
 
 export type GoalScheduleMode = 'one-time' | 'recurring';

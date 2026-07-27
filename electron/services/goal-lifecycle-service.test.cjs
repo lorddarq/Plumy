@@ -58,6 +58,44 @@ test('lifecycle transitions require evidence, acceptance, and revisions', () => 
   assert.equal(store.get(EXECUTIONS_KEY)[0].state, 'complete');
 });
 
+test('projectless Goals carry typed requirements into the contract packet', () => {
+  const store = makeStore();
+  store.set('omvra.goals.v1', [{
+    id: 'goal-1',
+    title: 'Typed contract',
+    inputs: [{ id: 'brief', kind: 'inline', value: 'Use the supplied brief.' }],
+    capabilities: [{ id: 'read', capabilityId: 'files.read', source: 'local', version: '1.0.0' }],
+  }]);
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const started = lifecycle.execute({
+    goalId: 'goal-1',
+    command: 'start',
+    expectedRevision: 0,
+    commandId: 'typed-start',
+    payload: { availableCapabilities: [{ capabilityId: 'files.read', version: '1.0.0', source: 'local' }] },
+  });
+  assert.equal(started.ok, true);
+  assert.equal(started.execution.contractPacket.references.inputs[0].id, 'brief');
+  assert.equal(started.execution.contractPacket.references.capabilities[0].capabilityId, 'files.read');
+  assert.equal(started.execution.contractPacket.inputResolution.ok, true);
+  assert.equal(started.execution.contractPacket.capabilityResolution.ok, true);
+});
+
+test('required typed requirements block setup before an execution is persisted', () => {
+  const store = makeStore();
+  store.set('omvra.goals.v1', [{
+    id: 'goal-1',
+    title: 'Blocked contract',
+    inputs: [{ id: 'brief', kind: 'inline', value: 'present' }],
+    capabilities: [{ id: 'missing-capability', capabilityId: 'missing.write', source: 'mcp' }],
+  }]);
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const result = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'blocked-start' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'GOAL_CAPABILITY_DENIED');
+  assert.deepEqual(store.get(EXECUTIONS_KEY) ?? [], []);
+});
+
 test('Goal lifecycle events are backfilled and appended to the configured external audit archive', () => {
   const store = makeStore();
   const archiveDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-goal-lifecycle-audit-'));

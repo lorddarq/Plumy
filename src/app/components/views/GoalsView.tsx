@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import type { GoalAgentConfiguration, GoalArtifactReference, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRuntimeProjection, GoalSchedule, Person, ProjectMilestone, SupportingArtifactType, Task } from '../../types.ts';
+import type { GoalAgentConfiguration, GoalArtifactReference, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRuntimeProjection, GoalSchedule, Person, ProjectMilestone, SupportingArtifactType, Task, TimelineSwimlane } from '../../types.ts';
 import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';
 import { GOAL_TEMPLATES, instantiateGoalTemplate, type GoalTemplate } from '../../data/goalTemplates.ts';
 import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/storage.ts';
@@ -22,7 +22,7 @@ import { GoalsArtifactEditor } from '../goals/GoalsArtifactEditor';
 import { GoalsConnectorInspector } from '../goals/GoalsConnectorInspector';
 import { GoalsPolicyEditor } from '../goals/GoalsPolicyEditor';
 import { GoalsRuntimeStatus } from '../goals/GoalsRuntimeStatus';
-import { GoalsAgentSection, GoalsConditionSection, GoalsConnectionsSection, GoalsControlFlowSection, GoalsDeliverableSection, GoalsScheduleSection } from '../goals/GoalsInspectorSections';
+import { GoalsAgentSection, GoalsConditionSection, GoalsConnectionsSection, GoalsControlFlowSection, GoalsDeliverableSection, GoalsProjectBindingsSection, GoalsRequirementsSection, GoalsScheduleSection } from '../goals/GoalsInspectorSections';
 import { GoalsSidebar } from '../goals/GoalsSidebar';
 import { GoalsToolbar } from '../goals/GoalsToolbar';
 import { ARTIFACT_ITEMS, CONTROL_FLOW_ITEMS, TOOL_ITEMS } from '../goals/GoalsMetadata';
@@ -34,7 +34,7 @@ const STORAGE_KEY = 'omvra.goals.v1';
 const GOAL_ID = 'goal-lights-off-factory';
 const ARTIFACT_SELECT_CLASS = 'h-9 rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200';
 
-export function GoalsView({ people = [], tasks = [], milestones = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; tasks?: Task[]; milestones?: ProjectMilestone[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
+export function GoalsView({ people = [], tasks = [], milestones = [], projects = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; tasks?: Task[]; milestones?: ProjectMilestone[]; projects?: TimelineSwimlane[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
   const [goals, setGoals] = useState<GoalRecord[]>(() => readGoals(STORAGE_KEY));
   const goalsRef = useRef<GoalRecord[]>([]);
   goalsRef.current = goals;
@@ -735,6 +735,8 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     {selectedElement && (
       <GoalsInspector selectedElement={selectedElement} selectedElementLocked={selectedElementLocked} onDelete={deleteElement} goalCopyState={goalCopyState} onCopyGoalDetails={() => { void copyGoalDetails(); }}>
         <GoalsInspectorIdentity element={selectedElement} activeGoal={activeGoal} people={people} selectedAgent={selectedAgent} selectedAgentMissing={Boolean(selectedAgentMissing)} selectedAgentConfiguration={selectedAgentConfiguration} selectedAgentMode={selectedAgentMode} onUpdateElement={updateElement} onUpdateGoal={updateGoal} onUpdateAgentName={updateAgentName} />
+        {selectedElement.type === 'goal' && <GoalsProjectBindingsSection goal={activeGoal} projects={projects} />}
+        <GoalsRequirementsSection goal={activeGoal} element={selectedElement} />
         <GoalsAgentSection element={selectedElement} people={people} selectedAgent={selectedAgent} selectedAgentMissing={Boolean(selectedAgentMissing)} selectedAgentConfiguration={selectedAgentConfiguration} selectedAgentMode={selectedAgentMode} onUpdateConfiguration={updateAgentConfiguration} />
         <GoalsControlFlowSection element={selectedElement} retryTargetTitle={selectedRetryTarget ? activeGoal?.elements.find(element => element.id === selectedRetryTarget)?.title ?? 'Missing node' : undefined} onUpdateElement={updateElement} />
         {selectedElement.type === 'deliverable' && (

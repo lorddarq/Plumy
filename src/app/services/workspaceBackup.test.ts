@@ -56,6 +56,9 @@ test('workspace backup preserves versioned Goal agent configuration through elec
   const goal = {
     id: 'goal-agent-backup',
     title: 'Backup delegation',
+    projectBindings: [{ id: 'binding-1', projectId: 'project-1', role: 'primary' }],
+    inputs: [{ id: 'brief', kind: 'file', valueRef: 'vault://brief', sensitive: true }],
+    capabilities: [{ id: 'read-files', capabilityId: 'files.read', source: 'local', version: '1.0.0', trust: 'trusted' }],
     elements: [{
       id: 'agent-node',
       type: 'agent',

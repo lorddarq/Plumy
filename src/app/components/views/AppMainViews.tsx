@@ -165,7 +165,7 @@ export function AppMainViews({
         </div>
       )}
 
-      {currentView === 'loops' && <GoalsView people={data.people} tasks={data.tasks} milestones={data.milestones} workspacePolicy={data.goalPolicy} goalAuditArchiveDirectory={data.goalAuditArchiveDirectory} onGoalAuditArchiveDirectoryChange={data.onGoalAuditArchiveDirectoryChange} />}
+      {currentView === 'loops' && <GoalsView people={data.people} tasks={data.tasks} milestones={data.milestones} projects={data.timelineSwimlanes} workspacePolicy={data.goalPolicy} goalAuditArchiveDirectory={data.goalAuditArchiveDirectory} onGoalAuditArchiveDirectoryChange={data.onGoalAuditArchiveDirectoryChange} />}
     </div>
   );
 }
