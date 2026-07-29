@@ -38,6 +38,15 @@ const {
   listTaskContextEntries,
   getTaskContextEntry,
   appendTaskContextEntry,
+  appendAgentRuntimeEvent,
+  appendAgentRuntimeOutcome,
+  confirmAgentExecutionStart,
+  createAgentRuntimeSessionBinding,
+  listAgentRuntimeSessions,
+  prepareAgentExecution,
+  prepareAgentRuntimeSessionArchive,
+  reconcileInterruptedAgentRuntimeSessions,
+  updateAgentRuntimeSessionBinding,
 } = require('./services/workspace-service.cjs');
 const { recordGoalPolicyChangeImpact } = require('./services/goal-policy.cjs');
 const { createGoalLifecycleService } = require('./services/goal-lifecycle-service.cjs');
@@ -56,6 +65,7 @@ const userDataPath = resolveWorkspaceUserDataPath({ appDataPath, appName: APP_NA
 app.setName(APP_NAME);
 app.setPath('userData', userDataPath);
 const store = new Store({ name: storeName });
+reconcileInterruptedAgentRuntimeSessions(store);
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';
 const GOAL_RUNTIME_CHANGED_CHANNEL = 'goals/runtime-changed';
@@ -514,7 +524,19 @@ registerUpdateIpcHandlers({
 registerDocumentIpcHandlers({ ipcMain, BrowserWindow, dialog, fs, shell });
 registerAttachmentIpcHandlers({ ipcMain, app, dialog, fs, path, shell });
 registerExternalLinkIpcHandlers({ ipcMain, shell });
-registerAgentRuntimeIpcHandlers({ ipcMain, store, shell });
+registerAgentRuntimeIpcHandlers({
+  ipcMain,
+  store,
+  shell,
+  appendAgentRuntimeEvent: (payload) => appendAgentRuntimeEvent(store, payload),
+  appendAgentRuntimeOutcome: (payload) => appendAgentRuntimeOutcome(store, payload),
+  confirmAgentExecutionStart: (payload) => confirmAgentExecutionStart(store, payload),
+  createAgentRuntimeSessionBinding: (payload) => createAgentRuntimeSessionBinding(store, payload),
+  listAgentRuntimeSessions: (payload) => listAgentRuntimeSessions(store, payload),
+  prepareAgentExecution: (payload) => prepareAgentExecution(store, payload),
+  prepareAgentRuntimeSessionArchive: (bindingId) => prepareAgentRuntimeSessionArchive(store, bindingId),
+  updateAgentRuntimeSessionBinding: (payload) => updateAgentRuntimeSessionBinding(store, payload),
+});
 registerRuntimeIpcHandlers({
   ipcMain,
   getAppRuntimeInfo: () => ({

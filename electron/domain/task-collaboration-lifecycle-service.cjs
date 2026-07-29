@@ -211,6 +211,12 @@ function createTaskCollaborationLifecycleService({
           ordinal: taskAttempts.length + 1,
           state: 'handed-off',
           idempotencyKey,
+          ...(options.executionContract && typeof options.executionContract === 'object'
+            ? { executionContract: JSON.parse(JSON.stringify(options.executionContract)) }
+            : {}),
+          ...(normalizeString(options.executionContractDigest)
+            ? { executionContractDigest: normalizeString(options.executionContractDigest).slice(0, 128) }
+            : {}),
           createdAt: timestamp,
           updatedAt: timestamp,
         };

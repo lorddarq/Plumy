@@ -126,6 +126,10 @@ async function testConnection(store, payload, options = {}) {
       providerName: negotiated.accountType || null,
       modelOrMode: negotiated.models?.find(model => model?.isDefault)?.id || negotiated.models?.find(model => model?.isDefault)?.model || null,
       agentCapabilities: negotiated.capabilities?.raw || negotiated.capabilities || {},
+      models: Array.isArray(negotiated.models) ? negotiated.models.slice(0, 100).map(model => ({
+        id: model?.id || model?.model,
+        isDefault: model?.isDefault === true,
+      })).filter(model => typeof model.id === 'string' && model.id) : [],
       authMethodCount: negotiated.authMethods?.length || (signedOut ? 1 : 0), observedAt,
       state: signedOut ? 'signed-out' : 'ready',
     };

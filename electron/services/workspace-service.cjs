@@ -8,6 +8,14 @@ const { createTaskService } = require('../domain/task-service.cjs');
 const { createTaskCollaborationService, COLLABORATION_SCHEMA_VERSION } = require('../domain/task-collaboration-service.cjs');
 const { createTaskCollaborationLifecycleService } = require('../domain/task-collaboration-lifecycle-service.cjs');
 const { createTaskContextLedgerService, TASK_CONTEXT_SCHEMA_VERSION } = require('../domain/task-context-ledger-service.cjs');
+const { createAgentExecutionPreflightService } = require('../domain/agent-execution-preflight-service.cjs');
+const {
+  SESSION_BINDINGS_KEY,
+  SESSION_EVENTS_KEY,
+  SESSION_SCHEMA_VERSION,
+  createAgentRuntimeSessionService,
+} = require('../domain/agent-runtime-session-service.cjs');
+const { OBSERVATIONS_STORE_KEY, resolveProfile: resolveRuntimeProfile } = require('../domain/agent-runtime-profile-service.cjs');
 const { migrateGoalRecords, normalizeAgentConfiguration, normalizeGoalInputs, normalizeGoalCapabilities, normalizeGoalProjectBindings } = require('./goal-state-service.cjs');
 const { isAgentMutationAllowed } = require('./goal-policy.cjs');
 
@@ -1826,6 +1834,30 @@ const taskContextLedgerService = createTaskContextLedgerService({
   },
 });
 
+const agentRuntimeSessionService = createAgentRuntimeSessionService({
+  readBindings: store => store.get(SESSION_BINDINGS_KEY),
+  writeBindings: (store, bindings) => store.set(SESSION_BINDINGS_KEY, bindings),
+  readEvents: store => store.get(SESSION_EVENTS_KEY),
+  writeEvents: (store, events) => store.set(SESSION_EVENTS_KEY, events),
+  attachBindingToAttempt: (store, binding) => {
+    if (binding.scope?.kind !== 'task') return { ok: true };
+    const attempts = readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY);
+    const attempt = attempts.find(item => item.id === binding.scope.executionAttemptId);
+    if (!attempt || attempt.taskId !== binding.scope.taskId || (binding.scope.contributionId && attempt.contributionId !== binding.scope.contributionId)) {
+      return { ok: false, error: 'ACP_EXECUTION_ATTEMPT_NOT_FOUND', message: 'The session binding does not match a persisted task execution attempt.' };
+    }
+    if (attempt.sessionBindingId && attempt.sessionBindingId !== binding.id) {
+      return { ok: false, error: 'ACP_EXECUTION_ALREADY_ACTIVE', message: 'The execution attempt is already bound to another session.' };
+    }
+    if (!attempt.sessionBindingId) {
+      store.set(TASK_CONTRIBUTION_ATTEMPTS_KEY, attempts.map(item => item.id === attempt.id ? { ...item, sessionBindingId: binding.id } : item));
+    }
+    return { ok: true };
+  },
+  appendTaskContext: (...args) => taskContextLedgerService.append(...args),
+  normalizeString,
+});
+
 const {
   normalizePerson: normalizePersonForMcp,
   resolveTaskExecutionContext: resolvePersonTaskExecutionContext,
@@ -1838,6 +1870,17 @@ function resolveTaskExecutionContext(store, taskId) {
   const projection = taskContextLedgerService.project(store, { taskId });
   return projection.ok ? { ...preflight, taskContext: projection.taskContext } : preflight;
 }
+
+const agentExecutionPreflightService = createAgentExecutionPreflightService({
+  getTaskById: (...args) => taskService.getTaskById(...args),
+  listTasks: (...args) => taskService.listTasks(...args),
+  readAttempts: store => readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY),
+  readObservations: store => readObject(store, OBSERVATIONS_STORE_KEY).observations || {},
+  resolveRuntimeProfile,
+  resolveTaskContext: resolveTaskExecutionContext,
+  startContributionAttempt: (...args) => taskCollaborationLifecycleService.transition(...args),
+  normalizeString,
+});
 
 const {
   normalizeTask: normalizeTaskForMcp,
@@ -1875,6 +1918,21 @@ const {
 } = taskContextLedgerService;
 
 const {
+  prepare: prepareAgentExecution,
+  confirmStart: confirmAgentExecutionStart,
+} = agentExecutionPreflightService;
+
+const {
+  appendDurableOutcome: appendAgentRuntimeOutcome,
+  appendEvent: appendAgentRuntimeEvent,
+  createBinding: createAgentRuntimeSessionBinding,
+  list: listAgentRuntimeSessions,
+  prepareArchive: prepareAgentRuntimeSessionArchive,
+  reconcileInterrupted: reconcileInterruptedAgentRuntimeSessions,
+  updateBinding: updateAgentRuntimeSessionBinding,
+} = agentRuntimeSessionService;
+
+const {
   listMilestones,
   getMilestoneById,
   createMilestone,
@@ -1889,6 +1947,9 @@ module.exports = {
   TASK_COLLABORATION_EVENTS_KEY,
   TASK_CONTEXT_ENTRIES_KEY,
   TASK_CONTEXT_SCHEMA_VERSION,
+  SESSION_BINDINGS_KEY,
+  SESSION_EVENTS_KEY,
+  SESSION_SCHEMA_VERSION,
   COLLABORATION_SCHEMA_VERSION,
   MILESTONES_KEY,
   MCP_PROTOCOL_VERSION,
@@ -1934,6 +1995,15 @@ module.exports = {
   getTaskContextEntry,
   appendTaskContextEntry,
   resolveTaskExecutionContext,
+  prepareAgentExecution,
+  confirmAgentExecutionStart,
+  createAgentRuntimeSessionBinding,
+  updateAgentRuntimeSessionBinding,
+  appendAgentRuntimeEvent,
+  appendAgentRuntimeOutcome,
+  listAgentRuntimeSessions,
+  prepareAgentRuntimeSessionArchive,
+  reconcileInterruptedAgentRuntimeSessions,
   listKanbanCards,
   listTimelineCards,
   buildMcpAgentGuide,

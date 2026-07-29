@@ -255,6 +255,8 @@ declare global {
         deleteProfile: (profileId: string) => Promise<{ ok: boolean; value?: boolean; error?: string }>;
         saveDefaults: (defaults: AgentRuntimeDefaults) => Promise<{ ok: boolean; value?: AgentRuntimeDefaults; error?: string }>;
         resolve: (payload: AgentRuntimeResolutionInput) => Promise<{ ok: boolean; value?: AgentRuntimeResolution; error?: string }>;
+        prepareExecution: (payload: Record<string, unknown>) => Promise<any>;
+        confirmStart: (payload: Record<string, unknown>) => Promise<any>;
         testConnection: (payload: AgentRuntimeResolutionInput & { workspacePath: string }) => Promise<AgentRuntimeOperationResult>;
         openExternal: (payload: AgentRuntimeResolutionInput & {
           workspacePath: string;
@@ -262,6 +264,14 @@ declare global {
           contextReference: string;
           prompt: string;
         }) => Promise<AgentRuntimeOperationResult>;
+        sessions: {
+          list: (payload?: { bindingId?: string; limit?: number }) => Promise<any>;
+          createBinding: (payload: Record<string, unknown>) => Promise<any>;
+          updateBinding: (payload: Record<string, unknown>) => Promise<any>;
+          appendEvent: (payload: Record<string, unknown>) => Promise<any>;
+          appendOutcome: (payload: Record<string, unknown>) => Promise<any>;
+          prepareArchive: (bindingId: string) => Promise<any>;
+        };
       };
       tasks: {
         exportPdf: (payload: {

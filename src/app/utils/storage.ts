@@ -213,6 +213,8 @@ const PORTABLE_OBJECT_STORE_KEYS = new Set([
   'omvra.agentRuntimeDefaults.v1',
   'omvra.agentRuntimeObservations.v1',
   'omvra.externalAgentHandoffs.v1',
+  'omvra.acpSessionBindings.v1',
+  'omvra.acpSessionEvents.v1',
 ]);
 
 export function getPortableStorageSnapshot(): Record<string, string> {

@@ -67,8 +67,13 @@ function makeHarness({ failFirstUpdate = false } = {}) {
 test('contribution lifecycle preserves handoff, revision, acceptance, and aggregate status boundaries', () => {
   const harness = makeHarness();
   assert.equal(harness.run('delegate', 'orchestrator').event.type, 'delegation');
-  const handedOff = harness.run('handoff', 'orchestrator');
+  const handedOff = harness.run('handoff', 'orchestrator', {
+    executionContract: { schemaVersion: 1, taskId: 'task-1', taskRevision: 1, runtimeProfileId: 'runtime-1' },
+    executionContractDigest: 'digest-1',
+  });
   assert.equal(handedOff.attempt.state, 'handed-off');
+  assert.equal(handedOff.attempt.executionContract.runtimeProfileId, 'runtime-1');
+  assert.equal(handedOff.attempt.executionContractDigest, 'digest-1');
   assert.equal(handedOff.contribution.state, 'pending');
   assert.equal(harness.run('acknowledge', 'contributor').contribution.state, 'working');
   assert.equal(harness.run('submit', 'contributor').error, 'EVIDENCE_REQUIRED');

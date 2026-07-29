@@ -113,13 +113,21 @@ test('workspace backup preserves immutable task context ledger records and unkno
   assert.deepEqual(repaired.electronStoreSnapshot['omvra.taskContextEntries.v1'], [entry]);
 });
 
-test('workspace backup preserves runtime profiles, defaults, and observations separately', () => {
+test('workspace backup preserves runtime profiles, defaults, observations, session bindings, and normalized events separately', () => {
   const electronStore = {
     'omvra.agentRuntimeProfiles.v1': { schemaVersion: 1, profiles: [{
       schemaVersion: 1, id: 'local', name: 'Local ACP', integrationMode: 'acp-local-stdio', executablePath: '/usr/bin/agent', fixedArgs: ['--acp'], enabled: true,
     }] },
     'omvra.agentRuntimeDefaults.v1': { schemaVersion: 1, globalProfileId: 'local', projectProfileIds: { 'project-1': 'local' } },
     'omvra.agentRuntimeObservations.v1': { schemaVersion: 1, observations: { local: { availability: 'available', observedAt: '2026-07-29T20:00:00.000Z' } } },
+    'omvra.acpSessionBindings.v1': [{
+      schemaVersion: 1, id: 'binding-1', runtimeProfileId: 'local', state: 'interrupted',
+      scope: { kind: 'task', taskId: 'task-1', executionAttemptId: 'attempt-1', taskRevision: 4 },
+      createdAt: '2026-07-29T20:00:00.000Z', updatedAt: '2026-07-29T20:01:00.000Z', extension: { retained: true },
+    }],
+    'omvra.acpSessionEvents.v1': [{
+      schemaVersion: 1, id: 'event-1', bindingId: 'binding-1', runtimeProfileId: 'local', type: 'session-state', sourceKind: 'session', state: 'interrupted', observedAt: '2026-07-29T20:01:00.000Z',
+    }],
   };
   const payload = buildWorkspaceBackupPayload({
     tasks: [], milestones: [], projects: [], people: [], statusColumns: fallbackStatusColumns,
@@ -134,6 +142,8 @@ test('workspace backup preserves runtime profiles, defaults, and observations se
   assert.deepEqual(repaired.electronStoreSnapshot['omvra.agentRuntimeProfiles.v1'], electronStore['omvra.agentRuntimeProfiles.v1']);
   assert.deepEqual(repaired.electronStoreSnapshot['omvra.agentRuntimeDefaults.v1'], electronStore['omvra.agentRuntimeDefaults.v1']);
   assert.deepEqual(repaired.electronStoreSnapshot['omvra.agentRuntimeObservations.v1'], electronStore['omvra.agentRuntimeObservations.v1']);
+  assert.deepEqual(repaired.electronStoreSnapshot['omvra.acpSessionBindings.v1'], electronStore['omvra.acpSessionBindings.v1']);
+  assert.deepEqual(repaired.electronStoreSnapshot['omvra.acpSessionEvents.v1'], electronStore['omvra.acpSessionEvents.v1']);
 });
 
 test('workspace backup preserves valid collaboration extensions and omits invalid delegation', () => {

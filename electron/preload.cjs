@@ -89,8 +89,18 @@ contextBridge.exposeInMainWorld('electron', {
     deleteProfile: (profileId) => ipcRenderer.invoke('agent-runtime/delete-profile', profileId),
     saveDefaults: (defaults) => ipcRenderer.invoke('agent-runtime/save-defaults', defaults),
     resolve: (payload) => ipcRenderer.invoke('agent-runtime/resolve', payload),
+    prepareExecution: (payload) => ipcRenderer.invoke('agent-runtime/prepare-execution', payload),
+    confirmStart: (payload) => ipcRenderer.invoke('agent-runtime/confirm-start', payload),
     testConnection: (payload) => ipcRenderer.invoke('agent-runtime/test-connection', payload),
     openExternal: (payload) => ipcRenderer.invoke('agent-runtime/open-external', payload),
+    sessions: {
+      list: (payload) => ipcRenderer.invoke('agent-runtime/sessions/list', payload),
+      createBinding: (payload) => ipcRenderer.invoke('agent-runtime/sessions/create-binding', payload),
+      updateBinding: (payload) => ipcRenderer.invoke('agent-runtime/sessions/update-binding', payload),
+      appendEvent: (payload) => ipcRenderer.invoke('agent-runtime/sessions/append-event', payload),
+      appendOutcome: (payload) => ipcRenderer.invoke('agent-runtime/sessions/append-outcome', payload),
+      prepareArchive: (bindingId) => ipcRenderer.invoke('agent-runtime/sessions/prepare-archive', bindingId),
+    },
   },
 
   // Task actions

@@ -284,3 +284,34 @@ test('workspace facade persists entries under the versioned ledger key', () => {
   assert.equal(listTaskContextEntries(store, { taskId: 'task-1' }).entries.length, 1);
   assert.equal(store.get('omvra.tasks.v1')[0].__mcpRevision, 4);
 });
+
+test('archived tasks retain bounded context access and large ledgers are never truncated in storage', () => {
+  const entries = Array.from({ length: 80 }, (_, index) => ({
+    schemaVersion: 1, id: `archived-${index}`, taskId: 'task-1', kind: 'decision', fromRevision: 4, toRevision: 4,
+    summary: `Archived decision ${index}`, markers: ['archive'], provenance: 'human-authored', actor: 'human-1',
+    sourceRefs: [{ type: 'comment', id: `comment-${index}` }], createdAt: `2026-07-29T${String(Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}:00.000Z`,
+  }));
+  const { service, store } = createHarness({ tasks: [{ id: 'task-1', archived: true, __mcpRevision: 4 }], entries });
+
+  const listed = service.list(store, { taskId: 'task-1', limit: 500 });
+  assert.equal(listed.ok, true);
+  assert.equal(listed.entries.length, 50);
+  assert.equal(listed.hasMore, true);
+  assert.equal(service.get(store, { taskId: 'task-1', entryId: 'archived-0' }).ok, true);
+  assert.equal(store.get('entries').length, 80);
+});
+
+test('invalid stored ledgers fail closed without fabricating or rewriting history', () => {
+  const { service, store } = createHarness({ entries: { legacy: 'not-an-array' } });
+  assert.equal(service.list(store, { taskId: 'task-1' }).error, 'INVALID_TASK_CONTEXT_STORE');
+  assert.deepEqual(store.get('entries'), { legacy: 'not-an-array' });
+
+  const valid = {
+    schemaVersion: 1, id: 'duplicate', taskId: 'task-1', kind: 'decision', fromRevision: 4, toRevision: 4,
+    summary: 'One known decision.', markers: ['history'], provenance: 'human-authored', actor: 'human-1',
+    sourceRefs: [{ type: 'comment', id: 'comment-1' }], createdAt: '2026-07-29T20:00:00.000Z',
+  };
+  const duplicateHarness = createHarness({ entries: [valid, { ...valid }] });
+  assert.equal(duplicateHarness.service.list(duplicateHarness.store, { taskId: 'task-1' }).error, 'DUPLICATE_TASK_CONTEXT_ENTRY_ID');
+  assert.equal(duplicateHarness.store.get('entries').length, 2);
+});
