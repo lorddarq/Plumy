@@ -19,6 +19,7 @@ const { registerDocumentIpcHandlers } = require('./ipc/documents.cjs');
 const { registerAttachmentIpcHandlers } = require('./ipc/attachments.cjs');
 const { registerExternalLinkIpcHandlers } = require('./ipc/external-links.cjs');
 const { registerRuntimeIpcHandlers } = require('./ipc/runtime.cjs');
+const { registerAgentRuntimeIpcHandlers } = require('./ipc/agent-runtime.cjs');
 const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
 const {
   createUpdateController,
@@ -490,6 +491,7 @@ registerUpdateIpcHandlers({
 registerDocumentIpcHandlers({ ipcMain, BrowserWindow, dialog, fs, shell });
 registerAttachmentIpcHandlers({ ipcMain, app, dialog, fs, path, shell });
 registerExternalLinkIpcHandlers({ ipcMain, shell });
+registerAgentRuntimeIpcHandlers({ ipcMain, store, shell });
 registerRuntimeIpcHandlers({
   ipcMain,
   getAppRuntimeInfo: () => ({

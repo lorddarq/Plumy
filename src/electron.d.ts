@@ -249,6 +249,20 @@ declare global {
         pickDirectory: () => Promise<string | null>;
       };
       openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
+      agentRuntime: {
+        getState: () => Promise<{ ok: boolean; value?: AgentRuntimeState; error?: string }>;
+        saveProfile: (profile: AgentRuntimeProfile) => Promise<{ ok: boolean; value?: AgentRuntimeProfile; error?: string }>;
+        deleteProfile: (profileId: string) => Promise<{ ok: boolean; value?: boolean; error?: string }>;
+        saveDefaults: (defaults: AgentRuntimeDefaults) => Promise<{ ok: boolean; value?: AgentRuntimeDefaults; error?: string }>;
+        resolve: (payload: AgentRuntimeResolutionInput) => Promise<{ ok: boolean; value?: AgentRuntimeResolution; error?: string }>;
+        testConnection: (payload: AgentRuntimeResolutionInput & { workspacePath: string }) => Promise<AgentRuntimeOperationResult>;
+        openExternal: (payload: AgentRuntimeResolutionInput & {
+          workspacePath: string;
+          taskId: string;
+          contextReference: string;
+          prompt: string;
+        }) => Promise<AgentRuntimeOperationResult>;
+      };
       tasks: {
         exportPdf: (payload: {
           html: string;
@@ -269,6 +283,70 @@ declare global {
         getWorkspaceSnapshot: () => Promise<McpBridgeResult<McpWorkspaceSnapshot>>;
         restartServer: () => Promise<{ success: boolean; error?: string; listenerStatus?: McpListenerStatus }>;
       };
+    };
+  }
+
+  interface AgentRuntimeProfile {
+    schemaVersion: 1;
+    id: string;
+    name: string;
+    integrationMode: 'acp-local-stdio' | 'external-handoff';
+    executablePath?: string;
+    fixedArgs: string[];
+    externalUrlScheme?: string;
+    enabled: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+  }
+
+  interface AgentRuntimeDefaults {
+    schemaVersion?: 1;
+    globalProfileId: string | null;
+    projectProfileIds: Record<string, string>;
+  }
+
+  interface AgentRuntimeObservation {
+    availability: 'available' | 'unavailable' | 'unknown';
+    authentication: 'authenticated' | 'required' | 'unknown';
+    capabilities: 'supported' | 'unsupported' | 'unknown';
+    observedAt: string;
+    state: string;
+    implementationName?: string | null;
+    adapterVersion?: string | null;
+    error?: string;
+  }
+
+  interface AgentRuntimeState {
+    schemaVersion: 1;
+    profiles: AgentRuntimeProfile[];
+    defaults: AgentRuntimeDefaults;
+    observations: Record<string, AgentRuntimeObservation>;
+  }
+
+  interface AgentRuntimeResolutionInput {
+    executionProfileId?: string;
+    projectId?: string;
+  }
+
+  interface AgentRuntimeResolution {
+    ok: boolean;
+    state: string;
+    source: 'execution-override' | 'project-default' | 'global-default';
+    profile?: AgentRuntimeProfile;
+    error?: string;
+  }
+
+  interface AgentRuntimeOperationResult extends AgentRuntimeResolution {
+    observation?: AgentRuntimeObservation;
+    handoff?: {
+      id: string;
+      profileId: string;
+      taskId: string;
+      contextReference: string;
+      workspacePath: string;
+      promptLength: number;
+      requestedAt: string;
+      outcome: 'intent-recorded';
     };
   }
 }

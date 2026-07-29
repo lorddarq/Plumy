@@ -7,6 +7,7 @@ const { registerDocumentIpcHandlers, sanitizePdfFileName } = require('./document
 const { registerAttachmentIpcHandlers } = require('./attachments.cjs');
 const { registerExternalLinkIpcHandlers } = require('./external-links.cjs');
 const { registerRuntimeIpcHandlers } = require('./runtime.cjs');
+const { registerAgentRuntimeIpcHandlers } = require('./agent-runtime.cjs');
 
 function createIpcHarness() {
   const handlers = new Map();
@@ -92,4 +93,24 @@ test('external-link and runtime registrars preserve denial behavior', async () =
   assert.equal(opened, false);
   assert.equal(handlers.get('mcp/restart-server')().success, false);
   assert.deepEqual(handlers.get('app/get-runtime-info')(), { name: 'Omvra' });
+});
+
+test('agent runtime registrar validates writes and keeps custom schemes behind its dedicated boundary', async () => {
+  const { handlers, ipcMain } = createIpcHarness();
+  const values = new Map();
+  const store = { get: key => values.get(key), set: (key, value) => values.set(key, value) };
+  let opened;
+  registerAgentRuntimeIpcHandlers({ ipcMain, store, shell: { openExternal: async url => { opened = url; } } });
+
+  const saved = handlers.get('agent-runtime/save-profile')(null, {
+    id: 'external', name: 'Codex', integrationMode: 'external-handoff', externalUrlScheme: 'codex', enabled: true,
+  });
+  assert.equal(saved.ok, true);
+  assert.deepEqual(handlers.get('agent-runtime/save-defaults')(null, { globalProfileId: 'external', projectProfileIds: {} }).value.globalProfileId, 'external');
+  const handoff = await handlers.get('agent-runtime/open-external')(null, {
+    workspacePath: '/tmp/workspace', taskId: 'task-1', contextReference: 'omvra://task/task-1', prompt: 'Continue task',
+  });
+  assert.equal(handoff.ok, true);
+  assert.equal(new URL(opened).protocol, 'codex:');
+  assert.equal(handlers.has('agent-runtime/test-connection'), true);
 });

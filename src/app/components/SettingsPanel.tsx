@@ -52,6 +52,11 @@ const SETTINGS_PANEL_NAV_GROUPS = [
         icon: AgentIcon,
       },
       {
+        id: 'agent-runtimes',
+        label: 'Agent runtimes',
+        icon: AgentIcon,
+      },
+      {
         id: 'mcp-access',
         label: 'MCP',
         icon: FiltersIcon,
@@ -134,6 +139,19 @@ export function GeneralSettingsSection({ children }: McpSettingsSectionProps) {
       title="General"
       icon={SlidersIcon}
       description="Workspace-wide appearance and behavior preferences"
+    >
+      {children}
+    </AnchoredPanelSection>
+  );
+}
+
+export function AgentRuntimeSettingsSection({ children }: McpSettingsSectionProps) {
+  return (
+    <AnchoredPanelSection
+      id="agent-runtimes"
+      title="Agent runtimes"
+      icon={AgentIcon}
+      description="Configure local ACP subprocesses and explicit external handoffs."
     >
       {children}
     </AnchoredPanelSection>

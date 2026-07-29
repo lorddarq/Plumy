@@ -7,6 +7,7 @@ import type { MarkdownAppearance } from '../utils/markdownAppearance';
 import type { GoalPolicyV1 } from '../utils/goalPolicy';
 import {
   DataSettingsSection,
+  AgentRuntimeSettingsSection,
   GeneralSettingsSection,
   McpActivitySettingsSection,
   McpSettingsSection,
@@ -21,6 +22,7 @@ import { McpCommandSettingsSection } from './settings/McpCommandSettingsSection'
 import { McpActivityLogSection } from './settings/McpDiagnosticsSections';
 import { PeopleManagementSections } from './settings/PeopleSettingsSections';
 import { Switch } from './ui/switch';
+import { AgentRuntimeSettings } from './settings/AgentRuntimeSettings';
 
 interface PreferencesPanelProps {
   isOpen: boolean;
@@ -394,6 +396,10 @@ export function PreferencesPanel({
         onUpdatePerson={onUpdatePerson}
         onDeletePerson={onDeletePerson}
       />
+
+      <AgentRuntimeSettingsSection>
+        <AgentRuntimeSettings projects={timelineSwimlanes} tasks={tasks} />
+      </AgentRuntimeSettingsSection>
 
       <McpSettingsSection>
         <McpAccessSettingsSection

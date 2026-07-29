@@ -158,6 +158,13 @@ const RENDERER_WORKSPACE_KEYS = [
 
 const IPC_INVOKE_CHANNELS = [
   'agent-configurations/export',
+  'agent-runtime/delete-profile',
+  'agent-runtime/get-state',
+  'agent-runtime/open-external',
+  'agent-runtime/resolve',
+  'agent-runtime/save-defaults',
+  'agent-runtime/save-profile',
+  'agent-runtime/test-connection',
   'app/get-runtime-info',
   'attachments/embed',
   'attachments/pick',
@@ -336,6 +343,7 @@ test('Electron main composes IPC registrars while retaining application lifecycl
     'documents.cjs',
     'attachments.cjs',
     'external-links.cjs',
+    'agent-runtime.cjs',
     'runtime.cjs',
   ].map(fileName => read(`electron/ipc/${fileName}`)).join('\n');
 

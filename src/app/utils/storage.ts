@@ -208,6 +208,13 @@ export function isPortableStorageKey(key: string): boolean {
   return normalizePortableStorageKey(key) !== null;
 }
 
+const PORTABLE_OBJECT_STORE_KEYS = new Set([
+  'omvra.agentRuntimeProfiles.v1',
+  'omvra.agentRuntimeDefaults.v1',
+  'omvra.agentRuntimeObservations.v1',
+  'omvra.externalAgentHandoffs.v1',
+]);
+
 export function getPortableStorageSnapshot(): Record<string, string> {
   if (typeof window === 'undefined') return {};
   const snapshot: Record<string, string> = {};
@@ -244,7 +251,9 @@ export function flattenPortableStoreEntries(
 
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const nextPrefix = prefix ? `${prefix}.${key}` : key;
-    if (child && typeof child === 'object' && !Array.isArray(child)) {
+    const portablePrefix = normalizePortableStorageKey(nextPrefix);
+    const isPortableObjectStoreValue = portablePrefix ? PORTABLE_OBJECT_STORE_KEYS.has(portablePrefix) : false;
+    if (child && typeof child === 'object' && !Array.isArray(child) && !isPortableObjectStoreValue) {
       flattenPortableStoreEntries(child, nextPrefix, out);
     } else {
       out[nextPrefix] = child;

@@ -83,6 +83,16 @@ contextBridge.exposeInMainWorld('electron', {
   // Open external (validated in main)
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
+  agentRuntime: {
+    getState: () => ipcRenderer.invoke('agent-runtime/get-state'),
+    saveProfile: (profile) => ipcRenderer.invoke('agent-runtime/save-profile', profile),
+    deleteProfile: (profileId) => ipcRenderer.invoke('agent-runtime/delete-profile', profileId),
+    saveDefaults: (defaults) => ipcRenderer.invoke('agent-runtime/save-defaults', defaults),
+    resolve: (payload) => ipcRenderer.invoke('agent-runtime/resolve', payload),
+    testConnection: (payload) => ipcRenderer.invoke('agent-runtime/test-connection', payload),
+    openExternal: (payload) => ipcRenderer.invoke('agent-runtime/open-external', payload),
+  },
+
   // Task actions
   tasks: {
     exportPdf: (payload) => ipcRenderer.invoke('tasks/export-pdf', payload),
