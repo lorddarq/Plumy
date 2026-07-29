@@ -30,8 +30,8 @@ function validateFixedArgs(value) {
 function validateProfile(input, now = new Date().toISOString()) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Runtime profile is required.');
   const integrationMode = input.integrationMode;
-  if (!['acp-local-stdio', 'external-handoff'].includes(integrationMode)) {
-    throw new Error('integrationMode must be acp-local-stdio or external-handoff.');
+  if (!['acp-local-stdio', 'codex-app-server-stdio', 'external-handoff'].includes(integrationMode)) {
+    throw new Error('integrationMode must be acp-local-stdio, codex-app-server-stdio, or external-handoff.');
   }
 
   const executablePath = input.executablePath ? cleanString(input.executablePath, 'executablePath', 2048) : undefined;
@@ -39,7 +39,9 @@ function validateProfile(input, now = new Date().toISOString()) {
     ? cleanString(input.externalUrlScheme, 'externalUrlScheme', 64).replace(/:$/, '').toLowerCase()
     : undefined;
   if (executablePath && !path.isAbsolute(executablePath)) throw new Error('executablePath must be absolute.');
-  if (integrationMode === 'acp-local-stdio' && !executablePath) throw new Error('Local ACP profiles require an executablePath.');
+  if (['acp-local-stdio', 'codex-app-server-stdio'].includes(integrationMode) && !executablePath) {
+    throw new Error('Local stdio profiles require an executablePath.');
+  }
   if (integrationMode === 'external-handoff' && !executablePath && !externalUrlScheme) {
     throw new Error('External handoff profiles require an executablePath or approved URL scheme.');
   }

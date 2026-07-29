@@ -32,6 +32,9 @@ test('runtime profiles validate executable paths, schemes, and credential-like a
     id: 'local', name: 'Local', integrationMode: 'acp-local-stdio', executablePath: '/usr/bin/agent', fixedArgs: ['--token', 'secret'], enabled: true,
   }), /Credentials/);
   assert.equal(store.get(PROFILE_STORE_KEY), undefined);
+  assert.equal(saveProfile(store, {
+    id: 'codex', name: 'Codex', integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', enabled: true,
+  }).integrationMode, 'codex-app-server-stdio');
 });
 
 test('runtime resolution is deterministic and never silently falls back', () => {

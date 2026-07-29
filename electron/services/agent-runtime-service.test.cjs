@@ -86,6 +86,50 @@ test('connection test reports advertised authentication as a visible signed-out 
   assert.equal(result.observation.authentication, 'required');
 });
 
+test('Codex connection test uses app-server directly and reuses its authenticated account', async () => {
+  const store = createStore();
+  saveProfile(store, { id: 'codex', name: 'Codex', integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', fixedArgs: ['-c', 'model="gpt-5"'], enabled: true });
+  saveDefaults(store, { globalProfileId: 'codex', projectProfileIds: {} });
+  const writes = [];
+  const child = createChild((value) => {
+    const message = JSON.parse(value);
+    writes.push(message);
+    if (message.id === 0) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 0, result: { userAgent: 'codex-cli/0.145.0', codexHome: '/tmp/codex' } })}\n`));
+    if (message.id === 1) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 1, result: { account: { type: 'chatgpt' }, requiresOpenaiAuth: true } })}\n`));
+  });
+  const result = await testConnection(store, { workspacePath: '/tmp/workspace' }, {
+    spawnProcess: (command, args) => {
+      assert.equal(command, '/usr/bin/codex');
+      assert.deepEqual(args, ['-c', 'model="gpt-5"', 'app-server', '--stdio']);
+      return child;
+    },
+    timeoutMs: 100,
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(writes.map(message => message.method), ['initialize', 'initialized', 'account/read']);
+  assert.equal('jsonrpc' in writes[0], false);
+  assert.equal(result.observation.authentication, 'authenticated');
+  assert.equal(result.observation.implementationName, 'Codex app-server');
+});
+
+test('Codex connection test reports its native signed-out state without collecting credentials', async () => {
+  const store = createStore();
+  saveProfile(store, { id: 'codex', name: 'Codex', integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', enabled: true });
+  saveDefaults(store, { globalProfileId: 'codex', projectProfileIds: {} });
+  const child = createChild((value) => {
+    const message = JSON.parse(value);
+    if (message.id === 0) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 0, result: {} })}\n`));
+    if (message.id === 1) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 1, result: { account: null, requiresOpenaiAuth: true } })}\n`));
+  });
+  const result = await testConnection(store, { workspacePath: '/tmp/workspace' }, { spawnProcess: () => child, timeoutMs: 100 });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.state, 'signed-out');
+  assert.equal(result.observation.authentication, 'required');
+  assert.equal(JSON.stringify(store.get('omvra.agentRuntimeObservations.v1')).includes('credential'), false);
+});
+
 test('external executable handoff reports launch failures instead of leaving an unhandled process error', async () => {
   const store = createStore();
   saveProfile(store, { id: 'external', name: 'External', integrationMode: 'external-handoff', executablePath: '/missing/agent', enabled: true });

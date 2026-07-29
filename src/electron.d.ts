@@ -290,7 +290,7 @@ declare global {
     schemaVersion: 1;
     id: string;
     name: string;
-    integrationMode: 'acp-local-stdio' | 'external-handoff';
+    integrationMode: 'acp-local-stdio' | 'codex-app-server-stdio' | 'external-handoff';
     executablePath?: string;
     fixedArgs: string[];
     externalUrlScheme?: string;
@@ -307,12 +307,16 @@ declare global {
 
   interface AgentRuntimeObservation {
     availability: 'available' | 'unavailable' | 'unknown';
-    authentication: 'authenticated' | 'required' | 'unknown';
+    authentication: 'authenticated' | 'not-required' | 'required' | 'unknown';
     capabilities: 'supported' | 'unsupported' | 'unknown';
     observedAt: string;
     state: string;
     implementationName?: string | null;
     adapterVersion?: string | null;
+    providerName?: string | null;
+    modelOrMode?: string | null;
+    agentCapabilities?: Record<string, unknown>;
+    authMethodCount?: number;
     error?: string;
   }
 

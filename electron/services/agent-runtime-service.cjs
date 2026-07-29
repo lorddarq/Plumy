@@ -53,9 +53,10 @@ function testConnection(store, payload, options = {}) {
   const resolution = resolveProfile(store, payload);
   if (!resolution.ok) return Promise.resolve(resolution);
   const { profile } = resolution;
-  if (profile.integrationMode !== 'acp-local-stdio') {
-    return Promise.resolve({ ok: false, state: 'unsupported', profile, error: 'Connection testing is only available for local ACP stdio profiles.' });
+  if (!['acp-local-stdio', 'codex-app-server-stdio'].includes(profile.integrationMode)) {
+    return Promise.resolve({ ok: false, state: 'unsupported', profile, error: 'Connection testing is only available for local stdio runtime profiles.' });
   }
+  const isCodexAppServer = profile.integrationMode === 'codex-app-server-stdio';
   const workspacePath = cleanWorkspacePath(payload.workspacePath);
   const spawnProcess = options.spawnProcess || spawn;
   const now = options.now || (() => new Date().toISOString());
@@ -68,6 +69,7 @@ function testConnection(store, payload, options = {}) {
     let stdout = '';
     let stderr = '';
     let timer;
+    let initializationResult;
 
     const finish = (result) => {
       if (settled) return;
@@ -80,7 +82,10 @@ function testConnection(store, payload, options = {}) {
     };
 
     try {
-      child = spawnProcess(profile.executablePath, profile.fixedArgs || [], {
+      const args = isCodexAppServer
+        ? [...(profile.fixedArgs || []), 'app-server', '--stdio']
+        : profile.fixedArgs || [];
+      child = spawnProcess(profile.executablePath, args, {
         cwd: workspacePath,
         shell: false,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -94,7 +99,7 @@ function testConnection(store, payload, options = {}) {
     timer = setTimeout(() => finish({
       ok: false,
       state: 'unavailable',
-      error: `ACP initialization timed out after ${timeoutMs} ms.`,
+      error: `${isCodexAppServer ? 'Codex app-server' : 'ACP'} initialization timed out after ${timeoutMs} ms.`,
     }), timeoutMs);
 
     child.once('error', error => finish({
@@ -112,12 +117,50 @@ function testConnection(store, payload, options = {}) {
         if (!line.trim()) continue;
         let message;
         try { message = JSON.parse(line); } catch { continue; }
+        if (isCodexAppServer && message.id === 1) {
+          if (message.error) {
+            finish({ ok: false, state: 'unavailable', error: message.error.message || 'Codex authentication check failed.' });
+            return;
+          }
+          const account = message.result?.account;
+          const requiresAuthentication = message.result?.requiresOpenaiAuth === true;
+          const signedOut = requiresAuthentication && !account;
+          const observation = {
+            availability: 'available',
+            authentication: signedOut ? 'required' : account ? 'authenticated' : 'not-required',
+            capabilities: 'supported',
+            implementationName: 'Codex app-server',
+            adapterVersion: initializationResult?.userAgent || null,
+            providerName: account?.type || null,
+            modelOrMode: null,
+            agentCapabilities: { threadLifecycle: true },
+            authMethodCount: requiresAuthentication ? 1 : 0,
+            observedAt,
+            state: signedOut ? 'signed-out' : 'ready',
+          };
+          finish({ ok: !signedOut, state: observation.state, error: signedOut ? 'Codex requires sign-in.' : undefined, observation });
+          return;
+        }
         if (message.id !== 0) continue;
         if (message.error) {
-          finish({ ok: false, state: 'incompatible', error: message.error.message || 'ACP initialization failed.' });
+          finish({ ok: false, state: 'incompatible', error: message.error.message || `${isCodexAppServer ? 'Codex app-server' : 'ACP'} initialization failed.` });
           return;
         }
         const result = message.result;
+        if (isCodexAppServer) {
+          if (!result || typeof result !== 'object') {
+            finish({ ok: false, state: 'incompatible', error: 'Codex app-server returned an invalid initialization response.' });
+            return;
+          }
+          initializationResult = result;
+          try {
+            child.stdin.write(`${JSON.stringify({ method: 'initialized', params: {} })}\n`);
+            child.stdin.write(`${JSON.stringify({ method: 'account/read', id: 1, params: { refreshToken: false } })}\n`);
+          } catch (error) {
+            finish({ ok: false, state: 'unavailable', error: error.message, errorObject: error });
+          }
+          continue;
+        }
         if (!result || result.protocolVersion !== ACP_PROTOCOL_VERSION) {
           finish({ ok: false, state: 'incompatible', error: `Unsupported ACP protocol version: ${result?.protocolVersion ?? 'missing'}.` });
           return;
@@ -140,15 +183,17 @@ function testConnection(store, payload, options = {}) {
       }
     });
     child.once('exit', (code) => {
-      if (!settled) finish({ ok: false, state: 'unavailable', error: `ACP agent exited before initialization (${code ?? 'unknown'}).${stderr ? ` ${stderr.trim()}` : ''}` });
+      if (!settled) finish({ ok: false, state: 'unavailable', error: `${isCodexAppServer ? 'Codex app-server' : 'ACP agent'} exited before initialization (${code ?? 'unknown'}).${stderr ? ` ${stderr.trim()}` : ''}` });
     });
 
     try {
       child.stdin.write(`${JSON.stringify({
-        jsonrpc: '2.0',
+        ...(!isCodexAppServer && { jsonrpc: '2.0' }),
         id: 0,
         method: 'initialize',
-        params: {
+        params: isCodexAppServer ? {
+          clientInfo: { name: 'omvra', title: 'Omvra', version: '1' },
+        } : {
           protocolVersion: ACP_PROTOCOL_VERSION,
           clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
           clientInfo: { name: 'omvra', title: 'Omvra', version: '1' },

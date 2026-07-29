@@ -100,7 +100,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
       executionProfileId: executionProfileId || undefined,
     });
     setBusy(false);
-    setFeedback(result.ok ? `Connection ready: ${result.observation?.implementationName || resolved?.name || 'ACP agent'}.` : result.error || `Connection state: ${result.state}.`);
+    setFeedback(result.ok ? `Connection ready: ${result.observation?.implementationName || resolved?.name || 'agent runtime'}.` : result.error || `Connection state: ${result.state}.`);
     await load();
   };
 
@@ -140,7 +140,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
                   {!profile.enabled && <span className="text-xs font-normal text-[#a1a1aa]">Disabled</span>}
                 </div>
                 <p className="mt-1 break-all text-xs text-[#7f8796]">
-                  {profile.integrationMode === 'acp-local-stdio' ? profile.executablePath : profile.externalUrlScheme ? `${profile.externalUrlScheme}:` : profile.executablePath}
+                  {profile.integrationMode !== 'external-handoff' ? profile.executablePath : profile.externalUrlScheme ? `${profile.externalUrlScheme}:` : profile.executablePath}
                 </p>
                 <p className="mt-1 text-xs text-[#7f8796]">Observed: {observation?.state || 'not tested'}</p>
               </button>
@@ -156,8 +156,8 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
 
         <div className="grid gap-3 rounded-xl border border-[#ececf0] p-4 sm:grid-cols-2">
           <label className="space-y-1"><span className="text-xs font-semibold text-[#71717a]">Name</span><Input value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} className={FIELD_CLASS} /></label>
-          <label className="space-y-1"><span className="text-xs font-semibold text-[#71717a]">Mode</span><select value={draft.integrationMode} onChange={event => setDraft({ ...draft, integrationMode: event.target.value as AgentRuntimeProfile['integrationMode'] })} className={`${FIELD_CLASS} w-full`}><option value="acp-local-stdio">Local ACP over stdio</option><option value="external-handoff">External handoff</option></select></label>
-          <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Exact executable path</span><Input value={draft.executablePath || ''} placeholder="/absolute/path/to/agent" onChange={event => setDraft({ ...draft, executablePath: event.target.value })} className={FIELD_CLASS} /></label>
+          <label className="space-y-1"><span className="text-xs font-semibold text-[#71717a]">Mode</span><select value={draft.integrationMode} onChange={event => setDraft({ ...draft, integrationMode: event.target.value as AgentRuntimeProfile['integrationMode'] })} className={`${FIELD_CLASS} w-full`}><option value="codex-app-server-stdio">Codex app-server over stdio</option><option value="acp-local-stdio">ACP agent over stdio</option><option value="external-handoff">External handoff</option></select></label>
+          <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Exact executable path</span><Input value={draft.executablePath || ''} placeholder="/absolute/path/to/agent" onChange={event => setDraft({ ...draft, executablePath: event.target.value })} className={FIELD_CLASS} />{draft.integrationMode === 'codex-app-server-stdio' && <span className="block text-xs leading-5 text-[#7f8796]">Select the installed Codex executable. Omvra launches its native app-server protocol automatically; no ACP adapter is required.</span>}</label>
           {draft.integrationMode === 'external-handoff' && <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Approved URL scheme (optional)</span><Input value={draft.externalUrlScheme || ''} placeholder="codex" onChange={event => setDraft({ ...draft, externalUrlScheme: event.target.value })} className={FIELD_CLASS} /></label>}
           <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Fixed arguments (one per line)</span><textarea value={fixedArgsText} onChange={event => setFixedArgsText(event.target.value)} className="min-h-20 w-full rounded-xl border border-[#e5e7eb] p-3 text-sm text-[#71717a]" /></label>
           <div className="flex items-center justify-between sm:col-span-2"><Label className="text-sm text-[#71717a]">Enabled</Label><Switch checked={draft.enabled} onCheckedChange={enabled => setDraft({ ...draft, enabled })} /></div>
@@ -181,7 +181,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
         <label className="block space-y-1"><span className="text-xs font-semibold text-[#71717a]">Workspace path</span><Input value={workspacePath} placeholder="/absolute/path/to/workspace" onChange={event => setWorkspacePath(event.target.value)} className={FIELD_CLASS} /></label>
         {!resolved ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">Configure an enabled runtime before testing or handing off.</p>
-        ) : resolved.integrationMode === 'acp-local-stdio' ? (
+        ) : resolved.integrationMode !== 'external-handoff' ? (
           <button type="button" onClick={() => void testResolvedConnection()} disabled={busy || !workspacePath.trim()} className={BUTTON_CLASS}>Test connection</button>
         ) : (
           <div className="space-y-3">

@@ -6,13 +6,13 @@ Task: `task-e245b4ab-1b7c-48c9-9742-58c448c5aa9c`
 
 ## Summary
 
-Add ACP as an optional execution adapter inside the existing Electron modular monolith. Omvra agent identity, installed runtime, and model provider remain separate. Runtime selection is deterministic and visible. Session bindings live in a separate versioned store and correlate one runtime-owned opaque session reference with one stable Omvra execution attempt.
+Add local agent runtimes as protocol-specific clients inside the existing Electron modular monolith. Omvra agent identity, installed runtime, protocol, and model provider remain separate. Runtime selection is deterministic and visible. Session bindings live in a separate versioned store and correlate one runtime-owned opaque session reference with one stable Omvra execution attempt.
 
 ACP owns live interaction. Existing task collaboration, Goal lifecycle, context ledger, evidence, revision, acceptance, archive, backup, and audit contracts remain authoritative. A session ending never submits, accepts, completes, archives, or abandons Omvra work.
 
-The first release supports only an explicitly configured local ACP subprocess over stdio plus a user-invoked external handoff. Stdio is a locality and process-lifecycle choice, not a single-agent restriction: Omvra may coordinate multiple concurrent ACP sessions in one capable runtime and/or multiple explicitly started runtime subprocesses. Distributed runtime pools and remote ACP transports remain deferred.
+The first release supports explicitly configured local stdio runtimes using either native ACP or the native Codex app-server protocol, plus a user-invoked external handoff. Omvra launches the installed runtime directly; it does not require a separately installed protocol-conversion executable. Stdio is a locality and process-lifecycle choice, not a single-agent restriction: Omvra may coordinate multiple concurrent sessions in one capable runtime and/or multiple explicitly started runtime subprocesses. Distributed runtime pools and remote transports remain deferred.
 
-ACP and MCP transports are independent. ACP carries runtime/session control over local stdio; MCP carries governed Omvra reads and writes through a separately negotiated, session-scoped connection. The first release does not give an ACP runtime the existing workspace-wide HTTP bearer token or unrestricted stdio MCP access. It does not add automatic spawning, watcher dispatch, remote gateways, provider authentication, arbitrary runtime plugins, or silent failover.
+Agent-runtime and MCP transports are independent. ACP or Codex app-server carries runtime/session control over local stdio; MCP carries governed Omvra reads and writes through a separately negotiated, session-scoped connection. The first release does not give a runtime the existing workspace-wide HTTP bearer token or unrestricted stdio MCP access. Codex authentication remains owned by Codex and is only observed through `account/read`; Omvra does not collect provider credentials. The release does not add automatic spawning, watcher dispatch, remote gateways, arbitrary runtime plugins, or silent failover.
 
 ## Decision drivers
 
@@ -22,7 +22,7 @@ ACP and MCP transports are independent. ACP carries runtime/session control over
 - Runtime, session, transcript, credential, and usage fields are rejected from the task collaboration projection.
 - Goal execution already owns acknowledgement, dispatch, retry, evidence, acceptance, and completion independently of any provider session.
 - `agent.resolve_task_context` is the canonical assigned-task preflight; the task-context ledger is the bounded, source-linked portability seam.
-- MCP transports and future ACP adapters must remain separate adapters over the domain layer.
+- MCP transports and runtime protocol clients must remain separate adapters over the domain layer.
 - Current MCP HTTP bearer authentication and stdio transport access are workspace-level boundaries, not ACP session authorization boundaries.
 - MCP audit records are bounded and redacted. Workspace backup/restore preserves versioned workspace records and unknown fields.
 
@@ -48,27 +48,27 @@ ACP and MCP transports are independent. ACP carries runtime/session control over
 | Option | Structure | Benefits | Costs and risks | Conditions |
 | --- | --- | --- | --- | --- |
 | Keep runtime/session data on collaboration, Goal nodes, or tasks | Add provider fields to current projections | Smallest initial lookup path | Couples identity to runtime, leaks runtime concerns into durable work, grows current records, conflicts with existing validation | Rejected |
-| Separate runtime profiles and session bindings behind an in-process ACP adapter | New versioned records; adapter calls existing task/Goal/context/evidence domains | Preserves ownership, supports multiple runtimes, bounded migration, reuses current deployment | Requires correlated writes and explicit recovery | **Selected** |
+| Separate runtime profiles and session bindings behind in-process protocol clients | New versioned records; native ACP and Codex clients call existing task/Goal/context/evidence domains | Preserves ownership, supports multiple runtimes without external conversion tools, bounded migration, reuses current deployment | Requires correlated writes, explicit recovery, and maintained protocol-specific clients | **Selected** |
 | Separate runtime service or arbitrary plugin host | New process/service owns runtime profiles and sessions | Strong isolation and extension flexibility | Adds authentication, synchronization, deployment, and plugin security cost before a demonstrated need | Rejected for the first release |
 
-The selected option uses local stdio for ACP because the client owns the child process and can correlate launch, exit, crash, cancellation, and cleanup without opening a listening endpoint. HTTP or WebSocket ACP becomes useful when the runtime must live on another machine, be shared independently of the desktop process, or scale as a distributed pool. Neither transport supplies orchestration: Omvra remains responsible for delegation, concurrency, dependencies, evidence, retries, budgets, and acceptance.
+The selected option uses local stdio because Omvra owns the child process and can correlate launch, exit, crash, cancellation, and cleanup without opening a listening endpoint. ACP-capable runtimes use ACP directly. Codex uses its native `codex app-server --stdio` JSONL protocol directly; Omvra does not route Codex through a Codex-to-ACP executable. HTTP or WebSocket becomes useful when a runtime must live on another machine, be shared independently of the desktop process, or scale as a distributed pool. No transport supplies orchestration: Omvra remains responsible for delegation, concurrency, dependencies, evidence, retries, budgets, and acceptance.
 
 ## Recommendation
 
-Use the separate in-process adapter and versioned-record option. It is the smallest design that supports multiple runtimes without binding personas to providers, and it preserves the existing domain authority and deployment model. Reconsider process isolation only if a supported remote runtime, untrusted third-party adapter, or independently deployed execution tier creates a demonstrated isolation requirement.
+Use separate in-process protocol clients and versioned records. This is the smallest design that connects directly to installed runtimes without binding personas to providers or requiring external conversion tools, while preserving the existing domain authority and deployment model. Reconsider process isolation only if a supported remote runtime, untrusted third-party runtime, or independently deployed execution tier creates a demonstrated isolation requirement.
 
 ## Evidence versus assumptions
 
 Evidence: current collaboration validation already excludes runtime data; stable attempt IDs and lifecycle transitions exist; Goal policy/evidence and MCP audit boundaries are implemented; Electron main-process composition already hosts local protocol adapters.
 
-Assumptions to validate during the first adapter spike: the selected ACP implementation exposes stable initialization/capability behavior, its opaque session reference can be restored reliably, and process-level interruption can be distinguished from an acknowledged cancellation. Failure of any assumption narrows resume or capability support; it does not justify simulated behavior or silent fallback.
+Assumptions to validate during each protocol-client spike: the runtime exposes stable initialization/capability behavior, its opaque session reference can be restored reliably, and process-level interruption can be distinguished from an acknowledged cancellation. Codex app-server schemas are version-specific, so the installed executable remains the source of truth. Failure of any assumption narrows resume or capability support; it does not justify simulated behavior or silent fallback.
 
 ## Identity and ownership boundaries
 
 | Concept | Owner | Durable meaning |
 | --- | --- | --- |
 | Omvra agent identity | Person/task/Goal contracts | Persona, instructions, assignment, contribution role, and accountability |
-| Runtime profile | ACP runtime configuration | One exact installed adapter/application and launch method |
+| Runtime profile | Agent runtime configuration | One exact installed application, native protocol, and launch method |
 | Model provider | External runtime, observed by Omvra when reported | Authentication, billing, provider limits, and model access |
 | Execution attempt | Task collaboration or Goal lifecycle | One governed attempt to perform a bounded work scope |
 | ACP session binding | ACP adapter store | Correlation between one execution attempt and one runtime-owned session |
@@ -81,7 +81,7 @@ No identity implies another. Assigning Arc, Codex, or any other Omvra persona do
 Runtime profiles are stored separately under `omvra.agentRuntimeProfiles.v1`. Defaults are workspace settings, not person fields.
 
 ```ts
-type RuntimeIntegrationMode = 'external-handoff' | 'acp-local-stdio';
+type RuntimeIntegrationMode = 'external-handoff' | 'acp-local-stdio' | 'codex-app-server-stdio';
 
 interface AgentRuntimeProfileV1 {
   schemaVersion: 1;
@@ -246,21 +246,21 @@ The following facts are distinct and must have distinct event types and owners:
 sequenceDiagram
   participant U as User or governed workflow
   participant O as Omvra lifecycle
-  participant A as ACP adapter
+  participant A as Runtime protocol client
   participant R as Selected runtime
   participant M as Scoped MCP gateway
   U->>O: Explicit execution request
   O->>O: Resolve runtime, dependencies, revision, policy, context
   O->>A: Create stable execution attempt
-  A->>R: Launch exact local stdio adapter
+  A->>R: Launch exact local stdio runtime
   R-->>A: Initialize and acknowledge
   A->>O: Runtime acknowledgement
-  A->>R: Create or resume ACP session
+  A->>R: Create or resume native session
   R-->>A: Opaque session reference and capabilities
   A->>O: Persist session binding
   O->>M: Issue binding-scoped grant
   M-->>R: Negotiated MCP connection
-  R-->>A: Live ACP updates
+  R-->>A: Live native-protocol updates
   A-->>U: Normalized progress and requests
   R->>O: Governed MCP writes and evidence references
   R-->>A: Session/process ends
@@ -274,7 +274,7 @@ sequenceDiagram
 - **Normal process exit:** record the observed exit and mark the attempt `completed` only when the existing lifecycle permits it. Contribution/task/Goal state does not advance automatically.
 - **Crash or lost transport:** mark the binding `interrupted` and the attempt `failed` or `stopped` through the existing lifecycle. Keep the work scope and checkpoint available.
 - **Resume:** allowed only with the same runtime profile when session-resume capability is `supported` and the opaque reference remains valid. Otherwise the user starts a new execution attempt and receives the latest accepted Omvra context pack.
-- **Cancellation:** enter `cancelling`, issue the ACP cancel operation only when supported, and wait for acknowledgement. A timeout becomes `interrupted`; Omvra does not claim cancellation succeeded. The attempt stops only through its existing transition.
+- **Cancellation:** enter `cancelling`, issue the selected protocol's cancel operation only when supported, and wait for acknowledgement. A timeout becomes `interrupted`; Omvra does not claim cancellation succeeded. The attempt stops only through its existing transition.
 - **Missing or unavailable runtime:** fail before session creation. Do not create a fabricated session, background retry, or fallback attempt. External handoff remains a separate explicit action.
 - **Authentication required:** surface the runtime-provided method or agent-native sign-in instruction. Omvra never receives or persists the credential.
 - **MCP grant failure or expiry:** deny MCP access visibly without falling back to a broader token or transport. The ACP session may remain open for user steering, but it cannot claim governed Omvra work succeeded.
@@ -284,13 +284,14 @@ Active and interrupted bindings retain the opaque reference so a supported resum
 
 ## Local-stdio first-release boundary
 
-- The ACP adapter runs in the Electron main process behind the existing domain facades; it is not a domain dependency and does not import MCP internals.
+- Native ACP and Codex app-server clients run in the Electron main process behind the existing domain facades; neither is a domain dependency or imports MCP internals.
+- Codex profiles launch the configured Codex executable with `app-server --stdio`. Omvra speaks Codex JSONL directly, sends `initialize`/`initialized`, and observes existing authentication with `account/read`; no Codex-to-ACP executable is installed or invoked.
 - Launch requires an explicit user or already-governed Goal action. Assignment, delegation eligibility, watcher changes, and board polling cannot launch it.
 - The executable path is exact, fixed arguments are an array, the workspace directory is validated, and no shell interpolation is used.
 - Only the selected runtime receives the bounded context pack and session-scoped Omvra MCP connection configuration required for the scope.
-- Omvra may run explicitly requested task/contribution or Goal-node attempts concurrently. A runtime may multiplex concurrent ACP sessions when it advertises that capability; otherwise Omvra uses separately managed subprocesses. Join behavior is based on accepted durable outputs, never shared transcripts or session proximity.
+- Omvra may run explicitly requested task/contribution or Goal-node attempts concurrently. A runtime may multiplex concurrent sessions when its native protocol advertises that capability; otherwise Omvra uses separately managed subprocesses. Join behavior is based on accepted durable outputs, never shared transcripts or session proximity.
 - This is local multi-agent execution, not a remote/shared agent pool. Remote ACP over HTTP/WebSocket may later expand deployment location and independent scaling without changing the collaboration, session-binding, MCP-grant, or acceptance contracts.
-- Remote gateways, hosted agents, embedded OAuth, provider SDKs, arbitrary adapter installation, recursive agent trees, background relaunch, and silent runtime failover are out of scope.
+- Remote gateways, hosted agents, Omvra-owned provider credentials, provider SDKs, arbitrary runtime/plugin installation, recursive agent trees, background relaunch, and silent runtime failover are out of scope.
 - `Open externally` uses an allowlisted application link or exact executable handoff. It records `external-handoff` only, creates no ACP binding or MCP grant, does not prove authentication or execution, and does not change task/Goal status. The UI should describe this as opening/preparing work externally, not starting or sending an ACP session.
 
 ## Alignment with existing Omvra contracts
@@ -346,14 +347,14 @@ No failure class authorizes fallback, lifecycle advancement, or data deletion. R
 2. Add normalized runtime-profile/default validation and persistence without launching processes.
 3. Add connection preflight and explicit external handoff with redacted audit.
 4. Add the separate session-binding/event store and `sessionBindingId` attempt extension.
-5. Add one local-stdio ACP adapter and focused initialization/capability/auth tests.
+5. Add native local-stdio ACP and Codex app-server clients with focused initialization/capability/auth tests.
 6. Add the session-scoped MCP grant/gateway boundary; prove that both negotiated transports deny out-of-scope and expired access without broader fallback.
 7. Bind one user-initiated task attempt; pass bounded context plus scoped MCP configuration.
 8. Add steering, input, permission, cancel, close, crash, and resume behavior only where negotiated capabilities support them.
 9. Add Goal-node binding after task behavior passes lifecycle, archive, backup, and privacy QA.
 10. Prove local multi-agent coordination with concurrent bounded attempts, then prove portability with a second runtime using the same accepted checkpoint, not a copied transcript.
 
-Rollback preserves runtime profiles, bindings, attempts, events, and unknown fields. Disabling ACP hides execution controls but leaves direct task/Goal behavior unchanged.
+Rollback preserves runtime profiles, bindings, attempts, events, and unknown fields. Disabling agent-runtime integration hides execution controls but leaves direct task/Goal behavior unchanged.
 
 ## Risks and mitigations
 
@@ -376,7 +377,7 @@ Rollback preserves runtime profiles, bindings, attempts, events, and unknown fie
 - Recovery: resume supported/unsupported, lost opaque reference, stale revision, cancel timeout, startup reconciliation, and missing runtime.
 - Privacy: no credential, prompt, response, transcript, tool payload, hidden reasoning, evidence body, or opaque session reference in task, collaboration, Goal graph, context index, general audit, cards, or exports.
 - Persistence: reload, backup/restore, archive/restore, unknown-field preservation, and ACP-disabled rollback.
-- Integration: direct task execution and Goals without session fields remain unchanged; MCP and ACP adapters remain siblings over domain services.
+- Integration: direct task execution and Goals without session fields remain unchanged; MCP and native runtime clients remain siblings over domain services.
 - MCP authorization: grant scope, expiry, revocation, redaction, HTTP and scoped-proxy parity, and rejection of broader fallback.
 - Local multi-agent execution: concurrent session multiplexing when supported, separate subprocess isolation otherwise, and joins gated by accepted durable outputs.
 
@@ -386,17 +387,17 @@ Rollback preserves runtime profiles, bindings, attempts, events, and unknown fie
 - Session closing, process exit, crash, and cancellation cannot complete or abandon Omvra work.
 - Provider credentials and raw transcripts are forbidden from workspace records.
 - Unsupported and unknown capabilities fail visibly and are never simulated.
-- ACP and MCP transports are independent; every ACP session receives only an ephemeral scope-bound MCP grant.
+- Runtime and MCP transports are independent; every governed runtime session receives only an ephemeral scope-bound MCP grant.
 - Local stdio permits bounded concurrent multi-agent work without implying a distributed runtime pool.
 - Automatic spawning, watcher dispatch, remote gateways, arbitrary plugins, and silent failover remain outside the first release.
 
 ## Remaining product decisions
 
-- The first and second curated runtime adapters used to prove portability.
+- The second native runtime protocol used to prove portability beyond ACP and Codex app-server.
 - Which installed applications support a safe review-before-send external handoff.
 - The later user-configurable retention duration for normalized closed-session events.
 - Whether provider-reported cost is warning-only or may trigger a governed cancellation threshold.
 
 ## Recommended next handoff
 
-After human acceptance, use the component-boundary review for the runtime-profile store, ACP adapter, session-binding store, and existing task/Goal domain seams before implementation. Runtime behavior should then be verified against the lifecycle and recovery cases in this contract.
+After human acceptance, use the component-boundary review for the runtime-profile store, native protocol clients, session-binding store, and existing task/Goal domain seams before implementation. Runtime behavior should then be verified against the lifecycle and recovery cases in this contract.
