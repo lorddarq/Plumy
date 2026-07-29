@@ -58,6 +58,7 @@ interface TaskAssignmentPopoverProps {
 
 export function TaskAssignmentPopover({ value, people, onApply, onOpenChange, loading = false, conflictMessage, onReload }: TaskAssignmentPopoverProps) {
   const [open, setOpen] = useState(false);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [draftContributions, setDraftContributions] = useState<TaskContributionV1[]>([]);
   const peopleById = useMemo(() => new Map(people.map(person => [person.id, person])), [people]);
@@ -89,6 +90,7 @@ export function TaskAssignmentPopover({ value, people, onApply, onOpenChange, lo
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
       setDraftContributions(cloneContributions(value.collaboration));
+      setPortalContainer(triggerRef.current?.closest('[data-slot="dialog-content"]') as HTMLElement | null);
     }
     setOpen(nextOpen);
     onOpenChange?.(nextOpen);
@@ -202,6 +204,7 @@ export function TaskAssignmentPopover({ value, people, onApply, onOpenChange, lo
               </button>
             </PopoverTrigger>
             <PopoverContent
+              container={portalContainer}
               align="end"
               sideOffset={6}
               collisionPadding={16}
