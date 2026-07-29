@@ -227,8 +227,8 @@ test('renderer workspace provider keeps its public exports and persistence keys'
   assert.match(workspaceStoreSource, /export function WorkspaceStoreProvider\(/);
   assert.match(workspaceStoreSource, /export function useWorkspaceStore\(/);
   assert.match(workspaceStoreSource, /export function createDefaultAppPreferences\(/);
-  assert.match(workspaceStoreSource, /window\.electron\?\.storeExport\?\.\(\)/);
-  assert.match(workspaceStoreSource, /window\.electron\?\.onStoreChanged\?\.\(/);
+  assert.match(storeSource, /window\.electron\?\.storeExport\?\.\(\)/);
+  assert.match(storeSource, /window\.electron\?\.onStoreChanged\?\.\(/);
 });
 
 test('preload invoke channels exactly match registered IPC handlers', () => {

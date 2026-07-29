@@ -1,4 +1,4 @@
-import { TaskStatus, type StatusColumn } from '../types';
+import type { TaskStatus, StatusColumn } from '../types.ts';
 
 export const swimlanes = [
   { id: 'open' as TaskStatus, title: 'Open', color: '#06b6d4', loadClassification: 'open-tasks', roadmapStage: 'not-started', aiWatchEnabled: false, aiAction: 'inspect_and_work' },
