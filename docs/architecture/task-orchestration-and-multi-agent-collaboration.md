@@ -45,11 +45,11 @@ The prerequisite `docs/architecture/domain-service-protocol-modularization-plan.
 ### Roles
 
 - **Orchestrator**: exactly one accountable person on a collaborative task. The orchestrator plans, delegates, steers, integrates, and requests aggregate review/completion.
-- **Contributor**: a human or agent responsible for one explicit scope.
+- **Contributor**: an agent responsible for one explicit delegated scope under the orchestrator.
 - **Subagent**: an agentic contributor selected through delegation and subject to delegation eligibility.
 - **Human reviewer**: the person who performs human acceptance when existing task policy requires it.
 
-Humans may contribute in v1. Only an agentic person may use the `subagent` role, and that person must be eligible for delegation. Eligibility permits selection only; it never starts a runtime, assigns work, or changes ownership.
+Humans may be direct assignees, orchestrators, and reviewers, but they cannot be contributors. Every contributor is an agentic person using the `subagent` role and must be eligible for delegation. Eligibility permits selection only; it never starts a runtime, assigns work, or changes ownership.
 
 ### Aggregate ownership rules
 
@@ -103,6 +103,7 @@ Rules:
 - When `collaboration` exists, `orchestratorId` is required and `assigneeId` must equal it. Reads derive the compatibility mirror if old stored data omitted it; the next collaboration write persists both.
 - `contribution.id` is stable and is not derived from `personId`, array position, child task, or runtime session.
 - One person may appear only once in a task's contribution list, and the orchestrator cannot also be a contributor.
+- New contributions must reference an agentic person who is available for subagent delegation and persist with role `subagent`. The `contributor` role is retained only for backward-compatible reads of earlier drafts.
 - `scope` is required plain text in v1. Child-task and Goal-node scope links are deferred; they may be added later as optional references without replacing the stable contribution ID.
 - Unknown fields on versioned collaboration, contribution, attempt, and event records survive load, export/import, backup/restore, and no-op writes.
 
@@ -175,7 +176,7 @@ stateDiagram-v2
 - Every collaboration mutation requires `expectedRevision`. Retryable transition commands also require an idempotency key.
 - The current store has no cross-key transaction. A domain command validates the complete change, appends one idempotent event/attempt record, then writes the task projection. Readers apply history only when its recorded next revision exists on the task. A retry or startup reconciliation completes an interrupted projection write without duplicating history.
 - Reads return the versioned task projection plus bounded attempt/event summaries; exact historical records use targeted reads.
-- Writes reject missing people, duplicate contributors, orchestrator/contributor conflicts, invalid roles, ineligible subagents, invalid transitions, stale revisions, and mismatched `assigneeId`/`orchestratorId`.
+- Writes reject missing people, human contributors, duplicate contributors, orchestrator/contributor conflicts, invalid roles, ineligible subagents, invalid transitions, stale revisions, and mismatched `assigneeId`/`orchestratorId`.
 - Existing `tasks.assign` remains valid. On a legacy task it updates `assigneeId`. On a collaborative task it performs an orchestrator transfer and atomically mirrors both IDs, subject to the active-contribution confirmation rule.
 - A focused collaboration write atomically replaces assignment/scope projection; focused transition writes change one contribution or attempt. Ordinary `tasks.update` must not bypass collaboration validation.
 - Successful MCP writes return the persisted task/record and next task revision. Dotted tool names and existing compatibility aliases follow the current MCP adapter pattern.
@@ -225,16 +226,16 @@ Opening the popover copies the current parent-form assignment into a local draft
 The popover contains:
 
 1. **Orchestrator** — a single-select list of all people plus **Unassigned**.
-2. **Contributors** — a checkbox list of humans and agents eligible for delegated selection.
-3. **Selected contributors** — chips/rows with person name, type, removal action, required scope input, and persisted lifecycle-state badge when one exists.
+2. **Contributors** — a checkbox list of agents eligible for delegated selection.
+3. **Selected contributors** — chips/rows with person name, type, removal action, resolved scope, and persisted lifecycle-state badge when one exists. The agent role supplies scope by default; an input is shown only when the role provides no usable scope.
 4. Inline validation and **Cancel** / **Apply** actions.
 
 Rules:
 
 - Any human or agent may be selected as orchestrator. Delegation eligibility does not restrict direct assignment.
-- A selected human persists as role `contributor`. A selected eligible agent persists as role `subagent`.
+- Only eligible agents may be selected as contributors, and they persist as role `subagent`. Humans may be direct assignees or reviewers but never contributors.
 - The orchestrator is excluded from the contributor checklist. Duplicate people are never added.
-- At least one non-whitespace scope is required for every selected contributor before **Apply** is enabled.
+- Every selected contributor requires a non-whitespace scope before **Apply** is enabled. The agent's role supplies it automatically when present; otherwise the user enters a task-specific scope.
 - Adding the first contributor requires an orchestrator. **Unassigned** is disabled while any contributor is selected.
 - A newly added contribution starts as `pending`; the assignment popover cannot choose or change lifecycle state.
 - With no contributors, saving preserves the legacy/direct-assignment shape and writes only `assigneeId`. Merely opening or saving the field does not force a collaboration migration.
@@ -266,7 +267,7 @@ Agent add/edit content includes one native checkbox labeled **Available for suba
 Behavior:
 
 - Existing or imported agent profiles without the field default to unchecked.
-- The control is shown only for agentic people. Humans remain selectable as ordinary contributors without this setting.
+- The control is shown only for agentic people. Humans are never offered in the contributor selector.
 - Unchecked agents remain selectable as orchestrators and direct assignees but are excluded from new subagent selection.
 - Turning eligibility off does not remove, stop, reassign, or complete existing contributions. Existing references remain visible with an **Unavailable for new delegation** warning.
 - Changing an agent with active subagent references into a human is blocked until those references are resolved; the form explains the impacted tasks instead of clearing them.
@@ -285,7 +286,7 @@ Behavior:
 Task details add **Collaboration** after **Basic Information** when collaboration exists. It shows:
 
 - orchestrator identity and role;
-- each contributor's identity, human/subagent type, scope, explicit text state, evidence count, and latest attempt summary when present;
+- each contributor's identity, subagent type, scope, explicit text state, evidence count, and latest attempt summary when present;
 - empty copy when an orchestrator has no contributors;
 - state-appropriate actions for the current orchestrator, such as accept submitted work, request revision, and inspect or recover blocked work.
 
@@ -298,7 +299,7 @@ Human review remains separate: agent-authored submission or acceptance cannot re
 ### Empty, loading, conflict, and failure states
 
 - **No people**: show “Add a person or agent before assigning this task” and a route to existing People settings; do not render an empty selector.
-- **No eligible agents**: humans remain selectable as contributors, plus explanatory copy and a route to agent settings. If neither humans nor eligible agents exist, show a contributor-specific empty state.
+- **No eligible agents**: show a contributor-specific empty state with explanatory copy and a route to Agent settings. Humans remain valid direct assignees but cannot be task contributors.
 - **Loading**: keep the trigger and actions disabled with a named loading state; do not flash **Unassigned** over a persisted value.
 - **Invalid draft**: show field-level messages for missing orchestrator, missing scope, duplicate/self-conflict, unavailable person, and ineligible subagent; preserve all selections.
 - **Revision conflict**: keep the draft visible, report that the task changed, and offer **Reload assignment**. Never overwrite newer persisted state.
@@ -331,7 +332,7 @@ Existing task-edit permission remains the outer UI gate. Collaboration validatio
 1. **Legacy preservation** — Given a task with only `assigneeId`, when it is opened and saved without contributors, then the same assignee remains and no collaboration record is created.
 2. **Collaborative assignment** — Given an orchestrator and valid scoped contributors, when the user applies and saves, then one orchestrator, mirrored `assigneeId`, stable contributions, roles, scopes, and `pending` states survive reload.
 3. **Required ownership** — Given at least one selected contributor, when no orchestrator is selected, then **Apply** is disabled and the missing-orchestrator error is announced.
-4. **Required scope** — Given a selected contributor with blank scope, when validation runs, then **Apply** is disabled and focus can reach the contributor's scope error.
+4. **Required scope** — Given a selected contributor whose agent role and task-specific scope are both blank, when validation runs, then **Apply** is disabled and focus can reach the contributor's scope error.
 5. **Direct versus delegated agent** — Given an unchecked agent, when assignment opens, then that agent is available as orchestrator/direct assignee but not as a new subagent.
 6. **Eligibility has no side effect** — Given an agent whose eligibility changes, when the profile is saved, then no task, status, attempt, runtime, provider, or watcher state changes automatically.
 7. **Conflict prevention** — Given the same person is selected as orchestrator and contributor, when the user applies, then the draft is rejected without changing persisted assignment.
@@ -429,9 +430,9 @@ Rollback is contract-preserving: old clients continue reading `assigneeId`; new 
 
 ## Benchmarking
 
-`docs/architecture/mcp-agent-benchmark-protocol.md` remains authoritative. This milestone adds a multi-agent arm without replacing the simple-versus-instructed comparison.
+`docs/architecture/mcp-agent-benchmark-protocol.md` remains authoritative. Its controlled arms are **simple**, **instructed**, and **multi-agent**. Simple-versus-instructed measures instruction uplift; instructed-versus-multi-agent measures orchestration uplift. The multi-agent arm uses one orchestrator and a flat list of eligible agentic subagents, each with a declared (or role-derived) scope, lifecycle handoff, evidence, review, and integration step. Humans may review or directly own a task but are never contributors.
 
-Keep product/model/settings, workspace fixture, task wording, and order controlled. Primary measures are acceptance coverage, rework, duration, tool calls, token/cost data where available, scope adherence, handoff evidence, delegation quality, revision detection, integration quality, and premature-completion errors. Subjective quality remains secondary and rubric-based.
+Keep product/model/settings, workspace fixture, task wording, and order controlled. Primary measures are acceptance coverage, rework, duration, tool calls, token/cost data where available, scope adherence, handoff evidence, delegation quality, revision detection, integration quality, and premature-completion errors. Subjective quality remains secondary and rubric-based. Benchmark manifests stay metadata-only and never persist prompts, responses, transcripts, or sensitive payloads.
 
 ## Non-goals for the first release
 
@@ -448,8 +449,8 @@ Keep product/model/settings, workspace fixture, task wording, and order controll
 Resolved for v1:
 
 - `collaboration.orchestratorId` is authoritative when present; `assigneeId` remains its compatibility mirror.
-- Humans may contribute; only eligible agentic people may be subagents.
-- Contribution scope is required plain text.
+- Humans may be direct assignees, orchestrators, and reviewers, but only eligible agentic people may contribute as subagents.
+- Contribution scope is required plain text and defaults to the agent role when available.
 - Contribution and execution-attempt IDs are stable and independent of people, array order, and runtime sessions.
 - Orchestrator transfer with active work requires explicit human confirmation.
 - ACP is an optional downstream session binding, not a collaboration dependency.

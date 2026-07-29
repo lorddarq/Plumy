@@ -77,7 +77,7 @@ function discoverUserSkills(options = {}, source = 'omvra-user') {
       if (entry.isDirectory()) { walk(entryPath, depth + 1); continue; }
       if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.md')) continue;
       const skillId = normalizeSkillId(entry.name.toLowerCase() === 'skill.md' ? path.basename(directory) : entry.name);
-      if (skillId) skills.push(normalizeSkill({ skillId, path: path.relative(root, entryPath), stages: [], personas: [] }, { root, source }));
+      if (skillId) skills.push(normalizeSkill({ skillId, path: path.relative(root, entryPath), stages: [], personas: [], trustStatus: options.trustStatus }, { root, source }));
     }
   };
   walk(root);
@@ -103,7 +103,13 @@ function listRootSkills(rootConfig) {
       return { skills: [], error: { code: 'INVALID_MANIFEST', message: error.message, root: rootConfig.root } };
     }
   }
-  return { skills: discoverUserSkills({ root: rootConfig.root }, rootConfig.source), error: null };
+  return {
+    skills: discoverUserSkills({
+      root: rootConfig.root,
+      trustStatus: rootConfig.trustStatus || (rootConfig.source === 'omvra-configured' ? 'trusted' : undefined),
+    }, rootConfig.source),
+    error: null,
+  };
 }
 
 function listAvailableSkills(options = {}) {

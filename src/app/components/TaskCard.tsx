@@ -11,11 +11,13 @@ interface TaskCardProps {
   color?: string;
   project?: string;
   priority?: TaskPriority;
+  orchestratorName?: string;
+  contributorCount?: number;
   onClick?: () => void;
   onEdit?: () => void;
 }
 
-function TaskCardComponent({ title, notes, color, project, priority = 'normal', onClick, onEdit }: TaskCardProps) {
+function TaskCardComponent({ title, notes, color, project, priority = 'normal', orchestratorName, contributorCount = 0, onClick, onEdit }: TaskCardProps) {
   const projectLabels = project
     ? project.split(',').map(label => label.trim()).filter(Boolean)
     : [];
@@ -81,6 +83,20 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
                 <div className="kanban-task-more-count">{remainingChecklistCount} more</div>
               )}
             </div>
+          </div>
+        )}
+
+        {orchestratorName && (
+          <div className="flex min-w-0 items-center gap-2 text-xs text-[#71717a]">
+            <span className="min-w-0 flex-1 truncate" title={orchestratorName}>{orchestratorName}</span>
+            {contributorCount > 0 && (
+              <span
+                className="shrink-0 rounded-full border border-black/[0.08] bg-black/[0.035] px-2 py-0.5 font-semibold tabular-nums text-[#52525b]"
+                aria-label={`${contributorCount} ${contributorCount === 1 ? 'contributor' : 'contributors'}`}
+              >
+                +{contributorCount}
+              </span>
+            )}
           </div>
         )}
 

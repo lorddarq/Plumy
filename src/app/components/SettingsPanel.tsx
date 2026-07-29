@@ -246,7 +246,7 @@ export function WorkflowSettingsSection({
       <div className="mt-5 border-t border-[#ececf0] pt-5">
         <div className="text-sm font-semibold leading-5 text-[#71717a]">External skills location</div>
         <p className="mt-1 max-w-[40rem] text-xs leading-4 text-[#6a7282]">
-          Use a local folder for skills that are not bundled with Omvra. Required skills are resolved from this folder before bundled fallbacks.
+          Use a local folder for skills that are not bundled with Omvra. Folder/SKILL.md skills work without a manifest and resolve before bundled fallbacks.
         </p>
         <div className="mt-3 flex items-center gap-2">
           <Input

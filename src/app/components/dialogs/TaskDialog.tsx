@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, ChevronsUpDown, FileText, RefreshCw, Trash2 } from 'lucide-react';
-import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../../types';
+import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment, TaskCollaborationV1 } from '../../types';
 import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
 import { toLocalISODate } from '../../utils/date';
 import { getMilestoneForTask, getMilestoneProjectIds, getTaskProjectIds, getTasksForMilestone, wouldCreateDependencyCycle } from '../../utils/roadmap';
@@ -44,6 +44,7 @@ import { CalendarIcon } from '../icons/CalendarIcon';
 import { TaskCheckboxControl } from '../TaskCheckboxControl';
 import { FeatheredScrollList } from '../FeatheredScrollList';
 import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../../utils/statusColumnSemantics';
+import { TaskAssignmentPopover } from '../TaskAssignmentPopover';
 
 function getFileNameFromPath(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/');
@@ -67,6 +68,15 @@ function formatTaskDateDisplay(value: string): string {
   const [year, month, day] = value.split('-');
   if (!year || !month || !day) return '';
   return `${day}/${month}/${year}`;
+}
+
+function getAssignmentSourceToken(task?: Task | null): string {
+  if (!task) return '';
+  return JSON.stringify({
+    assigneeId: task.assigneeId,
+    collaboration: task.collaboration,
+    mcpUpdatedAt: task.mcpUpdatedAt,
+  });
 }
 
 interface TaskDialogProps {
@@ -123,10 +133,16 @@ export function TaskDialog({
   const [milestoneId, setMilestoneId] = useState(NO_MILESTONE_VALUE);
   const [dependencyIds, setDependencyIds] = useState<string[]>([]);
   const [assigneeId, setAssigneeId] = useState('unassigned');
+  const [collaboration, setCollaboration] = useState<TaskCollaborationV1 | undefined>();
+  const [isAssignmentOpen, setIsAssignmentOpen] = useState(false);
+  const [assignmentSourceToken, setAssignmentSourceToken] = useState('');
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [attachmentAvailabilityByPath, setAttachmentAvailabilityByPath] = useState<Record<string, boolean | undefined>>({});
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const hasInvalidDateRange = Boolean(startDate && endDate && endDate < startDate);
+  const currentPersistedTask = task?.id ? tasks.find(candidate => candidate.id === task.id) : undefined;
+  const currentAssignmentSourceToken = getAssignmentSourceToken(currentPersistedTask);
+  const hasAssignmentConflict = Boolean(task && assignmentSourceToken && currentAssignmentSourceToken !== assignmentSourceToken);
   const normalizedProjectSearchQuery = projectSearchQuery.trim().toLowerCase();
   const filteredSwimlanes = useMemo(
     () => normalizedProjectSearchQuery
@@ -208,6 +224,8 @@ export function TaskDialog({
       );
       setDependencyIds(Array.isArray(task.dependencyIds) ? task.dependencyIds : []);
       setAssigneeId(task.assigneeId || 'unassigned');
+      setCollaboration(task.collaboration);
+      setAssignmentSourceToken(getAssignmentSourceToken(task));
       setAttachments(Array.isArray(task.attachments) ? task.attachments : []);
     } else {
       const initialProjectIds = defaultSwimlaneId ? [defaultSwimlaneId] : [];
@@ -223,6 +241,8 @@ export function TaskDialog({
       setMilestoneId(NO_MILESTONE_VALUE);
       setDependencyIds([]);
       setAssigneeId(defaultAssigneeId || 'unassigned');
+      setCollaboration(undefined);
+      setAssignmentSourceToken('');
       setAttachments([]);
       
       if (defaultDate) {
@@ -318,7 +338,7 @@ export function TaskDialog({
   };
 
   const handleSave = () => {
-    if (!title.trim() || hasInvalidDateRange) return;
+    if (!title.trim() || hasInvalidDateRange || hasAssignmentConflict) return;
 
     const taskData: Partial<Task> = {
       ...(task && { id: task.id }),
@@ -337,6 +357,7 @@ export function TaskDialog({
         .filter(Boolean)
         .join(', ') || undefined,
       assigneeId: assigneeId === 'unassigned' ? undefined : assigneeId,
+      collaboration,
       milestoneId: milestoneId === NO_MILESTONE_VALUE ? undefined : milestoneId,
       dependencyIds: milestoneId === NO_MILESTONE_VALUE ? [] : dependencyIds,
       attachments,
@@ -375,7 +396,9 @@ export function TaskDialog({
   const selectedPriorityIcon = TASK_PRIORITY_ICONS[priority];
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={nextOpen => {
+      if (!nextOpen && !isAssignmentOpen) onClose();
+    }}>
       <DialogSurface
         showClose={false}
         aria-describedby={undefined}
@@ -419,7 +442,7 @@ export function TaskDialog({
                 <Button
                   type="button"
                   onClick={handleSave}
-                  disabled={!title.trim() || hasInvalidDateRange}
+                  disabled={!title.trim() || hasInvalidDateRange || hasAssignmentConflict}
                   className="h-8 gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] shadow-none hover:bg-[#71717a]/5 hover:text-[#67676f] disabled:opacity-50"
                 >
                   <RefreshCw className="size-4" />
@@ -506,26 +529,7 @@ export function TaskDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-x-2 gap-y-5 md:grid-cols-[minmax(0,136px)_minmax(0,136px)_72px_120px_72px]">
-                {people.length > 0 && (
-                  <div className="space-y-1">
-                    <Label htmlFor="assignee" className={taskEditLabelClassName}>Assignee</Label>
-                    <Select value={assigneeId} onValueChange={setAssigneeId}>
-                      <SelectTrigger id="assignee" className={taskEditSelectClassName}>
-                        <SelectValue placeholder="Unassigned" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {people.map(person => (
-                          <SelectItem key={person.id} value={person.id}>
-                            {person.kind === 'agentic' ? 'Agent' : 'Human'}: {person.name} - {person.role}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
+              <div className="grid grid-cols-2 gap-x-2 gap-y-5 md:grid-cols-[minmax(0,1fr)_72px_120px_72px]">
                 <div className="space-y-1">
                   <Label htmlFor="task-priority" className={taskEditLabelClassName}>Priority</Label>
                   <Select value={priority} onValueChange={(value) => setPriority(value as TaskPriority)}>
@@ -598,6 +602,25 @@ export function TaskDialog({
                   </Select>
                 </div>
               </div>
+
+              <TaskAssignmentPopover
+                value={{
+                  assigneeId: assigneeId === 'unassigned' ? undefined : assigneeId,
+                  collaboration,
+                }}
+                people={people}
+                onApply={assignment => {
+                  setAssigneeId(assignment.assigneeId ?? 'unassigned');
+                  setCollaboration(assignment.collaboration);
+                }}
+                onOpenChange={setIsAssignmentOpen}
+                conflictMessage={hasAssignmentConflict ? 'This task changed while you were editing. Reload the assignment before saving.' : undefined}
+                onReload={currentPersistedTask ? () => {
+                  setAssigneeId(currentPersistedTask.assigneeId ?? 'unassigned');
+                  setCollaboration(currentPersistedTask.collaboration);
+                  setAssignmentSourceToken(currentAssignmentSourceToken);
+                } : undefined}
+              />
 
               <div className="grid grid-cols-1 gap-x-2 gap-y-5 md:grid-cols-[minmax(0,1fr)_200px]">
                 <div className="space-y-1">

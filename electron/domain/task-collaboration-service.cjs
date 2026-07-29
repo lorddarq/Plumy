@@ -112,10 +112,15 @@ function createTaskCollaborationService({ findPersonById, normalizeString }) {
 
       const person = verifyPeople ? findPersonById(store, personId) : null;
       if (verifyPeople && !person) return invalid('CONTRIBUTOR_NOT_FOUND', `Contributor "${personId}" was not found.`);
-      const preservesExistingSubagent = options.allowIneligibleExistingContributionIds instanceof Set
+      const preservesExistingContribution = options.allowIneligibleExistingContributionIds instanceof Set
         && options.allowIneligibleExistingContributionIds.has(id);
-      if (verifyPeople && role === 'subagent' && !preservesExistingSubagent
-        && (person.kind !== 'agentic' || person.availableForSubagentDelegation !== true)) {
+      if (verifyPeople && !preservesExistingContribution && person.kind !== 'agentic') {
+        return invalid('CONTRIBUTOR_MUST_BE_AGENTIC', `Contributor "${personId}" must be an agentic person.`);
+      }
+      if (verifyPeople && !preservesExistingContribution && role !== 'subagent') {
+        return invalid('INVALID_CONTRIBUTION_ROLE', 'Agentic task contributors must use the subagent role.');
+      }
+      if (verifyPeople && !preservesExistingContribution && person.availableForSubagentDelegation !== true) {
         return invalid('SUBAGENT_NOT_ELIGIBLE', `Contributor "${personId}" is not available for subagent delegation.`);
       }
 

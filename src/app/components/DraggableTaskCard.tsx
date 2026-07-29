@@ -1,7 +1,8 @@
 import { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { Task, TaskStatus, StatusColumn } from '../types';
+import { Person, Task, TaskStatus, StatusColumn } from '../types';
 import { TaskCard } from './TaskCard';
+import { getTaskAssignmentSummary } from '../utils/taskAssignment';
 
 export const TASK_ITEM_TYPE = 'TASK_CARD';
 
@@ -33,6 +34,7 @@ interface DraggableTaskCardProps {
   onTaskDropIndicatorClear: () => void;
   onTaskDrop: (draggedTask: Task, status: TaskStatus, indicator: TaskDropIndicator) => void;
   swimlanes: StatusColumn[];
+  people: Person[];
 }
 
 export function DraggableTaskCard({
@@ -45,6 +47,7 @@ export function DraggableTaskCard({
   onTaskDropIndicatorClear,
   onTaskDrop,
   swimlanes,
+  people,
 }: DraggableTaskCardProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -109,6 +112,7 @@ export function DraggableTaskCard({
 
   // Combine drag and drop refs
   drag(drop(ref));
+  const assignmentSummary = getTaskAssignmentSummary(task, people);
 
   return (
     <div
@@ -121,6 +125,8 @@ export function DraggableTaskCard({
         color={task.color}
         project={task.project}
         priority={task.priority}
+        orchestratorName={assignmentSummary.orchestratorName === 'Unassigned' ? undefined : assignmentSummary.orchestratorName}
+        contributorCount={assignmentSummary.contributorCount}
         onClick={() => onTaskClick(task)}
         onEdit={onEditTask ? () => onEditTask(task) : undefined}
       />

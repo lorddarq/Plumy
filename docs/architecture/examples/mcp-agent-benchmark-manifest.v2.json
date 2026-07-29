@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 2,
+  "protocol": "omvra-agent-benchmark",
+  "protocolVersion": "2026-07-29",
+  "fixture": {
+    "id": "fixture-task-collaboration-redacted-v1",
+    "version": "1.0.0"
+  },
+  "cells": [
+    {
+      "id": "cell-opaque-medium-task-collaboration-simple",
+      "product": "omvra",
+      "clientVersion": "desktop-redacted",
+      "modelSettingsCell": "settings-cell-opaque-01",
+      "taskFamily": "task-collaboration",
+      "complexityBand": "medium",
+      "arm": "simple",
+      "plannedEpisodes": 10
+    },
+    {
+      "id": "cell-opaque-medium-task-collaboration-instructed",
+      "product": "omvra",
+      "clientVersion": "desktop-redacted",
+      "modelSettingsCell": "settings-cell-opaque-01",
+      "taskFamily": "task-collaboration",
+      "complexityBand": "medium",
+      "arm": "instructed",
+      "plannedEpisodes": 10
+    },
+    {
+      "id": "cell-opaque-medium-task-collaboration-multi-agent",
+      "product": "omvra",
+      "clientVersion": "desktop-redacted",
+      "modelSettingsCell": "settings-cell-opaque-01",
+      "taskFamily": "task-collaboration",
+      "complexityBand": "medium",
+      "arm": "multi-agent",
+      "plannedEpisodes": 10
+    }
+  ],
+  "episodes": [
+    {
+      "runId": "run-opaque-0001",
+      "taskId": "task-opaque-0001",
+      "cellId": "cell-opaque-medium-task-collaboration-simple",
+      "arm": "simple",
+      "agent": "agent-opaque-remy",
+      "clientVersion": "desktop-redacted",
+      "complexityBand": "medium",
+      "taskFamily": "task-collaboration",
+      "fixtureVersion": "1.0.0",
+      "startedAt": "2026-07-29T12:00:00Z",
+      "endedAt": "2026-07-29T12:04:12Z"
+    },
+    {
+      "runId": "run-opaque-0002",
+      "taskId": "task-opaque-0002",
+      "cellId": "cell-opaque-medium-task-collaboration-instructed",
+      "arm": "instructed",
+      "agent": "agent-opaque-remy",
+      "clientVersion": "desktop-redacted",
+      "complexityBand": "medium",
+      "taskFamily": "task-collaboration",
+      "fixtureVersion": "1.0.0",
+      "startedAt": "2026-07-29T12:10:00Z",
+      "endedAt": "2026-07-29T12:13:41Z"
+    },
+    {
+      "runId": "run-opaque-0003",
+      "taskId": "task-opaque-0003",
+      "cellId": "cell-opaque-medium-task-collaboration-multi-agent",
+      "arm": "multi-agent",
+      "agent": "agent-opaque-remy",
+      "clientVersion": "desktop-redacted",
+      "complexityBand": "medium",
+      "taskFamily": "task-collaboration",
+      "fixtureVersion": "1.0.0",
+      "startedAt": "2026-07-29T12:20:00Z",
+      "endedAt": "2026-07-29T12:25:08Z"
+    }
+  ]
+}

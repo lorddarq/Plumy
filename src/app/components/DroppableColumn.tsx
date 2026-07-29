@@ -1,7 +1,7 @@
 import { Fragment, useRef, useState, type RefObject } from 'react';
 import { useDragLayer, useDrop } from 'react-dnd';
 import { GripVertical } from 'lucide-react';
-import { Task, TaskStatus, StatusColumn } from '../types';
+import { Person, Task, TaskStatus, StatusColumn } from '../types';
 import { getStatusVisual } from '../utils/roadmap';
 import {
   DraggableTaskCard,
@@ -16,6 +16,7 @@ interface DroppableColumnProps {
   swimlane: StatusColumn;
   tasks: Task[];
   swimlanes: StatusColumn[];
+  people: Person[];
   columnDragHandleRef?: RefObject<HTMLButtonElement | null>;
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
@@ -125,6 +126,7 @@ export function DroppableColumn({
   swimlane,
   tasks: swimlaneTasks,
   swimlanes,
+  people,
   columnDragHandleRef,
   onTaskClick,
   onEditTask,
@@ -236,6 +238,7 @@ export function DroppableColumn({
               onTaskDropIndicatorClear={() => setTaskDropIndicator(null)}
               onTaskDrop={handleTaskDrop}
               swimlanes={swimlanes}
+              people={people}
             />
             {visibleTaskDropIndicator?.targetTaskId === task.id && visibleTaskDropIndicator.position === 'after' && (
               <TaskInsertionMarker

@@ -48,6 +48,33 @@ test('required skills resolve bundled metadata and explicit local overrides in o
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('configured external skills resolve from SKILL.md without a manifest', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-skills-'));
+  const skillRoot = path.join(root, 'external-review');
+  fs.mkdirSync(skillRoot);
+  fs.writeFileSync(path.join(skillRoot, 'SKILL.md'), '# External review\n');
+
+  const options = { skillsRoot, skillRoots: [{ root }] };
+  const available = getAvailableSkill('external-review', options);
+  assert.equal(available.source, 'omvra-configured');
+  assert.equal(available.manifestPath, undefined);
+  assert.equal(available.trustStatus, 'trusted');
+  assert.match(available.content, /External review/);
+
+  const resolved = resolveRequiredSkills([{ skillId: 'external-review' }], options);
+  assert.equal(resolved.ok, true);
+  assert.equal(resolved.skills[0].source, 'omvra-configured');
+  assert.equal(resolved.skills[0].trustStatus, 'trusted');
+
+  const blocked = resolveRequiredSkills([{ skillId: 'external-review' }], {
+    skillsRoot,
+    skillRoots: [{ root, trustStatus: 'untrusted' }],
+  });
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.blockingResults[0].code, 'UNTRUSTED_SKILL');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('required skill failures are typed and block setup without installation', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-skills-'));
   fs.writeFileSync(path.join(root, 'manifest.json'), '{"schemaVersion": 9}');

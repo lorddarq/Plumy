@@ -224,6 +224,7 @@ export function KanbanView({
         <SwimlanesView
           tasks={filteredTasks}
           swimlanes={swimlanes}
+          people={people}
           isFilterActive={isBoardFiltered}
           onTaskClick={onTaskClick}
           onEditTask={onEditTask}

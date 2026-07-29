@@ -76,6 +76,7 @@ export function useTaskActions({
       swimlaneOnly: taskData.swimlaneOnly,
       swimlaneId: taskData.swimlaneId,
       assigneeId: taskData.assigneeId,
+      collaboration: taskData.collaboration,
       milestoneId: taskData.milestoneId,
       dependencyIds: taskData.dependencyIds || [],
       attachments: taskData.attachments || [],

@@ -1,6 +1,6 @@
 import { Fragment, useRef, useState } from 'react';
 import { useDrag, useDragLayer, useDrop } from 'react-dnd';
-import { Task, TaskStatus, StatusColumn } from '../../types';
+import { Person, Task, TaskStatus, StatusColumn } from '../../types';
 import { EmptyStateCard } from '../EmptyStateCard';
 import { DroppableColumn } from '../DroppableColumn';
 
@@ -60,6 +60,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   index,
   swimlaneTasks,
   swimlanes,
+  people,
   onTaskClick,
   onEditTask,
   onAddTask,
@@ -77,6 +78,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   index: number;
   swimlaneTasks: Task[];
   swimlanes: StatusColumn[];
+  people: Person[];
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
@@ -173,6 +175,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
         swimlane={swimlane as any}
         tasks={swimlaneTasks}
         swimlanes={swimlanes}
+        people={people}
         columnDragHandleRef={dragHandleRef}
         onTaskClick={onTaskClick}
         onEditTask={onEditTask}
@@ -189,6 +192,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
 interface SwimlanesViewProps {
   tasks: Task[];
   swimlanes: StatusColumn[];
+  people: Person[];
   isFilterActive?: boolean;
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
@@ -204,6 +208,7 @@ interface SwimlanesViewProps {
 export function SwimlanesView({
   tasks,
   swimlanes,
+  people,
   isFilterActive = false,
   onTaskClick,
   onEditTask,
@@ -299,6 +304,7 @@ export function SwimlanesView({
                   index={index}
                   swimlaneTasks={swimlaneTasks}
                   swimlanes={swimlanes}
+                  people={people}
                   onTaskClick={onTaskClick}
                   onEditTask={onEditTask}
                   onAddTask={onAddTask}

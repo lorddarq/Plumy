@@ -39,7 +39,7 @@ export function normalizeTaskCollaboration(
     if (!id || !personId || !scope || ids.has(id) || personIds.has(personId) || personId === orchestratorId || !ROLES.has(role) || !STATES.has(state)) return undefined;
     const person = peopleById?.get(personId);
     if (peopleById && !person) return undefined;
-    if (peopleById && role === 'subagent' && (person?.kind !== 'agentic' || person.availableForSubagentDelegation !== true)) return undefined;
+    if (peopleById && (role !== 'subagent' || person?.kind !== 'agentic' || person.availableForSubagentDelegation !== true)) return undefined;
 
     ids.add(id);
     personIds.add(personId);

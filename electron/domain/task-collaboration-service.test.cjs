@@ -57,7 +57,11 @@ test('collaboration service rejects duplicate, missing, self-conflicting, and in
   assert.equal(service.validate(null, collaboration([contribution({ personId: 'agent-ineligible' })]), {
     allowIneligibleExistingContributionIds: new Set(['contribution-1']),
   }).ok, true);
-  assert.equal(service.validate(null, collaboration([contribution({ personId: 'human', role: 'contributor' })])).ok, true);
+  assert.equal(service.validate(null, collaboration([contribution({ personId: 'human', role: 'contributor' })])).error, 'CONTRIBUTOR_MUST_BE_AGENTIC');
+  assert.equal(service.validate(null, collaboration([contribution({ role: 'contributor' })])).error, 'INVALID_CONTRIBUTION_ROLE');
+  assert.equal(service.validate(null, collaboration([contribution({ personId: 'human', role: 'contributor' })]), {
+    allowIneligibleExistingContributionIds: new Set(['contribution-1']),
+  }).ok, true);
 });
 
 test('collaboration service rejects runtime, session, transcript, and credential fields', () => {
