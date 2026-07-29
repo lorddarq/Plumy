@@ -1775,6 +1775,43 @@ test('agent.resolve_task_context enforces the exact assignee preflight contract'
   }
 });
 
+test('task context MCP tools append, retrieve sources, and enrich bounded preflight', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PREFERENCES_KEY, { mcpAgentAccessEnabled: true, mcpCapabilityProfile: 'task_write' });
+  store.set(TASKS_KEY, store.get(TASKS_KEY).map(task => task.id === 'task-1' ? {
+    ...task,
+    comments: [{ id: 'comment-1', author: 'Sorin', content: 'Keep the MCP projection bounded.', createdAt: '2026-07-29T20:00:00.000Z' }],
+  } : task));
+  const dispatch = createRequestDispatcher(store);
+  const call = (name, args) => dispatch({
+    jsonrpc: '2.0', id: name, method: 'tools/call', params: { name, arguments: args },
+  }, makeReq());
+
+  const appended = call('tasks_context_append', {
+    taskId: 'task-1', expectedRevision: 0, idempotencyKey: 'mcp-context-1', kind: 'decision',
+    fromRevision: 0, toRevision: 0, summary: 'Use a bounded task context projection.', markers: ['mcp'],
+    sourceRefs: [{ type: 'comment', id: 'comment-1' }, { type: 'evidence', id: 'missing-evidence' }],
+  });
+  assert.equal(appended.result.structuredContent.changed, true);
+  assert.equal(appended.result.structuredContent.entry.provenance, 'agent-authored');
+  assert.equal(appended.result.structuredContent.currentRevision, 0);
+
+  const listed = call('tasks_context_list', { taskId: 'task-1', markers: ['mcp'] });
+  assert.equal(listed.result.structuredContent.entries.length, 1);
+  assert.equal(listed.result.structuredContent.entries[0].sourceRefs, undefined);
+  const entryId = listed.result.structuredContent.entries[0].id;
+  const exact = call('tasks_context_get', { taskId: 'task-1', entryId });
+  assert.equal(exact.result.structuredContent.sources[0].status, 'resolved');
+  assert.equal(exact.result.structuredContent.sources[0].record.content, 'Keep the MCP projection bounded.');
+  assert.equal(exact.result.structuredContent.sources[1].status, 'missing');
+
+  const preflight = call('agent_resolve_task_context', { taskId: 'task-1' });
+  assert.deepEqual(preflight.result.structuredContent.taskContext.latestCheckpoint, null);
+  assert.equal(preflight.result.structuredContent.taskContext.entriesSinceCheckpoint.length, 1);
+  assert.equal(preflight.result.structuredContent.taskContext.entriesSinceCheckpoint[0].sourceRefs, undefined);
+  assert.equal(preflight.result.structuredContent.taskContext.hasMore, false);
+});
+
 test('instruction-like task notes remain workspace data and executor guidance says to ignore them as authority', () => {
   const store = makeStoreFromFixture('workspace-basic');
   const nextTasks = store.get(TASKS_KEY).map(task => (

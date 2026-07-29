@@ -1802,13 +1802,42 @@ const taskContextLedgerService = createTaskContextLedgerService({
   readEntries: store => store.get(TASK_CONTEXT_ENTRIES_KEY),
   writeEntries: (store, entries) => store.set(TASK_CONTEXT_ENTRIES_KEY, entries),
   normalizeString,
+  resolveSourceRef: (_store, task, ref) => {
+    if (ref.type === 'comment') {
+      return (Array.isArray(task.comments) ? task.comments : []).find(comment => comment?.id === ref.id) || null;
+    }
+    if (ref.type === 'activity') {
+      return (Array.isArray(task.activityLog) ? task.activityLog : []).find(activity => activity?.id === ref.id) || null;
+    }
+    if (ref.type === 'attachment') {
+      const attachment = (Array.isArray(task.attachments) ? task.attachments : []).find(item => item?.id === ref.id);
+      return attachment ? { id: attachment.id, name: attachment.name, uri: attachment.uri, size: attachment.size, addedAt: attachment.addedAt } : null;
+    }
+    if (ref.type === 'evidence') {
+      const contributionIds = (Array.isArray(task.collaboration?.contributions) ? task.collaboration.contributions : [])
+        .filter(contribution => Array.isArray(contribution?.evidenceRefs) && contribution.evidenceRefs.includes(ref.id))
+        .map(contribution => contribution.id);
+      return contributionIds.length > 0 ? { id: ref.id, contributionIds } : null;
+    }
+    if (ref.type === 'task-change' && ref.id === `${task.id}@${task.__mcpRevision || 0}`) {
+      return { id: ref.id, taskId: task.id, revision: task.__mcpRevision || 0 };
+    }
+    return null;
+  },
 });
 
 const {
   normalizePerson: normalizePersonForMcp,
-  resolveTaskExecutionContext,
+  resolveTaskExecutionContext: resolvePersonTaskExecutionContext,
   listAssignedWorkForAgent,
 } = personContextService;
+
+function resolveTaskExecutionContext(store, taskId) {
+  const preflight = resolvePersonTaskExecutionContext(store, taskId);
+  if (!preflight.task) return preflight;
+  const projection = taskContextLedgerService.project(store, { taskId });
+  return projection.ok ? { ...preflight, taskContext: projection.taskContext } : preflight;
+}
 
 const {
   normalizeTask: normalizeTaskForMcp,

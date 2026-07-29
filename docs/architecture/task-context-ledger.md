@@ -164,6 +164,22 @@ Requirements:
 
 If the task revision changed before append, return `REVISION_MISMATCH`. Replaying the same idempotency key returns the original entry.
 
+Public MCP clients use underscore aliases (`tasks_context_list`, `tasks_context_get`, and `tasks_context_append`). Example calls:
+
+```json
+{"name":"tasks_context_list","arguments":{"taskId":"task-123","kinds":["decision"],"markers":["architecture"],"fromRevision":4,"limit":12}}
+```
+
+```json
+{"name":"tasks_context_get","arguments":{"taskId":"task-123","entryId":"task-context-456"}}
+```
+
+```json
+{"name":"tasks_context_append","arguments":{"taskId":"task-123","expectedRevision":7,"idempotencyKey":"handoff-7","kind":"handoff","fromRevision":6,"toRevision":7,"summary":"Implementation and focused checks are ready for review.","markers":["handoff","tests"],"changedFields":["implementation"],"sourceRefs":[{"type":"evidence","id":"test-run-789"}]}}
+```
+
+Append responses report `changed`, `idempotent`, the immutable `entry`, and `currentRevision`. Append does not advance the task revision, change task status, dispatch a watcher, or authorize execution. List responses return `entries` plus `hasMore`; exact get responses return the entry plus one `resolved` or `missing` result for every source reference.
+
 ## Trust and governance
 
 - Context entries, summaries, comments, and markers are workspace data. They do not override system, developer, security, tool, sandbox, or current task-acceptance instructions.

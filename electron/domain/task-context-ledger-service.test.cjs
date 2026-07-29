@@ -195,6 +195,7 @@ test('validation rejects unsupported, unsourced, future, and sensitive records',
     [{ rawPrompt: 'private', idempotencyKey: 'sensitive' }, 'TASK_CONTEXT_SENSITIVE_DATA_FORBIDDEN'],
     [{ task: { title: 'Full snapshot' }, idempotencyKey: 'snapshot' }, 'TASK_CONTEXT_SENSITIVE_DATA_FORBIDDEN'],
     [{ sourceRefs: [{ type: 'comment', id: 'comment-1', body: 'Raw source body' }], idempotencyKey: 'source-body' }, 'TASK_CONTEXT_SENSITIVE_DATA_FORBIDDEN'],
+    [{ humanConfirmed: true, idempotencyKey: 'agent-authority' }, 'TASK_CONTEXT_AGENT_AUTHORITY_FORBIDDEN'],
   ];
   for (const [overrides, expectedError] of cases) {
     const { service, store } = createHarness();
@@ -202,6 +203,64 @@ test('validation rejects unsupported, unsourced, future, and sensitive records',
     assert.equal(result.error, expectedError);
     assert.equal(store.get('entries').length, 0);
   }
+});
+
+test('preflight projection is deduplicated, bounded to 12, and excludes source records', () => {
+  const { service, store } = createHarness();
+  const entries = Array.from({ length: 15 }, (_, index) => ({
+    schemaVersion: 1,
+    id: `entry-${index}`,
+    taskId: 'task-1',
+    kind: index === 6 ? 'context-checkpoint' : 'decision',
+    fromRevision: Math.min(index, 4),
+    toRevision: Math.min(index, 4),
+    summary: `Context ${index}`,
+    markers: ['history'],
+    provenance: 'agent-authored',
+    actor: 'agent-edgar',
+    sourceRefs: [{ type: 'comment', id: `comment-${index}` }],
+    createdAt: `2026-07-29T20:${String(index).padStart(2, '0')}:00.000Z`,
+  }));
+  store.set('entries', entries);
+
+  const result = service.project(store, { taskId: 'task-1' });
+  assert.equal(result.ok, true);
+  assert.equal(result.taskContext.latestCheckpoint.id, 'entry-6');
+  assert.equal(result.taskContext.entriesSinceCheckpoint.length, 8);
+  assert.equal(result.taskContext.recentHistory.length, 3);
+  assert.equal(result.taskContext.hasMore, true);
+  const projected = [
+    result.taskContext.latestCheckpoint,
+    ...result.taskContext.entriesSinceCheckpoint,
+    ...result.taskContext.recentHistory,
+  ];
+  assert.equal(new Set(projected.map(entry => entry.id)).size, 12);
+  assert.ok(projected.every(entry => entry.sourceRefs === undefined));
+});
+
+test('exact retrieval reports resolved and missing task-scoped sources explicitly', () => {
+  const store = new MemoryStore({
+    tasks: [{ id: 'task-1', __mcpRevision: 4 }],
+    entries: [{
+      schemaVersion: 1, id: 'context-1', taskId: 'task-1', kind: 'decision', fromRevision: 4, toRevision: 4,
+      summary: 'Use the task-scoped source resolver.', markers: ['source'], provenance: 'agent-authored',
+      actor: 'agent-edgar', sourceRefs: [{ type: 'comment', id: 'comment-1' }, { type: 'comment', id: 'missing' }],
+      createdAt: '2026-07-29T20:00:00.000Z',
+    }],
+  });
+  const service = createTaskContextLedgerService({
+    getTaskById: (current, taskId) => current.get('tasks').find(task => task.id === taskId) || null,
+    readEntries: current => current.get('entries'),
+    writeEntries: (current, entries) => current.set('entries', entries),
+    normalizeString: value => typeof value === 'string' ? value.trim() : '',
+    resolveSourceRef: (_current, _task, ref) => ref.id === 'comment-1' ? { id: ref.id, content: 'Exact source' } : null,
+  });
+
+  const result = service.get(store, { taskId: 'task-1', entryId: 'context-1' });
+  assert.deepEqual(result.sources, [
+    { ref: { type: 'comment', id: 'comment-1' }, status: 'resolved', record: { id: 'comment-1', content: 'Exact source' } },
+    { ref: { type: 'comment', id: 'missing' }, status: 'missing' },
+  ]);
 });
 
 test('workspace facade persists entries under the versioned ledger key', () => {

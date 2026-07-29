@@ -33,6 +33,15 @@ const FORBIDDEN_KEYS = new Set([
   'toolResponse',
   'transcript',
 ]);
+const AGENT_FORBIDDEN_AUTHORITY_KEYS = new Set([
+  'accepted',
+  'acceptedBy',
+  'approved',
+  'approvedBy',
+  'completed',
+  'completedBy',
+  'humanConfirmed',
+]);
 const MAX_SUMMARY_LENGTH = 2_000;
 const MAX_LIST_ITEMS = 50;
 const MAX_MARKER_LENGTH = 80;
@@ -46,10 +55,11 @@ function createTaskContextLedgerService({
   readEntries,
   writeEntries,
   normalizeString,
+  resolveSourceRef = () => null,
   now = () => new Date().toISOString(),
   createId = () => `task-context-${randomUUID()}`,
 }) {
-  const required = { getTaskById, readEntries, writeEntries, normalizeString, now, createId };
+  const required = { getTaskById, readEntries, writeEntries, normalizeString, resolveSourceRef, now, createId };
   for (const [name, value] of Object.entries(required)) {
     if (typeof value !== 'function') throw new TypeError(`createTaskContextLedgerService requires ${name}.`);
   }
@@ -74,6 +84,23 @@ function createTaskContextLedgerService({
     for (const [key, child] of Object.entries(value)) {
       if (FORBIDDEN_KEYS.has(key)) return `${path}.${key}`;
       const found = findForbiddenKey(child, `${path}.${key}`);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function findAgentAuthorityKey(value, path = 'entry') {
+    if (!value || typeof value !== 'object') return null;
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        const found = findAgentAuthorityKey(value[index], `${path}[${index}]`);
+        if (found) return found;
+      }
+      return null;
+    }
+    for (const [key, child] of Object.entries(value)) {
+      if (AGENT_FORBIDDEN_AUTHORITY_KEYS.has(key)) return `${path}.${key}`;
+      const found = findAgentAuthorityKey(child, `${path}.${key}`);
       if (found) return found;
     }
     return null;
@@ -163,6 +190,10 @@ function createTaskContextLedgerService({
     }
     if (!TASK_CONTEXT_PROVENANCE.has(provenance)) {
       return failure('INVALID_TASK_CONTEXT_PROVENANCE', `Unsupported task context provenance "${provenance}".`);
+    }
+    const authorityPath = provenance === 'agent-authored' ? findAgentAuthorityKey(value) : null;
+    if (authorityPath) {
+      return failure('TASK_CONTEXT_AGENT_AUTHORITY_FORBIDDEN', `${authorityPath} cannot represent human approval, acceptance, or completion.`);
     }
     if (!actor || actor.length > MAX_ACTOR_LENGTH) {
       return failure('INVALID_TASK_CONTEXT_ACTOR', `actor must contain 1-${MAX_ACTOR_LENGTH} characters.`);
@@ -279,7 +310,7 @@ function createTaskContextLedgerService({
     return {
       ok: true,
       taskId,
-      entries: clone(filtered.slice(-limit)),
+      entries: filtered.slice(-limit).map(toIndexEntry),
       hasMore: filtered.length > limit,
     };
   }
@@ -296,8 +327,59 @@ function createTaskContextLedgerService({
     const entry = (indexEntriesByTaskId(stored.entries).get(normalizedTaskId) || [])
       .find(item => item.id === normalizedEntryId);
     return entry
-      ? { ok: true, entry: clone(entry) }
+      ? {
+          ok: true,
+          entry: clone(entry),
+          sources: entry.sourceRefs.map(ref => {
+            const resolved = resolveSourceRef(store, task, ref);
+            return resolved
+              ? { ref: clone(ref), status: 'resolved', record: clone(resolved) }
+              : { ref: clone(ref), status: 'missing' };
+          }),
+        }
       : failure('TASK_CONTEXT_ENTRY_NOT_FOUND', `Task context entry "${normalizedEntryId}" not found.`);
+  }
+
+  function toIndexEntry(entry) {
+    return {
+      id: entry.id,
+      kind: entry.kind,
+      fromRevision: entry.fromRevision,
+      toRevision: entry.toRevision,
+      summary: entry.summary,
+      markers: clone(entry.markers),
+      provenance: entry.provenance,
+      createdAt: entry.createdAt,
+    };
+  }
+
+  function project(store, { taskId, limit = 12 } = {}) {
+    const normalizedTaskId = normalizeString(taskId);
+    if (!normalizedTaskId) return failure('TASK_ID_REQUIRED', 'taskId is required.');
+    if (!getTaskById(store, normalizedTaskId)) return failure('TASK_NOT_FOUND', `Task "${normalizedTaskId}" not found.`);
+    const stored = readValidatedEntries(store);
+    if (!stored.ok) return stored;
+
+    const taskEntries = indexEntriesByTaskId(stored.entries).get(normalizedTaskId) || [];
+    const boundedLimit = Math.max(1, Math.min(12, Math.floor(Number(limit)) || 12));
+    const checkpointIndex = taskEntries.findLastIndex(entry => entry.kind === 'context-checkpoint');
+    const checkpoint = checkpointIndex >= 0 ? taskEntries[checkpointIndex] : null;
+    const later = checkpoint ? taskEntries.slice(checkpointIndex + 1) : taskEntries;
+    const selectedLater = later.slice(-(boundedLimit - (checkpoint ? 1 : 0)));
+    const remaining = boundedLimit - selectedLater.length - (checkpoint ? 1 : 0);
+    const earlier = checkpoint ? taskEntries.slice(0, checkpointIndex) : [];
+    const selectedEarlier = remaining > 0 ? earlier.slice(-remaining) : [];
+    const includedCount = selectedLater.length + selectedEarlier.length + (checkpoint ? 1 : 0);
+
+    return {
+      ok: true,
+      taskContext: {
+        latestCheckpoint: checkpoint ? toIndexEntry(checkpoint) : null,
+        entriesSinceCheckpoint: selectedLater.map(toIndexEntry),
+        recentHistory: selectedEarlier.map(toIndexEntry),
+        hasMore: taskEntries.length > includedCount,
+      },
+    };
   }
 
   function comparable(entry) {
@@ -373,7 +455,7 @@ function createTaskContextLedgerService({
     return { ok: true, idempotent: false, entry: clone(persisted), currentRevision };
   }
 
-  return { append, get, indexEntriesByTaskId, list, normalizeEntry };
+  return { append, get, indexEntriesByTaskId, list, normalizeEntry, project };
 }
 
 module.exports = {

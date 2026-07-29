@@ -13,6 +13,9 @@ const {
   listTasks,
   getTaskById,
   getTaskCollaborationHistory,
+  listTaskContextEntries,
+  getTaskContextEntry,
+  appendTaskContextEntry,
   resolveTaskExecutionContext,
   listAssignedWorkForAgent,
   listKanbanCards,
@@ -174,6 +177,18 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
         };
       }
       return { result: makeToolResult(getTaskById(store, taskId)) };
+    }
+
+    case 'tasks.context.list': {
+      const result = listTaskContextEntries(store, args);
+      if (!result.ok) return { error: invalidParams(result.message, result) };
+      return { result: makeToolResult(result) };
+    }
+
+    case 'tasks.context.get': {
+      const result = getTaskContextEntry(store, args);
+      if (!result.ok) return { error: invalidParams(result.message, result) };
+      return { result: makeToolResult(result) };
     }
 
     case 'tasks.collaboration_history': {
@@ -492,6 +507,45 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
           artifactAuditId: result.audit?.id,
           goal: result.goal,
           revision: result.revision,
+        }),
+      };
+    }
+
+    case 'tasks.context.append': {
+      const taskId = parseTaskId(args);
+      if (!taskId) return { error: invalidParams('Invalid params: "taskId" is required.') };
+      const result = appendTaskContextEntry(store, {
+        ...args,
+        taskId,
+        provenance: 'agent-authored',
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        entryId: result.entry.id,
+        kind: result.entry.kind,
+        provenance: result.entry.provenance,
+        fromRevision: result.entry.fromRevision,
+        toRevision: result.entry.toRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: !result.idempotent,
+          idempotent: result.idempotent,
+          auditId: audit?.auditId,
+          entry: result.entry,
+          currentRevision: result.currentRevision,
         }),
       };
     }

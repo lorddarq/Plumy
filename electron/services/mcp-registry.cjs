@@ -65,6 +65,37 @@ const READ_TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'tasks.context.list',
+    description: 'Lists bounded, source-linked context ledger entries for one task. Defaults to 12 entries and never returns source bodies.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        taskId: { type: 'string' },
+        kinds: { type: 'array', items: { type: 'string' }, maxItems: 50 },
+        markers: { type: 'array', items: { type: 'string' }, maxItems: 50 },
+        search: { type: 'string' },
+        fromRevision: { type: 'integer', minimum: 0 },
+        toRevision: { type: 'integer', minimum: 0 },
+        limit: { type: 'integer', minimum: 1, maximum: 50 },
+      },
+      required: ['taskId'],
+    },
+  },
+  {
+    name: 'tasks.context.get',
+    description: 'Gets one exact task context ledger entry and task-scoped source resolution results. Missing sources remain explicit.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        taskId: { type: 'string' },
+        entryId: { type: 'string' },
+      },
+      required: ['taskId', 'entryId'],
+    },
+  },
+  {
     name: 'tasks.collaboration_history',
     description: 'Returns bounded contribution attempt and redacted lifecycle-event history for one task, optionally filtered to one contribution.',
     inputSchema: {
@@ -190,6 +221,40 @@ const READ_TOOL_DEFINITIONS = [
 ];
 
 const WRITE_TOOL_DEFINITIONS = [
+  {
+    name: 'tasks.context.append',
+    description: 'Appends one immutable, agent-authored task context entry with optimistic revision and idempotency protection. It does not mutate the task or authorize execution.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        taskId: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        idempotencyKey: { type: 'string' },
+        kind: { type: 'string', enum: ['requirement-change', 'decision', 'implementation-attempt', 'blocker', 'review-feedback', 'handoff', 'evidence', 'status-change', 'context-checkpoint'] },
+        fromRevision: { type: 'integer', minimum: 0 },
+        toRevision: { type: 'integer', minimum: 0 },
+        summary: { type: 'string' },
+        markers: { type: 'array', items: { type: 'string' }, maxItems: 50 },
+        changedFields: { type: 'array', items: { type: 'string' }, maxItems: 50 },
+        sourceRefs: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 50,
+          items: {
+            type: 'object',
+            additionalProperties: true,
+            properties: {
+              type: { type: 'string', enum: ['comment', 'activity', 'attachment', 'evidence', 'task-change'] },
+              id: { type: 'string' },
+            },
+            required: ['type', 'id'],
+          },
+        },
+      },
+      required: ['taskId', 'expectedRevision', 'idempotencyKey', 'kind', 'summary', 'markers', 'sourceRefs'],
+    },
+  },
   {
     name: 'goals.update',
     description: 'Replaces a goal graph through MCP with optimistic revision protection. Use this for canvas positions, nodes, typed connectors, scoped instructions, conditions, approval gates, and overseer assignment.',
@@ -847,6 +912,9 @@ const TOOL_NAME_ALIASES = new Map([
   ['goals_gc', 'goals.gc'],
   ['tasks_list', 'tasks.list'],
   ['tasks_get', 'tasks.get'],
+  ['tasks_context_list', 'tasks.context.list'],
+  ['tasks_context_get', 'tasks.context.get'],
+  ['tasks_context_append', 'tasks.context.append'],
   ['tasks_collaboration_history', 'tasks.collaboration_history'],
   ['agent_resolve_task_context', 'agent.resolve_task_context'],
   ['cards_kanban_list', 'cards.kanban.list'],
