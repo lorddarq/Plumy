@@ -34,7 +34,10 @@ Task attachment implementation:
 - Backup/import normalization: `src/app/services/workspaceBackup.ts`
 - Main/preload bridge: `electron/main.cjs`, `electron/preload.cjs`, and `src/electron.d.ts`
 - MCP mutation logic: `electron/services/workspace-service.cjs`
-- MCP tool exposure and JSON-RPC handlers: `electron/services/mcp-http-server.cjs`
+- MCP tool/resource registry: `electron/services/mcp-registry.cjs`
+- MCP tool and resource handlers: `electron/services/mcp-handlers.cjs`, `electron/services/mcp-resource-handlers.cjs`
+- MCP response and audit adapters: `electron/services/mcp-response.cjs`, `electron/services/mcp-audit-adapter.cjs`
+- MCP JSON-RPC dispatch and HTTP transport: `electron/services/mcp-http-server.cjs`
 
 Generating icon assets:
 

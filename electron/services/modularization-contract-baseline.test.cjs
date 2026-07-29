@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const workspaceService = require('./workspace-service.cjs');
 const { createRequestDispatcher } = require('./mcp-http-server.cjs');
+const { PUBLIC_READ_TOOL_DEFINITIONS, PUBLIC_WRITE_TOOL_DEFINITIONS } = require('./mcp-registry.cjs');
 const { makeStoreFromFixture } = require('./test-fixtures.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -211,6 +212,42 @@ test('admin MCP profile advertises the characterized public tool names', () => {
   }, { transport: 'stdio', headers: {} });
 
   assert.deepEqual(response.result.tools.map(tool => tool.name).sort(), ADMIN_MCP_TOOLS);
+});
+
+test('HTTP and stdio dispatch advertise the shared MCP registry', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set('omvra.preferences.v1', {
+    mcpAgentAccessEnabled: true,
+    mcpCapabilityProfile: 'admin',
+  });
+  const dispatch = createRequestDispatcher(store);
+  const request = {
+    jsonrpc: '2.0',
+    id: 'modularization-shared-registry',
+    method: 'tools/list',
+    params: {},
+  };
+  const expectedNames = [...PUBLIC_READ_TOOL_DEFINITIONS, ...PUBLIC_WRITE_TOOL_DEFINITIONS]
+    .map(tool => tool.name)
+    .sort();
+
+  for (const transport of ['http', 'stdio']) {
+    const response = dispatch(request, { transport, headers: {} });
+    assert.deepEqual(response.result.tools.map(tool => tool.name).sort(), expectedNames);
+  }
+});
+
+test('MCP transport and handler modules keep their characterized boundaries', () => {
+  const transportSource = read('electron/services/mcp-http-server.cjs');
+  const handlerSource = [
+    read('electron/services/mcp-handlers.cjs'),
+    read('electron/services/mcp-resource-handlers.cjs'),
+  ].join('\n');
+
+  assert.doesNotMatch(handlerSource, /http\.createServer|server\.listen|Access-Control-Allow-Origin/);
+  assert.doesNotMatch(transportSource, /\b(createTask|updateTaskDetails|createMilestone|linkMilestoneTasks)\s*\(/);
+  assert.match(transportSource, /require\('\.\/mcp-registry\.cjs'\)/);
+  assert.match(transportSource, /require\('\.\/mcp-audit-adapter\.cjs'\)/);
 });
 
 test('renderer workspace provider keeps its public exports and persistence keys', () => {
