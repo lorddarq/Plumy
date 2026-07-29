@@ -191,6 +191,9 @@ const IPC_INVOKE_CHANNELS = [
   'store/export',
   'store/get',
   'store/set',
+  'task-context/append-checkpoint',
+  'task-context/get',
+  'task-context/list',
   'tasks/export-pdf',
   'updates/check',
   'updates/dismiss',
@@ -348,6 +351,7 @@ test('Electron main composes IPC registrars while retaining application lifecycl
     'external-links.cjs',
     'agent-runtime.cjs',
     'runtime.cjs',
+    'task-context.cjs',
   ].map(fileName => read(`electron/ipc/${fileName}`)).join('\n');
 
   assert.doesNotMatch(mainSource, /ipcMain\.handle\(/);
@@ -388,6 +392,7 @@ test('modularization extension boundaries remain acyclic with one domain rule ow
     'electron/ipc/attachments.cjs',
     'electron/ipc/external-links.cjs',
     'electron/ipc/runtime.cjs',
+    'electron/ipc/task-context.cjs',
     'electron/main.cjs',
   ]);
 });

@@ -8,6 +8,7 @@ const { registerAttachmentIpcHandlers } = require('./attachments.cjs');
 const { registerExternalLinkIpcHandlers } = require('./external-links.cjs');
 const { registerRuntimeIpcHandlers } = require('./runtime.cjs');
 const { registerAgentRuntimeIpcHandlers } = require('./agent-runtime.cjs');
+const { registerTaskContextIpcHandlers } = require('./task-context.cjs');
 
 function createIpcHarness() {
   const handlers = new Map();
@@ -113,4 +114,27 @@ test('agent runtime registrar validates writes and keeps custom schemes behind i
   assert.equal(handoff.ok, true);
   assert.equal(new URL(opened).protocol, 'codex:');
   assert.equal(handlers.has('agent-runtime/test-connection'), true);
+});
+
+test('task context registrar keeps reads targeted and checkpoints human-authored', () => {
+  const { handlers, ipcMain } = createIpcHarness();
+  let appendOptions;
+  registerTaskContextIpcHandlers({
+    ipcMain,
+    store: {},
+    listTaskContextEntries: (_store, options) => ({ ok: true, entries: [], taskId: options.taskId, hasMore: false }),
+    getTaskContextEntry: (_store, options) => ({ ok: true, entry: { id: options.entryId }, sources: [] }),
+    appendTaskContextEntry: (_store, options) => { appendOptions = options; return { ok: true, entry: options }; },
+  });
+
+  assert.equal(handlers.get('task-context/list')(null, { taskId: 'task-1' }).taskId, 'task-1');
+  assert.equal(handlers.get('task-context/get')(null, { taskId: 'task-1', entryId: 'entry-1' }).entry.id, 'entry-1');
+  const appended = handlers.get('task-context/append-checkpoint')(null, {
+    taskId: 'task-1', expectedRevision: 4, summary: 'Keep the compact history.', idempotencyKey: 'manual-1',
+  });
+  assert.equal(appended.ok, true);
+  assert.equal(appendOptions.kind, 'context-checkpoint');
+  assert.equal(appendOptions.provenance, 'human-authored');
+  assert.deepEqual(appendOptions.sourceRefs, [{ type: 'task-change', id: 'task-1@4' }]);
+  assert.equal(handlers.get('task-context/append-checkpoint')(null, { taskId: '', summary: '' }).error, 'TASK_ID_REQUIRED');
 });

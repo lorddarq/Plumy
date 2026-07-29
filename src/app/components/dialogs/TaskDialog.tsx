@@ -45,6 +45,7 @@ import { TaskCheckboxControl } from '../TaskCheckboxControl';
 import { FeatheredScrollList } from '../FeatheredScrollList';
 import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../../utils/statusColumnSemantics';
 import { TaskAssignmentPopover } from '../TaskAssignmentPopover';
+import { TaskContextHistorySection } from '../TaskContextHistorySection';
 
 function getFileNameFromPath(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/');
@@ -385,11 +386,12 @@ export function TaskDialog({
           { id: 'task-edit-basic', label: 'Basic Info', icon: BasicInfoIcon },
           { id: 'task-edit-roadmap', label: 'Dependencies', icon: NodesIcon },
           { id: 'task-edit-description', label: 'Description', icon: DescriptionIcon },
+          ...(task ? [{ id: 'task-context-history', label: 'Context History', icon: FileText }] : []),
           { id: 'task-edit-attachments', label: 'Attachments', icon: AttachmentIcon },
         ],
       },
     ],
-    []
+    [task]
   );
   const selectedProjectChips = selectedProjects.slice(0, 2);
   const remainingSelectedProjectCount = selectedProjects.length - selectedProjectChips.length;
@@ -810,6 +812,13 @@ export function TaskDialog({
               />
             </div>
           </AnchoredPanelSection>
+
+          {task && (
+            <TaskContextHistorySection
+              taskId={task.id}
+              expectedRevision={task.__mcpRevision || 0}
+            />
+          )}
 
           <AnchoredPanelSection
             id="task-edit-attachments"

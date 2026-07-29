@@ -96,6 +96,7 @@ test('Codex connection test uses app-server directly and reuses its authenticate
     writes.push(message);
     if (message.id === 0) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 0, result: { userAgent: 'codex-cli/0.145.0', codexHome: '/tmp/codex' } })}\n`));
     if (message.id === 1) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 1, result: { account: { type: 'chatgpt' }, requiresOpenaiAuth: true } })}\n`));
+    if (message.id === 2) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 2, result: { data: [{ id: 'gpt-5', isDefault: true }] } })}\n`));
   });
   const result = await testConnection(store, { workspacePath: '/tmp/workspace' }, {
     spawnProcess: (command, args) => {
@@ -107,7 +108,7 @@ test('Codex connection test uses app-server directly and reuses its authenticate
   });
 
   assert.equal(result.ok, true);
-  assert.deepEqual(writes.map(message => message.method), ['initialize', 'initialized', 'account/read']);
+  assert.deepEqual(writes.map(message => message.method), ['initialize', 'initialized', 'account/read', 'model/list']);
   assert.equal('jsonrpc' in writes[0], false);
   assert.equal(result.observation.authentication, 'authenticated');
   assert.equal(result.observation.implementationName, 'Codex app-server');
@@ -121,6 +122,7 @@ test('Codex connection test reports its native signed-out state without collecti
     const message = JSON.parse(value);
     if (message.id === 0) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 0, result: {} })}\n`));
     if (message.id === 1) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 1, result: { account: null, requiresOpenaiAuth: true } })}\n`));
+    if (message.id === 2) queueMicrotask(() => child.stdout.write(`${JSON.stringify({ id: 2, result: { data: [] } })}\n`));
   });
   const result = await testConnection(store, { workspacePath: '/tmp/workspace' }, { spawnProcess: () => child, timeoutMs: 100 });
 
@@ -135,13 +137,14 @@ test('Claude connection test verifies its native stream-json CLI without consumi
   saveProfile(store, { id: 'claude', name: 'Claude', integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude', fixedArgs: ['--setting-sources', 'user,project'], enabled: true });
   saveDefaults(store, { globalProfileId: 'claude', projectProfileIds: {} });
   let writes = 0;
-  const child = createChild(() => { writes += 1; });
+  const calls = [];
   const resultPromise = testConnection(store, { workspacePath: '/tmp/workspace' }, {
     spawnProcess: (command, args) => {
       assert.equal(command, '/usr/bin/claude');
-      assert.deepEqual(args, ['--setting-sources', 'user,project', '--help']);
+      calls.push(args);
+      const child = createChild(() => { writes += 1; });
       queueMicrotask(() => {
-        child.stdout.write('Usage: claude --print --input-format stream-json --output-format stream-json\n');
+        child.stdout.write(args.includes('--version') ? '2.1.0\n' : 'Usage: claude --print --input-format stream-json --output-format stream-json\n');
         child.emit('exit', 0);
       });
       return child;
@@ -152,9 +155,13 @@ test('Claude connection test verifies its native stream-json CLI without consumi
 
   assert.equal(result.ok, true);
   assert.equal(writes, 0);
+  assert.deepEqual(calls, [
+    ['--setting-sources', 'user,project', '--version'],
+    ['--setting-sources', 'user,project', '--help'],
+  ]);
   assert.equal(result.observation.implementationName, 'Claude Code');
   assert.equal(result.observation.authentication, 'unknown');
-  assert.equal(result.observation.adapterVersion, null);
+  assert.equal(result.observation.adapterVersion, '2.1.0');
 });
 
 test('OpenCode remains configurable through the generic native ACP profile', async () => {

@@ -98,6 +98,12 @@ contextBridge.exposeInMainWorld('electron', {
     exportPdf: (payload) => ipcRenderer.invoke('tasks/export-pdf', payload),
   },
 
+  taskContext: {
+    list: (payload) => ipcRenderer.invoke('task-context/list', payload),
+    get: (payload) => ipcRenderer.invoke('task-context/get', payload),
+    appendCheckpoint: (payload) => ipcRenderer.invoke('task-context/append-checkpoint', payload),
+  },
+
   agentConfigurations: {
     export: (payload) => ipcRenderer.invoke('agent-configurations/export', payload),
   },

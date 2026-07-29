@@ -269,6 +269,11 @@ declare global {
           defaultFileName?: string;
         }) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
       };
+      taskContext: {
+        list: (payload: { taskId: string; limit?: number }) => Promise<any>;
+        get: (payload: { taskId: string; entryId: string }) => Promise<any>;
+        appendCheckpoint: (payload: { taskId: string; expectedRevision: number; summary: string; idempotencyKey: string }) => Promise<any>;
+      };
       agentConfigurations: {
         export: (payload: {
           json: string;

@@ -20,6 +20,8 @@ const { registerAttachmentIpcHandlers } = require('./ipc/attachments.cjs');
 const { registerExternalLinkIpcHandlers } = require('./ipc/external-links.cjs');
 const { registerRuntimeIpcHandlers } = require('./ipc/runtime.cjs');
 const { registerAgentRuntimeIpcHandlers } = require('./ipc/agent-runtime.cjs');
+const { registerTaskContextIpcHandlers } = require('./ipc/task-context.cjs');
+const { captureMeaningfulTaskCheckpoints } = require('./domain/task-context-checkpoint-service.cjs');
 const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
 const {
   createUpdateController,
@@ -33,6 +35,9 @@ const {
   updateGoal,
   updateGoalArtifactReferences,
   archiveMcpAuditEntries,
+  listTaskContextEntries,
+  getTaskContextEntry,
+  appendTaskContextEntry,
 } = require('./services/workspace-service.cjs');
 const { recordGoalPolicyChangeImpact } = require('./services/goal-policy.cjs');
 const { createGoalLifecycleService } = require('./services/goal-lifecycle-service.cjs');
@@ -55,6 +60,7 @@ const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';
 const GOAL_RUNTIME_CHANGED_CHANNEL = 'goals/runtime-changed';
 const PREFERENCES_KEY = 'omvra.preferences.v1';
+const TASKS_KEY = 'omvra.tasks.v1';
 const goalRuntime = createGoalRuntimeService({ store });
 let mcpHttpServer = null;
 let updateController = null;
@@ -388,7 +394,16 @@ function createWindow() {
 
 app.whenReady().then(() => {
   // Bind MCP endpoint to localhost only; no external interface exposure.
-  store.onDidAnyChange(() => {
+  store.onDidAnyChange((nextStore, previousStore) => {
+    try {
+      captureMeaningfulTaskCheckpoints(store, {
+        previousTasks: previousStore?.[TASKS_KEY],
+        nextTasks: nextStore?.[TASKS_KEY],
+        appendTaskContextEntry,
+      });
+    } catch (error) {
+      console.error('[task-context] checkpoint capture failed:', error?.message || error);
+    }
     broadcastStoreDidChange();
     syncUpdateChannelFromStore();
   });
@@ -445,6 +460,14 @@ registerStoreIpcHandlers({
       userDataPath: app.getPath('userData'),
     });
   },
+});
+
+registerTaskContextIpcHandlers({
+  ipcMain,
+  store,
+  listTaskContextEntries,
+  getTaskContextEntry,
+  appendTaskContextEntry,
 });
 
 registerGoalIpcHandlers({

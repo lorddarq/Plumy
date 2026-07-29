@@ -8,6 +8,7 @@ import { useStatusColumnActions } from './useStatusColumnActions.ts';
 import { createDuplicatedTask, useTaskActions } from './useTaskActions.ts';
 import { useMcpPanelState } from './useMcpPanelState.ts';
 import { useViewState, type AllViewStates } from './useViewState.ts';
+import { useTaskContextHistory } from './useTaskContextHistory.ts';
 import {
   useAgentWatchRuntime,
   getAgentWatchPollingInterval,
@@ -148,6 +149,63 @@ test('useTaskActions saves, comments, and promotes agentic tasks to review', asy
   assert.equal(tasks[1].status, 'in-progress');
 
   await harness.unmount();
+});
+
+test('useTaskContextHistory keeps list reads bounded and resolves details on demand', async () => {
+  let listLimit = 0;
+  let getCalls = 0;
+  let appendPayload: Record<string, unknown> | null = null;
+  let storeChanged: (() => void) | null = null;
+  const restoreWindow = setWindowMock({
+    electron: {
+      taskContext: {
+        list: async ({ limit }: { limit?: number }) => {
+          listLimit = limit || 0;
+          return {
+            ok: true,
+            entries: [{
+              id: 'entry-1', kind: 'context-checkpoint', fromRevision: 4, toRevision: 4,
+              summary: 'Decision captured.', markers: ['decision'], provenance: 'human-authored',
+              createdAt: '2026-07-30T08:00:00.000Z',
+            }],
+            hasMore: true,
+          };
+        },
+        get: async ({ entryId }: { entryId: string }) => {
+          getCalls += 1;
+          return { ok: true, entry: { id: entryId, sourceRefs: [], actor: 'workspace-user' }, sources: [] };
+        },
+        appendCheckpoint: async (payload: Record<string, unknown>) => {
+          appendPayload = payload;
+          return { ok: true };
+        },
+      },
+      onStoreChanged: (listener: () => void) => { storeChanged = listener; return () => { storeChanged = null; }; },
+    },
+  });
+
+  try {
+    const harness = await renderHook(() => useTaskContextHistory('task-1', 4), undefined as never);
+    await act(async () => {});
+    assert.equal(listLimit, 12);
+    assert.equal(harness.result().entries.length, 1);
+    assert.equal(getCalls, 0);
+
+    await act(async () => { await harness.result().selectEntry('entry-1'); });
+    assert.equal(getCalls, 1);
+    assert.equal(harness.result().detail?.entry.id, 'entry-1');
+
+    await act(async () => { assert.equal(await harness.result().appendCheckpoint('Keep this decision.'), true); });
+    assert.equal(appendPayload?.taskId, 'task-1');
+    assert.equal(appendPayload?.expectedRevision, 4);
+
+    await act(async () => { storeChanged?.(); });
+    assert.equal(listLimit, 12);
+    await harness.unmount();
+    assert.equal(storeChanged, null);
+  } finally {
+    restoreWindow();
+  }
 });
 
 test('createDuplicatedTask copies planning fields and resets identity/history links', () => {

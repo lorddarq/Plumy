@@ -15,6 +15,7 @@ import { exportPdfDocument } from '../../utils/pdfExport';
 import { TaskAttachmentsSection } from '../TaskAttachmentsSection';
 import { TaskCommentsSection } from '../TaskCommentsSection';
 import { TaskDescriptionSection } from '../TaskDescriptionSection';
+import { TaskContextHistorySection } from '../TaskContextHistorySection';
 import { TaskDetailsActionMenu } from '../TaskDetailsActionMenu';
 import { TaskFooterActions } from '../TaskFooterActions';
 import { TaskDependencyDetailsSection, TaskLoadDetailsSection, TaskSummarySection } from '../TaskSummarySection';
@@ -133,6 +134,7 @@ export function TaskDetailsDialog({
         items: [
           { id: 'task-basic', label: 'Basic Info', icon: BasicInfoIcon },
           { id: 'task-description', label: 'Description', icon: DescriptionIcon },
+          { id: 'task-context-history', label: 'Context History', icon: FileText },
           { id: 'task-load', label: 'Load', icon: LoadIcon },
           { id: 'task-dependencies', label: 'Dependencies', icon: NodesIcon },
           { id: 'task-attachments', label: 'Attachments', icon: AttachmentIcon },
@@ -354,6 +356,11 @@ export function TaskDetailsDialog({
           >
             <TaskDescriptionSection notes={task?.notes} isExpanded={isDescriptionExpanded} />
           </AnchoredPanelSection>
+
+          <TaskContextHistorySection
+            taskId={task?.id}
+            expectedRevision={task?.__mcpRevision || 0}
+          />
 
           <AnchoredPanelSection
             id="task-load"

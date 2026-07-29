@@ -110,6 +110,7 @@ export interface TaskCollaborationEventV1 {
 
 export interface Task {
   id: string;
+  __mcpRevision?: number;
   title: string;
   createdAt?: string;
   status: TaskStatus;

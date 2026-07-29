@@ -7,6 +7,7 @@ const {
   getState,
   resolveProfile,
 } = require('../domain/agent-runtime-profile-service.cjs');
+const { createNativeRuntimeClient } = require('./agent-runtime-protocol-client.cjs');
 
 const ACP_PROTOCOL_VERSION = 1;
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -49,191 +50,95 @@ function observationFromError(error, observedAt) {
   };
 }
 
-function testConnection(store, payload, options = {}) {
-  const resolution = resolveProfile(store, payload);
-  if (!resolution.ok) return Promise.resolve(resolution);
-  const { profile } = resolution;
-  if (!['acp-local-stdio', 'claude-stream-json-stdio', 'codex-app-server-stdio'].includes(profile.integrationMode)) {
-    return Promise.resolve({ ok: false, state: 'unsupported', profile, error: 'Connection testing is only available for local stdio runtime profiles.' });
-  }
-  const isCodexAppServer = profile.integrationMode === 'codex-app-server-stdio';
-  const isClaudeStreamJson = profile.integrationMode === 'claude-stream-json-stdio';
-  const runtimeName = isCodexAppServer ? 'Codex app-server' : isClaudeStreamJson ? 'Claude Code' : 'ACP';
-  const workspacePath = cleanWorkspacePath(payload.workspacePath);
-  const spawnProcess = options.spawnProcess || spawn;
-  const now = options.now || (() => new Date().toISOString());
-  const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
-
-  return new Promise((resolve) => {
-    const observedAt = now();
+function runBoundedCliProbe(spawnProcess, command, args, { workspacePath, timeoutMs, runtimeName }) {
+  return new Promise((resolve, reject) => {
     let child;
-    let settled = false;
     let stdout = '';
-    let rawStdout = '';
     let stderr = '';
-    let timer;
-    let initializationResult;
-
-    const finish = (result) => {
+    let settled = false;
+    const finish = (error, result) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       if (child && !child.killed) child.kill();
-      const observation = result.observation || observationFromError(result.errorObject || new Error(result.error), observedAt);
-      persistObservation(store, profile.id, observation);
-      resolve({ ...result, profile, source: resolution.source, observation });
+      if (error) reject(error);
+      else resolve(result);
     };
-
+    const timer = setTimeout(() => finish(Object.assign(new Error(`${runtimeName} probe timed out after ${timeoutMs} ms.`), { state: 'unavailable' })), timeoutMs);
     try {
-      const args = isCodexAppServer
-        ? [...(profile.fixedArgs || []), 'app-server', '--stdio']
-        : isClaudeStreamJson
-          ? [...(profile.fixedArgs || []), '--help']
-        : profile.fixedArgs || [];
-      child = spawnProcess(profile.executablePath, args, {
-        cwd: workspacePath,
-        shell: false,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        windowsHide: true,
-      });
+      child = spawnProcess(command, args, { cwd: workspacePath, shell: false, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     } catch (error) {
-      finish({ ok: false, state: error.code === 'ENOENT' ? 'missing' : 'unavailable', error: error.message, errorObject: error });
+      finish(error);
       return;
     }
-
-    timer = setTimeout(() => finish({
-      ok: false,
-      state: 'unavailable',
-      error: `${runtimeName} initialization timed out after ${timeoutMs} ms.`,
-    }), timeoutMs);
-
-    child.once('error', error => finish({
-      ok: false,
-      state: error.code === 'ENOENT' ? 'missing' : 'unavailable',
-      error: error.message,
-      errorObject: error,
-    }));
+    child.once('error', error => finish(error));
+    child.stdout?.on('data', chunk => { stdout = `${stdout}${chunk}`.slice(-32768); });
     child.stderr?.on('data', chunk => { stderr = `${stderr}${chunk}`.slice(-2048); });
-    child.stdout?.on('data', chunk => {
-      const text = chunk.toString();
-      rawStdout = `${rawStdout}${text}`.slice(-32768);
-      stdout += text;
-      const lines = stdout.split(/\r?\n/);
-      stdout = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        let message;
-        try { message = JSON.parse(line); } catch { continue; }
-        if (isCodexAppServer && message.id === 1) {
-          if (message.error) {
-            finish({ ok: false, state: 'unavailable', error: message.error.message || 'Codex authentication check failed.' });
-            return;
-          }
-          const account = message.result?.account;
-          const requiresAuthentication = message.result?.requiresOpenaiAuth === true;
-          const signedOut = requiresAuthentication && !account;
-          const observation = {
-            availability: 'available',
-            authentication: signedOut ? 'required' : account ? 'authenticated' : 'not-required',
-            capabilities: 'supported',
-            implementationName: 'Codex app-server',
-            adapterVersion: initializationResult?.userAgent || null,
-            providerName: account?.type || null,
-            modelOrMode: null,
-            agentCapabilities: { threadLifecycle: true },
-            authMethodCount: requiresAuthentication ? 1 : 0,
-            observedAt,
-            state: signedOut ? 'signed-out' : 'ready',
-          };
-          finish({ ok: !signedOut, state: observation.state, error: signedOut ? 'Codex requires sign-in.' : undefined, observation });
-          return;
-        }
-        if (message.id !== 0) continue;
-        if (message.error) {
-          finish({ ok: false, state: 'incompatible', error: message.error.message || `${isCodexAppServer ? 'Codex app-server' : 'ACP'} initialization failed.` });
-          return;
-        }
-        const result = message.result;
-        if (isCodexAppServer) {
-          if (!result || typeof result !== 'object') {
-            finish({ ok: false, state: 'incompatible', error: 'Codex app-server returned an invalid initialization response.' });
-            return;
-          }
-          initializationResult = result;
-          try {
-            child.stdin.write(`${JSON.stringify({ method: 'initialized', params: {} })}\n`);
-            child.stdin.write(`${JSON.stringify({ method: 'account/read', id: 1, params: { refreshToken: false } })}\n`);
-          } catch (error) {
-            finish({ ok: false, state: 'unavailable', error: error.message, errorObject: error });
-          }
-          continue;
-        }
-        if (!result || result.protocolVersion !== ACP_PROTOCOL_VERSION) {
-          finish({ ok: false, state: 'incompatible', error: `Unsupported ACP protocol version: ${result?.protocolVersion ?? 'missing'}.` });
-          return;
-        }
-        const authMethods = Array.isArray(result.authMethods) ? result.authMethods : [];
-        const observation = {
-          availability: 'available',
-          authentication: authMethods.length ? 'required' : 'unknown',
-          capabilities: 'supported',
-          implementationName: result.agentInfo?.title || result.agentInfo?.name || null,
-          adapterVersion: result.agentInfo?.version || null,
-          providerName: null,
-          modelOrMode: null,
-          agentCapabilities: result.agentCapabilities || {},
-          authMethodCount: authMethods.length,
-          observedAt,
-          state: authMethods.length ? 'signed-out' : 'ready',
-        };
-        finish({ ok: authMethods.length === 0, state: observation.state, error: authMethods.length ? 'The ACP agent requires sign-in.' : undefined, observation });
-      }
+    child.once('exit', code => {
+      if (code !== 0) return finish(Object.assign(new Error(`${runtimeName} probe exited (${code ?? 'unknown'}).${stderr.trim() ? ` ${stderr.trim()}` : ''}`), { state: 'unavailable' }));
+      finish(null, stdout);
     });
-    child.once('exit', (code) => {
-      if (settled) return;
-      if (isClaudeStreamJson && code === 0) {
-        const supportsStreamJson = ['--print', '--input-format', '--output-format', 'stream-json'].every(value => rawStdout.includes(value));
-        if (!supportsStreamJson) {
-          finish({ ok: false, state: 'incompatible', error: 'Claude Code does not advertise the required stream-json stdio interface.' });
-          return;
-        }
-        const observation = {
-          availability: 'available',
-          authentication: 'unknown',
-          capabilities: 'supported',
-          implementationName: 'Claude Code',
-          adapterVersion: null,
-          providerName: 'anthropic',
-          modelOrMode: null,
-          agentCapabilities: { streamJson: true, sessionResume: true },
-          authMethodCount: 0,
-          observedAt,
-          state: 'ready',
-        };
-        finish({ ok: true, state: observation.state, observation });
-        return;
-      }
-      finish({ ok: false, state: 'unavailable', error: `${runtimeName} exited before initialization (${code ?? 'unknown'}).${stderr ? ` ${stderr.trim()}` : ''}` });
-    });
-
-    try {
-      if (isClaudeStreamJson) return;
-      child.stdin.write(`${JSON.stringify({
-        ...(!isCodexAppServer && { jsonrpc: '2.0' }),
-        id: 0,
-        method: 'initialize',
-        params: isCodexAppServer ? {
-          clientInfo: { name: 'omvra', title: 'Omvra', version: '1' },
-        } : {
-          protocolVersion: ACP_PROTOCOL_VERSION,
-          clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
-          clientInfo: { name: 'omvra', title: 'Omvra', version: '1' },
-        },
-      })}\n`);
-    } catch (error) {
-      finish({ ok: false, state: 'unavailable', error: error.message, errorObject: error });
-    }
   });
+}
+
+async function testConnection(store, payload, options = {}) {
+  const resolution = resolveProfile(store, payload);
+  if (!resolution.ok) return resolution;
+  const { profile } = resolution;
+  if (!['acp-local-stdio', 'claude-stream-json-stdio', 'codex-app-server-stdio'].includes(profile.integrationMode)) {
+    return { ok: false, state: 'unsupported', profile, error: 'Connection testing is only available for local stdio runtime profiles.' };
+  }
+  const isClaudeStreamJson = profile.integrationMode === 'claude-stream-json-stdio';
+  const workspacePath = cleanWorkspacePath(payload.workspacePath);
+  const spawnProcess = options.spawnProcess || spawn;
+  const now = options.now || (() => new Date().toISOString());
+  const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
+  const observedAt = now();
+  if (isClaudeStreamJson) {
+    try {
+      const versionOutput = await runBoundedCliProbe(spawnProcess, profile.executablePath, [...(profile.fixedArgs || []), '--version'], { workspacePath, timeoutMs, runtimeName: 'Claude Code' });
+      const helpOutput = await runBoundedCliProbe(spawnProcess, profile.executablePath, [...(profile.fixedArgs || []), '--help'], { workspacePath, timeoutMs, runtimeName: 'Claude Code' });
+      const supported = ['--print', '--input-format', '--output-format', 'stream-json'].every(value => helpOutput.includes(value));
+      if (!supported) throw Object.assign(new Error('Claude Code does not advertise the required stream-json stdio interface.'), { state: 'incompatible' });
+      const observation = {
+        availability: 'available', authentication: 'unknown', capabilities: 'supported', implementationName: 'Claude Code',
+        adapterVersion: versionOutput.trim().slice(0, 128) || null, providerName: 'anthropic', modelOrMode: null,
+        agentCapabilities: { streamJson: true, sessionResume: true }, authMethodCount: 0, observedAt, state: 'ready',
+      };
+      persistObservation(store, profile.id, observation);
+      return { ok: true, state: 'ready', profile, source: resolution.source, observation };
+    } catch (error) {
+      const state = error.code === 'ENOENT' ? 'missing' : error.state || 'unavailable';
+      const observation = observationFromError(Object.assign(error, { state }), observedAt);
+      persistObservation(store, profile.id, observation);
+      return { ok: false, state, error: error.message, profile, source: resolution.source, observation };
+    }
+  }
+
+  let client;
+  try {
+    client = createNativeRuntimeClient(profile, { workspacePath, spawnProcess, timeoutMs });
+    const negotiated = await client.initialize();
+    const signedOut = negotiated.authentication === 'required';
+    const observation = {
+      availability: 'available', authentication: negotiated.authentication, capabilities: 'supported',
+      implementationName: negotiated.implementationName, adapterVersion: negotiated.adapterVersion,
+      providerName: negotiated.accountType || null,
+      modelOrMode: negotiated.models?.find(model => model?.isDefault)?.id || negotiated.models?.find(model => model?.isDefault)?.model || null,
+      agentCapabilities: negotiated.capabilities?.raw || negotiated.capabilities || {},
+      authMethodCount: negotiated.authMethods?.length || (signedOut ? 1 : 0), observedAt,
+      state: signedOut ? 'signed-out' : 'ready',
+    };
+    persistObservation(store, profile.id, observation);
+    return { ok: !signedOut, state: observation.state, ...(signedOut ? { error: profile.integrationMode === 'codex-app-server-stdio' ? 'Codex requires sign-in.' : 'The ACP agent requires sign-in.' } : {}), profile, source: resolution.source, observation };
+  } catch (error) {
+    const state = error.code === 'ACP_RUNTIME_MISSING' ? 'missing' : error.code === 'ACP_PROTOCOL_INCOMPATIBLE' ? 'incompatible' : 'unavailable';
+    const observation = observationFromError(Object.assign(error, { state }), observedAt);
+    persistObservation(store, profile.id, observation);
+    return { ok: false, state, error: error.message, profile, source: resolution.source, observation };
+  } finally {
+    client?.close();
+  }
 }
 
 async function openExternalHandoff(store, payload, options = {}) {
