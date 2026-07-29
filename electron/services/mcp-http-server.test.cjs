@@ -866,7 +866,7 @@ test('contribution lifecycle is MCP-visible, evidence-gated, audited, and cannot
   assert.equal(collaboration.result.structuredContent.revision, 1);
 
   const premature = call('tasks_complete_and_request_review', {
-    taskId: 'task-1', expectedRevision: 1, completion: 'Should remain blocked.',
+    taskId: 'task-1', expectedRevision: 1, actorPersonId: 'agent-1', completion: 'Should remain blocked.',
   });
   assert.equal(premature.error.data.error, 'CONTRIBUTIONS_NOT_ACCEPTED');
   assert.equal(store.get(TASKS_KEY)[0].status, 'in-progress');
@@ -889,6 +889,7 @@ test('contribution lifecycle is MCP-visible, evidence-gated, audited, and cannot
   const submitted = call('tasks_transition_contribution', {
     taskId: 'task-1', contributionId: 'contribution-1', command: 'submit', actorPersonId: 'agent-2',
     expectedRevision: 3, idempotencyKey: 'submit-1', attemptId, evidenceRefs: ['artifact-private-ref'],
+    prompt: 'raw-private-prompt-must-not-persist', response: 'raw-private-response-must-not-persist',
   });
   assert.equal(submitted.result.structuredContent.contribution.state, 'submitted');
   assert.equal(store.get(TASKS_KEY)[0].status, 'in-progress');
@@ -900,13 +901,19 @@ test('contribution lifecycle is MCP-visible, evidence-gated, audited, and cannot
   assert.equal(accepted.result.structuredContent.contribution.state, 'accepted');
   assert.equal(store.get(TASKS_KEY)[0].status, 'in-progress');
 
+  const unauthorizedCompletion = call('tasks_complete_and_request_review', {
+    taskId: 'task-1', expectedRevision: 5, actorPersonId: 'agent-2', completion: 'Contributor cannot complete aggregate work.',
+  });
+  assert.equal(unauthorizedCompletion.error.data.error, 'COLLABORATION_ORCHESTRATOR_REQUIRED');
+
   const history = call('tasks_collaboration_history', { taskId: 'task-1', contributionId: 'contribution-1' });
   assert.equal(history.result.structuredContent.attempts.length, 1);
   assert.equal(history.result.structuredContent.events.length, 4);
   assert.equal(history.result.structuredContent.events.at(-1).type, 'accepted');
+  assert.equal(JSON.stringify(store.get('omvra.taskCollaborationEvents.v1')).includes('raw-private'), false);
 
   const completion = call('tasks_complete_and_request_review', {
-    taskId: 'task-1', expectedRevision: 5, completion: 'Integrated accepted contribution.',
+    taskId: 'task-1', expectedRevision: 5, actorPersonId: 'agent-1', completion: 'Integrated accepted contribution.',
   });
   assert.equal(completion.result.structuredContent.revision, 6);
   assert.equal(completion.result.structuredContent.task.status, 'ready-human');

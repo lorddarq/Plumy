@@ -71,6 +71,7 @@ test('contribution lifecycle preserves handoff, revision, acceptance, and aggreg
   assert.equal(handedOff.attempt.state, 'handed-off');
   assert.equal(handedOff.contribution.state, 'pending');
   assert.equal(harness.run('acknowledge', 'contributor').contribution.state, 'working');
+  assert.equal(harness.run('submit', 'contributor').error, 'EVIDENCE_REQUIRED');
   assert.equal(harness.run('submit', 'contributor', { evidenceRefs: ['artifact-1'] }).contribution.state, 'submitted');
   assert.equal(harness.run('request-revision', 'orchestrator').contribution.state, 'revision-requested');
   assert.equal(harness.run('handoff', 'orchestrator').attempt.ordinal, 2);
@@ -152,6 +153,7 @@ test('retry reconciles an event-first write without duplicating attempt history'
   assert.equal(harness.service.transition(harness.store, input).error, 'PROJECTION_WRITE_FAILED');
   assert.equal(harness.store.get('events').length, 1);
   assert.equal(harness.store.get('attempts').length, 1);
+  assert.equal(harness.service.listHistory(harness.store, { taskId: 'task-1' }).events.length, 0);
   const recovered = harness.service.transition(harness.store, input);
   assert.equal(recovered.ok, true);
   assert.equal(recovered.idempotent, true);
@@ -159,4 +161,5 @@ test('retry reconciles an event-first write without duplicating attempt history'
   assert.equal(harness.store.get('events').length, 1);
   assert.equal(harness.store.get('attempts').length, 1);
   assert.equal(harness.getTask().__mcpRevision, 1);
+  assert.equal(harness.service.listHistory(harness.store, { taskId: 'task-1' }).events.length, 1);
 });

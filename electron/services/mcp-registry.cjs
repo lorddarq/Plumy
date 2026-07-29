@@ -688,6 +688,7 @@ const WRITE_TOOL_DEFINITIONS = [
       additionalProperties: true,
       properties: {
         taskId: { type: 'string' },
+        actorPersonId: { type: 'string' },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['taskId', 'expectedRevision'],
@@ -759,6 +760,7 @@ const WRITE_TOOL_DEFINITIONS = [
       additionalProperties: true,
       properties: {
         taskId: { type: 'string' },
+        actorPersonId: { type: 'string' },
         completion: { type: 'string' },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
@@ -807,6 +809,7 @@ const WRITE_TOOL_DEFINITIONS = [
       additionalProperties: true,
       properties: {
         taskId: { type: 'string' },
+        actorPersonId: { type: 'string' },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['taskId', 'expectedRevision'],

@@ -15,7 +15,6 @@ const COMMANDS = new Set([
   'complete',
 ]);
 const ORCHESTRATOR_ONLY = new Set(['delegate', 'handoff', 'request-revision', 'accept', 'unblock']);
-const ATTEMPT_COMMANDS = new Set(['handoff', 'acknowledge', 'start', 'submit', 'stop', 'fail', 'complete']);
 const TERMINAL_ATTEMPT_STATES = new Set(['submitted', 'completed', 'stopped', 'failed']);
 const MAX_HISTORY_LIMIT = 100;
 const MAX_EVIDENCE_REFS = 50;
@@ -55,11 +54,22 @@ function createTaskCollaborationLifecycleService({
       : 25;
     const matches = record => record?.taskId === normalizedTaskId
       && (!normalizedContributionId || record.contributionId === normalizedContributionId);
+    const matchingEvents = readEvents(store).filter(matches);
+    const taskRevision = Number(task.__mcpRevision || 0);
+    const contributionById = new Map((task.collaboration?.contributions || []).map(item => [item.id, item]));
+    const visibleEvents = matchingEvents.filter(event => (
+      taskRevision >= Number(event.nextTaskRevision)
+      && (
+        contributionById.get(event.contributionId)?.lastLifecycleEventId === event.id
+        || matchingEvents.some(later => later.contributionId === event.contributionId && later.baseTaskRevision >= event.nextTaskRevision)
+      )
+    ));
+    const visibleAttemptIds = new Set(visibleEvents.map(event => event.attemptId).filter(Boolean));
     return {
       ok: true,
       task,
-      attempts: readAttempts(store).filter(matches).slice(-boundedLimit),
-      events: readEvents(store).filter(matches).slice(-boundedLimit),
+      attempts: readAttempts(store).filter(record => matches(record) && visibleAttemptIds.has(record.id)).slice(-boundedLimit),
+      events: visibleEvents.slice(-boundedLimit),
     };
   }
 
@@ -91,7 +101,15 @@ function createTaskCollaborationLifecycleService({
       return failure('IDEMPOTENCY_CONFLICT', 'idempotencyKey was already used for a different lifecycle transition.');
     }
     const currentRevision = Number(task.__mcpRevision || 0);
-    if (existingEvent && currentRevision >= existingEvent.nextTaskRevision) {
+    const supersededByLaterEvent = existingEvent && events.some(event => (
+      event?.taskId === taskId
+      && event.contributionId === contributionId
+      && event.baseTaskRevision >= existingEvent.nextTaskRevision
+    ));
+    const existingEventApplied = existingEvent && (
+      contribution.lastLifecycleEventId === existingEvent.id || supersededByLaterEvent
+    );
+    if (existingEventApplied) {
       const attempts = readAttempts(store);
       return {
         ok: true,
@@ -107,11 +125,18 @@ function createTaskCollaborationLifecycleService({
     if (!Number.isFinite(expectedRevision)) {
       return failure('EXPECTED_REVISION_REQUIRED', 'expectedRevision is required and must be a finite number.', { currentRevision });
     }
-    if (Math.max(0, Math.floor(expectedRevision)) !== currentRevision) {
+    const expected = Math.max(0, Math.floor(expectedRevision));
+    if (existingEvent && expected !== existingEvent.baseTaskRevision) {
+      return failure('IDEMPOTENCY_CONFLICT', 'The retry revision does not match the original lifecycle command.');
+    }
+    if (!existingEvent && expected !== currentRevision) {
       return failure('REVISION_MISMATCH', 'Task revision mismatch.', {
         currentRevision,
-        expectedRevision: Math.max(0, Math.floor(expectedRevision)),
+        expectedRevision: expected,
       });
+    }
+    if (existingEvent && contribution.state !== existingEvent.previousState) {
+      return failure('RECONCILIATION_CONFLICT', 'Contribution state changed before the interrupted lifecycle projection could be reconciled.');
     }
 
     const isOrchestrator = actorPersonId === task.collaboration.orchestratorId;
@@ -123,7 +148,7 @@ function createTaskCollaborationLifecycleService({
     const attempts = readAttempts(store);
     const taskAttempts = attempts.filter(item => item?.taskId === taskId && item.contributionId === contributionId);
     const requestedAttemptId = normalizeString(options.attemptId);
-    let attempt = requestedAttemptId
+    const attempt = requestedAttemptId
       ? taskAttempts.find(item => item.id === requestedAttemptId)
       : taskAttempts.find(item => item.id === contribution.latestAttemptId) || taskAttempts.at(-1);
     const timestamp = now();
@@ -144,6 +169,7 @@ function createTaskCollaborationLifecycleService({
         state: existingEvent.nextState,
         latestAttemptId: nextAttempt?.id || contribution.latestAttemptId,
         evidenceRefs: recoveredEvidenceRefs,
+        lastLifecycleEventId: existingEvent.id,
         updatedAt: timestamp,
       };
       const recovered = updateTaskCollaboration(store, {
@@ -250,21 +276,7 @@ function createTaskCollaborationLifecycleService({
         return failure('INVALID_CONTRIBUTION_COMMAND', `Unsupported contribution command "${command}".`);
     }
 
-    const nextEvidenceRefs = command === 'submit'
-      ? Array.from(new Set([...(contribution.evidenceRefs || []), ...evidenceRefs])).slice(0, MAX_EVIDENCE_REFS)
-      : contribution.evidenceRefs;
-    const nextContribution = {
-      ...contribution,
-      state: nextState,
-      latestAttemptId: nextAttempt?.id || contribution.latestAttemptId,
-      evidenceRefs: nextEvidenceRefs,
-      updatedAt: timestamp,
-    };
-    const nextCollaboration = {
-      ...task.collaboration,
-      contributions: task.collaboration.contributions.map(item => item.id === contributionId ? nextContribution : item),
-    };
-    const event = existingEvent || {
+    const event = {
       schemaVersion: 1,
       id: `collaboration-event-${randomUUID()}`,
       idempotencyKey,
@@ -283,6 +295,21 @@ function createTaskCollaborationLifecycleService({
       evidenceRefs: command === 'submit' ? evidenceRefs : undefined,
       blockerRef: command === 'block' ? normalizeString(options.blockerRef).slice(0, 240) : undefined,
       occurredAt: timestamp,
+    };
+    const nextEvidenceRefs = command === 'submit'
+      ? Array.from(new Set([...(contribution.evidenceRefs || []), ...evidenceRefs])).slice(0, MAX_EVIDENCE_REFS)
+      : contribution.evidenceRefs;
+    const nextContribution = {
+      ...contribution,
+      state: nextState,
+      latestAttemptId: nextAttempt?.id || contribution.latestAttemptId,
+      evidenceRefs: nextEvidenceRefs,
+      lastLifecycleEventId: event.id,
+      updatedAt: timestamp,
+    };
+    const nextCollaboration = {
+      ...task.collaboration,
+      contributions: task.collaboration.contributions.map(item => item.id === contributionId ? nextContribution : item),
     };
 
     if (nextAttempt) {

@@ -580,9 +580,17 @@ function createTaskService({
       .map(contribution => ({ id: contribution.id, personId: contribution.personId, state: contribution.state }));
   }
 
-  function requireAcceptedContributions(store, taskId) {
+  function requireAcceptedContributions(store, taskId, actorPersonId) {
     const task = getTaskById(store, taskId);
     if (!task) return { ok: false, error: 'TASK_NOT_FOUND', message: `Task "${taskId}" not found.` };
+    if (task.collaboration && normalizeString(actorPersonId) !== task.collaboration.orchestratorId) {
+      return {
+        ok: false,
+        error: 'COLLABORATION_ORCHESTRATOR_REQUIRED',
+        message: 'Only the task orchestrator can request aggregate review for a collaborative task.',
+        currentRevision: task[revisionField] || 0,
+      };
+    }
     const blockers = getAggregateReviewBlockers(task);
     if (blockers.length > 0) {
       return {
@@ -1093,8 +1101,8 @@ function createTaskService({
     };
   }
   
-  function transitionTaskToUnderReview(store, { taskId, expectedRevision, actor = 'agent' }) {
-    const gate = requireAcceptedContributions(store, taskId);
+  function transitionTaskToUnderReview(store, { taskId, expectedRevision, actorPersonId, actor = 'agent' }) {
+    const gate = requireAcceptedContributions(store, taskId, actorPersonId);
     if (!gate.ok) return gate;
     return updateTaskWithRevision(store, taskId, expectedRevision, (task) => {
       if (task.status !== 'in-progress') return null;
@@ -1167,8 +1175,8 @@ function createTaskService({
     }));
   }
   
-  function moveTaskToReadyForHumanReview(store, { taskId, expectedRevision, actor = 'agent' }) {
-    const gate = requireAcceptedContributions(store, taskId);
+  function moveTaskToReadyForHumanReview(store, { taskId, expectedRevision, actorPersonId, actor = 'agent' }) {
+    const gate = requireAcceptedContributions(store, taskId, actorPersonId);
     if (!gate.ok) return gate;
     const ensured = ensureReadyForHumanReviewStatusColumn(store);
     const result = moveTaskToStatus(store, {
@@ -1190,6 +1198,7 @@ function createTaskService({
     taskId,
     completion,
     expectedRevision,
+    actorPersonId,
     actor = 'agent',
   }) {
     const completionText = sanitizeCompletionText(completion);
@@ -1200,7 +1209,7 @@ function createTaskService({
         message: 'completion is required.',
       };
     }
-    const gate = requireAcceptedContributions(store, taskId);
+    const gate = requireAcceptedContributions(store, taskId, actorPersonId);
     if (!gate.ok) return gate;
   
     const ensured = ensureReadyForHumanReviewStatusColumn(store);

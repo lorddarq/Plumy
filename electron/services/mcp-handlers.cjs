@@ -1035,6 +1035,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
       const result = transitionTaskToUnderReview(store, {
         taskId,
         expectedRevision: args.expectedRevision,
+        actorPersonId: args.actorPersonId,
         actor: 'mcp-agent',
       });
       if (!result.ok) {
@@ -1241,6 +1242,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
         taskId,
         completion: args.completion,
         expectedRevision: args.expectedRevision,
+        actorPersonId: args.actorPersonId,
         actor: 'mcp-agent',
       });
       if (!result.ok) {
@@ -1322,6 +1324,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
       const result = moveTaskToReadyForHumanReview(store, {
         taskId,
         expectedRevision: args.expectedRevision,
+        actorPersonId: args.actorPersonId,
         actor: 'mcp-agent',
       });
       if (!result.ok) {
