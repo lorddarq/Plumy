@@ -143,3 +143,5 @@ Protected renderer persistence keys at this baseline:
 Primary risk: a mechanically smaller file split could preserve mixed ownership. Mitigation: move rules by responsibility, keep adapter modules orchestration-only, and use the forbidden-dependency list during review.
 
 Reversal cost is low: the facades remain stable throughout the prerequisite pass, so an extraction can be reverted internally without changing MCP clients, preload consumers, persisted workspaces, or renderer callers.
+
+Integration results, downstream extension seams, retained facade owners, and command evidence are recorded in [`domain-service-protocol-integration-qa.md`](./domain-service-protocol-integration-qa.md).

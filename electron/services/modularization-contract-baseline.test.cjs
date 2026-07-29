@@ -192,6 +192,32 @@ function collectMatches(source, expression) {
   return [...source.matchAll(expression)].map(match => match[1]);
 }
 
+function assertAcyclicCommonJsModules(relativePaths) {
+  const modulePaths = new Set(relativePaths.map(relativePath => path.join(REPO_ROOT, relativePath)));
+  const dependencies = new Map([...modulePaths].map(filePath => {
+    const requires = collectMatches(fs.readFileSync(filePath, 'utf8'), /require\(['"](\.[^'"]+)['"]\)/g)
+      .map(specifier => path.resolve(path.dirname(filePath), specifier))
+      .filter(dependencyPath => modulePaths.has(dependencyPath));
+    return [filePath, requires];
+  }));
+  const visiting = new Set();
+  const visited = new Set();
+
+  function visit(filePath, chain = []) {
+    if (visiting.has(filePath)) {
+      assert.fail(`Circular modularization dependency: ${[...chain, filePath]
+        .map(item => path.relative(REPO_ROOT, item)).join(' -> ')}`);
+    }
+    if (visited.has(filePath)) return;
+    visiting.add(filePath);
+    for (const dependencyPath of dependencies.get(filePath) || []) visit(dependencyPath, [...chain, filePath]);
+    visiting.delete(filePath);
+    visited.add(filePath);
+  }
+
+  for (const filePath of modulePaths) visit(filePath);
+}
+
 test('workspace service keeps the characterized compatibility facade', () => {
   assert.deepEqual(Object.keys(workspaceService).sort(), WORKSPACE_FACADE_EXPORTS);
   assert.equal(workspaceService.MCP_TASK_REV_FIELD, '__mcpRevision');
@@ -303,4 +329,40 @@ test('Electron main composes IPC registrars while retaining application lifecycl
   assert.match(mainSource, /new BrowserWindow\(/);
   assert.match(mainSource, /app\.whenReady\(\)/);
   assert.doesNotMatch(registrarSource, /require\(['"]\.\.\/services\/(?:workspace|goal-[^'"]+)-service\.cjs['"]\)/);
+});
+
+test('modularization extension boundaries remain acyclic with one domain rule owner', () => {
+  const domainFiles = collectFiles(
+    path.join(REPO_ROOT, 'electron/domain'),
+    filePath => filePath.endsWith('.cjs') && !filePath.endsWith('.test.cjs'),
+  );
+  const domainSource = domainFiles.map(filePath => fs.readFileSync(filePath, 'utf8')).join('\n');
+  const adapterSource = [
+    read('electron/services/mcp-handlers.cjs'),
+    read('electron/services/mcp-resource-handlers.cjs'),
+    read('electron/services/mcp-http-server.cjs'),
+  ].join('\n');
+
+  assert.doesNotMatch(domainSource, /require\(['"](?:\.\.\/ipc|\.\.\/services\/mcp-|\.\.\/main|\.\.\/\.\.\/src\/app)/);
+  assert.doesNotMatch(adapterSource, /store\.(?:get|set)\(['"]omvra\.(?:tasks|milestones|people)\.v\d+/);
+  assert.doesNotMatch(adapterSource, /['"](?:DEPENDENCY_CYCLE|TASK_REFERENCE_NOT_FOUND|INVALID_TASK_REFERENCE)['"]/);
+
+  assertAcyclicCommonJsModules([
+    ...domainFiles.map(filePath => path.relative(REPO_ROOT, filePath)),
+    'electron/services/workspace-service.cjs',
+    'electron/services/mcp-registry.cjs',
+    'electron/services/mcp-handlers.cjs',
+    'electron/services/mcp-resource-handlers.cjs',
+    'electron/services/mcp-response.cjs',
+    'electron/services/mcp-audit-adapter.cjs',
+    'electron/services/mcp-http-server.cjs',
+    'electron/ipc/mcp.cjs',
+    'electron/ipc/store.cjs',
+    'electron/ipc/goals.cjs',
+    'electron/ipc/documents.cjs',
+    'electron/ipc/attachments.cjs',
+    'electron/ipc/external-links.cjs',
+    'electron/ipc/runtime.cjs',
+    'electron/main.cjs',
+  ]);
 });
