@@ -5,11 +5,13 @@ const { createDependencyRules } = require('../domain/dependency-rules.cjs');
 const { createMilestoneService } = require('../domain/milestone-service.cjs');
 const { createPersonContextService } = require('../domain/person-context-service.cjs');
 const { createTaskService } = require('../domain/task-service.cjs');
+const { createTaskCollaborationService, COLLABORATION_SCHEMA_VERSION } = require('../domain/task-collaboration-service.cjs');
 const { migrateGoalRecords, normalizeAgentConfiguration, normalizeGoalInputs, normalizeGoalCapabilities, normalizeGoalProjectBindings } = require('./goal-state-service.cjs');
 const { isAgentMutationAllowed } = require('./goal-policy.cjs');
 
 const PREFERENCES_KEY = 'omvra.preferences.v1';
 const TASKS_KEY = 'omvra.tasks.v1';
+const TASK_CONTRIBUTION_ATTEMPTS_KEY = 'omvra.taskContributionAttempts.v1';
 const MILESTONES_KEY = 'omvra.milestones.v1';
 const PEOPLE_KEY = 'omvra.people.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
@@ -1722,6 +1724,11 @@ const dependencyRules = createDependencyRules({
   normalizeTaskIdList,
 });
 
+const taskCollaborationService = createTaskCollaborationService({
+  findPersonById: personContextService.findPersonById,
+  normalizeString,
+});
+
 milestoneService = createMilestoneService({
   dependencyRules,
   hasOwn,
@@ -1741,6 +1748,7 @@ milestoneService = createMilestoneService({
 taskService = createTaskService({
   activityLogMaxEntries: TASK_ACTIVITY_LOG_MAX_ENTRIES,
   dependencyRules,
+  collaborationService: taskCollaborationService,
   findPersonById: personContextService.findPersonById,
   findPersonByReference: personContextService.findPersonByReference,
   hasOwn,
@@ -1782,6 +1790,7 @@ const {
   createTask,
   updateTaskDetails,
   updateTaskDescription,
+  updateTaskCollaboration,
   attachTaskFile,
   removeTaskAttachment,
   logTaskTime,
@@ -1809,6 +1818,8 @@ const {
 
 module.exports = {
   PREFERENCES_KEY,
+  TASK_CONTRIBUTION_ATTEMPTS_KEY,
+  COLLABORATION_SCHEMA_VERSION,
   MILESTONES_KEY,
   MCP_PROTOCOL_VERSION,
   MCP_SERVER_NAME,
@@ -1871,6 +1882,7 @@ module.exports = {
   assignTaskToPerson,
   updateTaskDetails,
   updateTaskDescription,
+  updateTaskCollaboration,
   attachTaskFile,
   removeTaskAttachment,
   logTaskTime,

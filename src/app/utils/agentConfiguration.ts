@@ -9,6 +9,7 @@ export interface PortableAgentConfiguration {
   role: string;
   agentInstructions?: string;
   agentOperationalInstructions?: string;
+  availableForSubagentDelegation?: boolean;
 }
 
 export interface AgentConfigurationFile {
@@ -23,12 +24,13 @@ export function buildAgentConfigurationFile(people: Person[], exportedAt = new D
     kind: AGENT_CONFIGURATION_KIND,
     version: AGENT_CONFIGURATION_VERSION,
     exportedAt,
-    agents: people.filter(person => person.kind === 'agentic').map(({ id, name, role, agentInstructions, agentOperationalInstructions }) => ({
+    agents: people.filter(person => person.kind === 'agentic').map(({ id, name, role, agentInstructions, agentOperationalInstructions, availableForSubagentDelegation }) => ({
       id,
       name,
       role,
       ...(agentInstructions ? { agentInstructions } : {}),
       ...(agentOperationalInstructions ? { agentOperationalInstructions } : {}),
+      ...(availableForSubagentDelegation ? { availableForSubagentDelegation: true } : {}),
     })),
   };
 }
@@ -65,6 +67,9 @@ export function parseAgentConfigurationFile(value: unknown): { ok: true; agents:
     if (agent.agentOperationalInstructions !== undefined && typeof agent.agentOperationalInstructions !== 'string') {
       return { ok: false, error: 'Operational instructions must be text.' };
     }
+    if (agent.availableForSubagentDelegation !== undefined && typeof agent.availableForSubagentDelegation !== 'boolean') {
+      return { ok: false, error: 'Subagent delegation availability must be true or false.' };
+    }
 
     const id = typeof agent.id === 'string' ? agent.id.trim() : undefined;
     if (id) ids.add(id);
@@ -74,6 +79,7 @@ export function parseAgentConfigurationFile(value: unknown): { ok: true; agents:
       role: agent.role.trim(),
       ...(typeof agent.agentInstructions === 'string' && agent.agentInstructions.trim() ? { agentInstructions: agent.agentInstructions.trim() } : {}),
       ...(typeof agent.agentOperationalInstructions === 'string' && agent.agentOperationalInstructions.trim() ? { agentOperationalInstructions: agent.agentOperationalInstructions.trim() } : {}),
+      ...(agent.availableForSubagentDelegation === true ? { availableForSubagentDelegation: true } : {}),
     });
   }
 

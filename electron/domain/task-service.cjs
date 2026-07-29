@@ -5,6 +5,7 @@ const path = require("path");
 function createTaskService({
   activityLogMaxEntries,
   dependencyRules,
+  collaborationService,
   findPersonById,
   findPersonByReference,
   hasOwn,
@@ -62,6 +63,10 @@ function createTaskService({
   if (!dependencyRules || typeof dependencyRules.validateTaskReferences !== "function"
     || typeof dependencyRules.validateDependencyCycles !== "function") {
     throw new TypeError("createTaskService requires dependencyRules.");
+  }
+  if (!collaborationService || typeof collaborationService.normalizeStored !== 'function'
+    || typeof collaborationService.validate !== 'function') {
+    throw new TypeError('createTaskService requires collaborationService.');
   }
   if (typeof revisionField !== "string" || !revisionField) {
     throw new TypeError("createTaskService requires revisionField.");
@@ -206,6 +211,7 @@ function createTaskService({
       : 0;
     const descriptionProjectContext = extractProjectContextFromDescription(task.notes);
     const timeSpentMinutes = normalizePositiveInteger(task.timeSpentMinutes);
+    const collaborationResult = collaborationService.normalizeStored(task.collaboration);
     return {
       ...task,
       dependencyIds: normalizeTaskIdList(task.dependencyIds),
@@ -215,6 +221,11 @@ function createTaskService({
       attachments: normalizeTaskAttachments(task.attachments),
       [revisionField]: revision,
       descriptionProjectContext,
+      collaboration: collaborationResult.ok ? collaborationResult.collaboration : task.collaboration,
+      collaborationError: collaborationResult.ok ? undefined : {
+        error: collaborationResult.error,
+        message: collaborationResult.message,
+      },
     };
   }
   
@@ -388,7 +399,6 @@ function createTaskService({
         message: 'Assignee kind does not match the selected person.',
       };
     }
-  
     const requestedProjectIds = normalizeTaskIdList(
       Array.isArray(projectIds)
         ? projectIds.concat(projectId ? [projectId] : [])
@@ -624,6 +634,14 @@ function createTaskService({
         message: 'Assignee kind does not match the selected person.',
       };
     }
+    const currentTaskForAssignment = hasAssigneePatch ? getTaskById(store, normalizedTaskId) : null;
+    if (currentTaskForAssignment?.collaboration && assignee?.id !== currentTaskForAssignment.assigneeId) {
+      return {
+        ok: false,
+        error: 'COLLABORATION_ASSIGNMENT_REQUIRES_ASSIGN_TOOL',
+        message: 'Collaborative task assignment must use tasks.assign so orchestratorId and assigneeId stay synchronized.',
+      };
+    }
   
     const hasProjectPatch = hasOwn(patch, 'projectId') || hasOwn(patch, 'projectIds');
     let resolvedProjects = null;
@@ -788,6 +806,29 @@ function createTaskService({
       ...task,
       notes: typeof nextNotes === 'string' ? nextNotes : '',
       mcpLastActor: actor,
+    }));
+  }
+
+  function updateTaskCollaboration(store, options = {}) {
+    const patch = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+    const taskId = normalizeString(patch.taskId);
+    if (!taskId) return { ok: false, error: 'TASK_ID_REQUIRED', message: 'taskId is required.' };
+
+    if (patch.collaboration === null) {
+      return updateTaskWithRevision(store, taskId, patch.expectedRevision, task => {
+        const { collaboration: _collaboration, collaborationError: _collaborationError, ...legacyTask } = task;
+        return { ...legacyTask, mcpLastActor: patch.actor || 'agent' };
+      });
+    }
+
+    const validation = collaborationService.validate(store, patch.collaboration);
+    if (!validation.ok) return validation;
+
+    return updateTaskWithRevision(store, taskId, patch.expectedRevision, task => ({
+      ...task,
+      assigneeId: validation.collaboration.orchestratorId,
+      collaboration: validation.collaboration,
+      mcpLastActor: patch.actor || 'agent',
     }));
   }
   
@@ -1206,10 +1247,21 @@ function createTaskService({
     if (currentTask.assigneeId === assignee.id) {
       return { ok: true, changed: false, task: currentTask, currentRevision };
     }
+
+    let nextCollaboration;
+    if (currentTask.collaboration) {
+      const validation = collaborationService.validate(store, {
+        ...currentTask.collaboration,
+        orchestratorId: assignee.id,
+      });
+      if (!validation.ok) return validation;
+      nextCollaboration = validation.collaboration;
+    }
   
-    return updateTaskWithRevision(store, taskId, expectedRevision, (nextTask) => ({
+    return updateTaskWithRevision(store, taskId, expectedRevision, nextTask => ({
       ...nextTask,
       assigneeId: assignee.id,
+      ...(nextCollaboration ? { collaboration: nextCollaboration } : {}),
       mcpLastActor: actor,
     }));
   }
@@ -1469,6 +1521,7 @@ function createTaskService({
     createTask,
     updateTaskDetails,
     updateTaskDescription,
+    updateTaskCollaboration,
     attachTaskFile,
     removeTaskAttachment,
     logTaskTime,

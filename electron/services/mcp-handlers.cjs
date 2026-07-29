@@ -20,6 +20,7 @@ const {
   createTask,
   updateTaskDetails,
   updateTaskDescription,
+  updateTaskCollaboration,
   attachTaskFile,
   removeTaskAttachment,
   deleteTask,
@@ -603,6 +604,43 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
         result: makeWriteToolResult(name, {
           changed: true,
           auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'tasks.update_collaboration': {
+      const taskId = parseTaskId(args);
+      if (!taskId) return { error: invalidParams('Invalid params: "taskId" is required.') };
+      const result = updateTaskCollaboration(store, {
+        taskId,
+        collaboration: args.collaboration,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        orchestratorId: result.task?.collaboration?.orchestratorId,
+        contributionIds: result.task?.collaboration?.contributions?.map(item => item.id),
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          collaborationSchemaVersion: result.task?.collaboration?.schemaVersion,
           task: result.task,
           revision: result.task?.__mcpRevision,
         }),

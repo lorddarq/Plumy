@@ -1,17 +1,20 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createTaskService } = require('./task-service.cjs');
+const { createTaskCollaborationService } = require('./task-collaboration-service.cjs');
 
 function makeService(initialTasks) {
   let tasks = initialTasks;
   const noop = () => null;
   const normalizeString = value => typeof value === 'string' ? value : '';
+  const collaborationService = createTaskCollaborationService({ findPersonById: noop, normalizeString });
   const service = createTaskService({
     activityLogMaxEntries: 50,
     dependencyRules: {
       validateTaskReferences: (_store, taskIds) => ({ ok: true, taskIds: taskIds || [] }),
       validateDependencyCycles: () => ({ ok: true }),
     },
+    collaborationService,
     findPersonById: noop,
     findPersonByReference: noop,
     hasOwn: (value, key) => Boolean(value) && Object.prototype.hasOwnProperty.call(value, key),

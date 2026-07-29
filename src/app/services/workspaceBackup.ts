@@ -22,6 +22,7 @@ import { getDefaultStatusId, syncLocalMcpServerAddress } from '../utils/mcpPrefe
 import { flattenPortableStoreEntries, normalizePortableStorageKey } from '../utils/storage.ts';
 import { AI_ACTIONS, LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics.ts';
 import { createDefaultGoalPolicy, sanitizeGoalPolicy, type GoalPolicyV1 } from '../utils/goalPolicy.ts';
+import { normalizeTaskCollaboration } from '../utils/taskCollaboration.ts';
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
 export const GOAL_POLICY_BACKUP_SCHEMA_VERSION = 1;
@@ -260,6 +261,7 @@ function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
         .filter(entry => entry.minutes > 0)
       : [],
     attachments: normalizeTaskAttachments(task.attachments),
+    collaboration: normalizeTaskCollaboration(task.collaboration),
   };
 }
 
@@ -346,6 +348,7 @@ export function sanitizePeople(value: unknown, fallback: Person[] = []): Person[
         name: candidate.name,
         role: typeof candidate.role === 'string' ? candidate.role : 'Team Member',
         kind: (candidate.kind === 'agentic' ? 'agentic' : 'human') as Person['kind'],
+        availableForSubagentDelegation: candidate.kind === 'agentic' && candidate.availableForSubagentDelegation === true,
         avatar: typeof candidate.avatar === 'string' ? candidate.avatar : undefined,
         color: typeof candidate.color === 'string' ? candidate.color : defaultColors[index % defaultColors.length],
         agentInstructions: candidate.kind === 'agentic' && typeof candidate.agentInstructions === 'string'
@@ -727,6 +730,10 @@ export function repairWorkspaceBackupPayload(
       .map(projectId => importedProjects.find(project => project.id === projectId)?.name)
       .filter(Boolean)
       .join(', ');
+    const collaboration = normalizeTaskCollaboration(task.collaboration, importedPeople);
+    if (task.collaboration && !collaboration) {
+      warnings.push(`Task "${task.title}" had invalid collaboration data; it was omitted.`);
+    }
 
     return {
       ...task,
@@ -734,7 +741,8 @@ export function repairWorkspaceBackupPayload(
       projectIds: nextProjectIds,
       project: project || undefined,
       swimlaneId: nextSwimlaneId,
-      assigneeId: nextAssigneeId,
+      assigneeId: collaboration?.orchestratorId || nextAssigneeId,
+      collaboration,
       milestoneId: importedMilestones.some(milestone => milestone.id === task.milestoneId)
         ? task.milestoneId
         : undefined,

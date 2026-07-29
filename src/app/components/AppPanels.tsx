@@ -111,7 +111,7 @@ export interface WorkspaceAdminActions {
   onSaveSwimlane: (swimlaneData: Partial<TimelineSwimlane>) => void;
   onDeleteSwimlane: (swimlaneId: string) => void;
   onAddPerson: (personData: Omit<Person, 'id'>) => void;
-  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
+  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions' | 'availableForSubagentDelegation'>) => void;
   onDeletePerson: (personId: string) => void;
   onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
   onRemoveAgentWatchConfig: (personId: string) => void;

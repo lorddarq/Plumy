@@ -35,6 +35,8 @@ const AUDIT_DETAIL_KEYS = [
   'targetStatusTitle',
   'assigneeId',
   'assigneeName',
+  'orchestratorId',
+  'contributionIds',
   'capabilityProfile',
   'revision',
   'expectedRevision',

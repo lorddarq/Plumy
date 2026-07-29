@@ -59,7 +59,7 @@ interface PreferencesPanelProps {
   onResetGoalPolicy: () => void;
   onUpdateStatusColumn: (columnId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
-  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
+  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions' | 'availableForSubagentDelegation'>) => void;
   onDeletePerson: (personId: string) => void;
   onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
   onRemoveAgentWatchConfig: (personId: string) => void;

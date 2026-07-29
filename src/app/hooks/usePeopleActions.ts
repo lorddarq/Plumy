@@ -21,6 +21,7 @@ export function usePeopleActions({
       avatar: personData.avatar,
       agentInstructions: personData.kind === 'agentic' ? personData.agentInstructions?.trim() || undefined : undefined,
       agentOperationalInstructions: personData.kind === 'agentic' ? personData.agentOperationalInstructions?.trim() || undefined : undefined,
+      availableForSubagentDelegation: personData.kind === 'agentic' && personData.availableForSubagentDelegation === true,
     };
     setPeople(prevPeople => [...prevPeople, newPerson]);
   }, [setPeople]);
@@ -33,7 +34,7 @@ export function usePeopleActions({
 
   const updatePerson = useCallback((
     personId: string,
-    updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>
+    updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions' | 'availableForSubagentDelegation'>
   ) => {
     setPeople(prevPeople => prevPeople.map(p => {
       if (p.id !== personId) return p;
@@ -44,6 +45,7 @@ export function usePeopleActions({
         kind: nextKind,
         agentInstructions: nextKind === 'agentic' ? updates.agentInstructions?.trim() || undefined : undefined,
         agentOperationalInstructions: nextKind === 'agentic' ? updates.agentOperationalInstructions?.trim() || undefined : undefined,
+        availableForSubagentDelegation: nextKind === 'agentic' && updates.availableForSubagentDelegation === true,
       };
     }));
   }, [setPeople]);

@@ -194,6 +194,179 @@ Replace the single-assignee list item with an assignment popover containing:
 
 Task cards stay compact: show the effective orchestrator and a contribution count. Existing single-assignee tasks remain editable without forced migration. Detailed evidence, attempts, revisions, and blockers belong in task details, not on cards.
 
+## Product UX and acceptance contract
+
+Status: proposed for human acceptance alongside the architecture decision.
+
+### Outcome and existing surface anchors
+
+The smallest useful release extends existing task and agent editing surfaces:
+
+- `TaskDialog` replaces its single **Assignee** select with one **Assignment** popover.
+- `TaskDetailsDialog` adds a **Collaboration** section and derives aggregate-review availability from contribution state.
+- `TaskCard` adds one compact ownership row; it does not become a lifecycle inspector.
+- `PeopleSettingsSections` adds delegation eligibility to the existing agent add/edit content.
+- Existing task footer, status, person, checkbox, select, popover, chip/badge, and confirmation primitives remain the interaction foundation.
+
+No collaboration-only page, wizard, second task editor, or recursive agent browser is required.
+
+### Assignment trigger and summary
+
+The task form shows one field labeled **Assignment**. Its button opens the popover and summarizes the current draft:
+
+- **Unassigned** when no accountable person exists;
+- the effective orchestrator name for direct assignment or collaboration with no contributors;
+- `<orchestrator name> + <count>` when contributions exist, with an accessible label such as “Pericles, orchestrator, plus 2 contributors.”
+
+Opening the popover copies the current parent-form assignment into a local draft. **Apply** validates the draft and returns it to the parent task form; the task form's existing **Save** action persists it with the rest of the task. **Cancel**, Escape, or outside dismissal discards changes made since the popover opened. A standalone use from task details may persist on **Apply**, but it must call the same validated collaboration write and use the current task revision.
+
+### Popover content and selection rules
+
+The popover contains:
+
+1. **Orchestrator** — a single-select list of all people plus **Unassigned**.
+2. **Contributors** — a checkbox list of humans and agents eligible for delegated selection.
+3. **Selected contributors** — chips/rows with person name, type, removal action, required scope input, and persisted lifecycle-state badge when one exists.
+4. Inline validation and **Cancel** / **Apply** actions.
+
+Rules:
+
+- Any human or agent may be selected as orchestrator. Delegation eligibility does not restrict direct assignment.
+- A selected human persists as role `contributor`. A selected eligible agent persists as role `subagent`.
+- The orchestrator is excluded from the contributor checklist. Duplicate people are never added.
+- At least one non-whitespace scope is required for every selected contributor before **Apply** is enabled.
+- Adding the first contributor requires an orchestrator. **Unassigned** is disabled while any contributor is selected.
+- A newly added contribution starts as `pending`; the assignment popover cannot choose or change lifecycle state.
+- With no contributors, saving preserves the legacy/direct-assignment shape and writes only `assigneeId`. Merely opening or saving the field does not force a collaboration migration.
+- With contributors, **Apply** produces exactly the architecture-defined `collaboration` projection and mirrored `assigneeId`; UI-only labels, avatars, and list order are not persisted as new contract fields.
+
+### Direct assignment and delegated participation
+
+Direct assignment means selecting a person as the accountable owner with no contributions. The person appears through the legacy `assigneeId` contract and existing direct execution remains available.
+
+Delegated participation means selecting one or more contributors under an orchestrator. Selection records responsibility and scope only. It does not start a runtime, create an execution attempt, dispatch a watcher, change task status, or represent acceptance.
+
+The UI uses **Orchestrator** and **Contributors** consistently. It may describe an eligible agent as a subagent in supporting copy, but it must not call every assignee a subagent or imply that a checkbox creates a runtime session.
+
+### Removal and ownership transfer
+
+- An unsaved selection or persisted `pending` contribution may be removed through the assignment popover.
+- A contribution that has reached `working`, `submitted`, `revision-requested`, `accepted`, or `blocked` cannot be removed from this popover. The control is disabled with guidance to resolve it in **Collaboration**; history is never silently discarded.
+- Selecting an existing contributor as orchestrator is blocked until that pending contribution is removed. Active contribution conflicts require lifecycle resolution rather than automatic reassignment.
+- Unassigning the orchestrator is allowed only when no contributions exist.
+- Changing the orchestrator with no active contributions uses the ordinary revision-protected save. When any contribution is active, the final save requires the architecture-defined human confirmation and names the old/new orchestrators and affected contributions.
+- A missing person reference remains visible as **Unavailable person** with its stable record context. Saving cannot silently drop or reassign it.
+
+### Delegation eligibility in agent details
+
+Agent add/edit content includes one native checkbox labeled **Available for subagent delegation** with this explanatory text:
+
+> Allows this agent to be selected for delegated task work. It does not assign work or start the agent.
+
+Behavior:
+
+- Existing or imported agent profiles without the field default to unchecked.
+- The control is shown only for agentic people. Humans remain selectable as ordinary contributors without this setting.
+- Unchecked agents remain selectable as orchestrators and direct assignees but are excluded from new subagent selection.
+- Turning eligibility off does not remove, stop, reassign, or complete existing contributions. Existing references remain visible with an **Unavailable for new delegation** warning.
+- Changing an agent with active subagent references into a human is blocked until those references are resolved; the form explains the impacted tasks instead of clearing them.
+- Changing eligibility alone never starts ACP, selects a provider/runtime, or dispatches a watcher.
+
+### Task cards, filters, and People mode
+
+- Compact task cards show the effective orchestrator avatar/name and a `+N` contribution badge when `N > 0`.
+- The badge accessible label announces the full count. It does not encode contributor state by color alone.
+- Cards do not show scopes, attempt state, evidence, blockers, or runtime/session data.
+- Timeline **People** mode and existing assignee filters continue to group/filter by the effective orchestrator only. Contributors do not duplicate a task into several lanes.
+- Existing clipboard/PDF **Assignee** values resolve to the effective orchestrator. Detailed collaboration export is deferred from v1.
+
+### Task details and lifecycle behavior
+
+Task details add **Collaboration** after **Basic Information** when collaboration exists. It shows:
+
+- orchestrator identity and role;
+- each contributor's identity, human/subagent type, scope, explicit text state, evidence count, and latest attempt summary when present;
+- empty copy when an orchestrator has no contributors;
+- state-appropriate actions for the current orchestrator, such as accept submitted work, request revision, and inspect or recover blocked work.
+
+Lifecycle actions use the focused domain transitions; editing task metadata cannot imitate them. Plans, progress text, external handoff, runtime acknowledgement, attempt completion, and contributor submission remain visibly distinct.
+
+For a collaborative task, aggregate **Move to review** is available only when every contribution is `accepted`. If any contribution is pending, working, submitted, revision-requested, or blocked, the action remains disabled and the UI lists the blocking people/states. Satisfying the contribution gate never invokes the action automatically. Tasks without collaboration retain current review behavior.
+
+Human review remains separate: agent-authored submission or acceptance cannot represent human approval, and no collaboration action moves a task to **Done** without the existing required review path.
+
+### Empty, loading, conflict, and failure states
+
+- **No people**: show “Add a person or agent before assigning this task” and a route to existing People settings; do not render an empty selector.
+- **No eligible agents**: humans remain selectable as contributors, plus explanatory copy and a route to agent settings. If neither humans nor eligible agents exist, show a contributor-specific empty state.
+- **Loading**: keep the trigger and actions disabled with a named loading state; do not flash **Unassigned** over a persisted value.
+- **Invalid draft**: show field-level messages for missing orchestrator, missing scope, duplicate/self-conflict, unavailable person, and ineligible subagent; preserve all selections.
+- **Revision conflict**: keep the draft visible, report that the task changed, and offer **Reload assignment**. Never overwrite newer persisted state.
+- **Write failure**: keep the task form open with its draft and an actionable retry message. Do not close on a failed save.
+- **Read-only**: render the same ownership and contribution information without checkboxes, removal buttons, or lifecycle actions.
+
+### Permissions and trust boundary
+
+Existing task-edit permission remains the outer UI gate. Collaboration validation and transition authority are enforced again by the task domain service; hiding a button is not authorization.
+
+- Task editors may prepare assignment drafts.
+- The current orchestrator may perform contributor review/steering transitions allowed by state.
+- A contributor cannot accept its own submission or request aggregate completion through contributor controls.
+- Human confirmation and human acceptance can only be recorded by the existing trusted human path.
+- Runtime/provider availability never grants task-edit, transition, or review authority.
+
+### Accessibility contract
+
+- The Assignment trigger is a named button with expanded state and a concise summary.
+- **Orchestrator** is a labeled single-select. **Contributors** is a fieldset/group with individually named native checkboxes.
+- Space toggles a focused checkbox; Arrow keys follow the existing select/list behavior; Tab order follows orchestrator, contributors, selected scopes/removal, validation, then actions.
+- Escape closes and discards the popover draft, then returns focus to the trigger.
+- Every chip removal button names the person, for example “Remove Edgar from contributors.”
+- Validation is associated with the relevant control and announced through the existing live-region/error pattern.
+- State and eligibility use text in addition to color/icon treatment. Disabled actions expose a visible reason.
+- The popover and selected rows remain usable at the existing task-dialog mobile width without horizontal scrolling.
+
+### Observable acceptance criteria
+
+1. **Legacy preservation** — Given a task with only `assigneeId`, when it is opened and saved without contributors, then the same assignee remains and no collaboration record is created.
+2. **Collaborative assignment** — Given an orchestrator and valid scoped contributors, when the user applies and saves, then one orchestrator, mirrored `assigneeId`, stable contributions, roles, scopes, and `pending` states survive reload.
+3. **Required ownership** — Given at least one selected contributor, when no orchestrator is selected, then **Apply** is disabled and the missing-orchestrator error is announced.
+4. **Required scope** — Given a selected contributor with blank scope, when validation runs, then **Apply** is disabled and focus can reach the contributor's scope error.
+5. **Direct versus delegated agent** — Given an unchecked agent, when assignment opens, then that agent is available as orchestrator/direct assignee but not as a new subagent.
+6. **Eligibility has no side effect** — Given an agent whose eligibility changes, when the profile is saved, then no task, status, attempt, runtime, provider, or watcher state changes automatically.
+7. **Conflict prevention** — Given the same person is selected as orchestrator and contributor, when the user applies, then the draft is rejected without changing persisted assignment.
+8. **Safe removal** — Given a `pending` contribution, when an authorized editor removes and saves it, then it leaves the current projection; a non-pending contribution cannot be removed through assignment editing.
+9. **Revision safety** — Given another write changes the task after the popover opens, when the stale draft saves, then it fails visibly and newer state remains unchanged.
+10. **Compact cards** — Given a collaborative task, when it renders on Kanban or Timeline surfaces, then it appears once under the effective orchestrator and shows the correct `+N` count without scopes or lifecycle detail.
+11. **Lifecycle separation** — Given an attempt is handed off, acknowledged, stopped, failed, or completed, when task details refresh, then those facts do not appear as contribution acceptance or aggregate completion.
+12. **Submission separation** — Given a contributor submits evidence, when the contribution becomes `submitted`, then task status does not change and only the orchestrator review actions become available.
+13. **Aggregate gate** — Given any contribution is not `accepted`, when aggregate review is considered, then **Move to review** is disabled with the blocking states; accepting the last contribution does not invoke review automatically.
+14. **Human acceptance** — Given all contributions are accepted and the orchestrator requests review, when an agent-authored action completes, then the task awaits the existing required human acceptance and is not marked **Done**.
+15. **Missing references** — Given a referenced person is unavailable, when assignment/details render, then the reference remains visible and no save silently drops or replaces it.
+16. **Keyboard operation** — Given keyboard-only use, when the user opens, changes, validates, cancels, and reopens assignment, then focus order, announcements, discard behavior, and focus return match the accessibility contract.
+
+### Negative acceptance criteria
+
+- Assignment never creates recursive contributor trees, child tasks, Goal nodes, or runtime sessions.
+- Eligibility never implies ownership, dispatch, availability, or successful execution.
+- A contributor or runtime cannot mutate aggregate task status through contribution controls.
+- No person is duplicated or stored as both orchestrator and contributor.
+- No active contribution is silently removed because a person, kind, or eligibility setting changed.
+- No raw prompt, response, transcript, credential, evidence body, or opaque session reference appears in assignment UI or general task cards.
+- No save, dismissal, revision conflict, or write failure silently loses the user's draft.
+
+### Definition of done for downstream implementation
+
+- The persisted/API contract is accepted or this UX contract is reconciled with any approved architecture changes before implementation merges.
+- Task and person forms use existing shared controls and one validated domain write path; no duplicate assignment model exists in renderer state.
+- Positive and negative criteria above have focused automated coverage at the domain/MCP boundary and the smallest supported interaction coverage in the renderer.
+- Legacy task, missing-person, no-eligible-agent, stale-revision, active-transfer, and all contributor-state fixtures are covered.
+- Keyboard, focus return, labels, error announcements, disabled reasons, and narrow-width layout are manually verified.
+- Kanban, Timeline People mode, task details, task form, agent settings, reload, import/export, and backup/restore agree on effective ownership.
+- Audit output contains bounded identifiers and transition facts only; privacy-negative checks pass.
+- Renderer build, focused workspace/MCP tests, and `git diff --check` pass, with any unrelated failure recorded separately.
+- A human reviewer accepts the architecture/UX contract before downstream implementation is considered complete.
+
 ## Audit and trust boundary
 
 Extend the existing bounded MCP/audit projection with collaboration event type, task ID, contribution ID, attempt ID, actor, previous/next state, task revision, outcome, failure class, and duration where applicable.

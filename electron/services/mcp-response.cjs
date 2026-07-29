@@ -115,6 +115,10 @@ function makeWriteToolResult(action, payload = {}) {
     structuredContent.deletedTaskId = payload.deletedTaskId;
   }
 
+  if (Object.prototype.hasOwnProperty.call(payload, 'collaborationSchemaVersion')) {
+    structuredContent.collaborationSchemaVersion = payload.collaborationSchemaVersion;
+  }
+
   return makeToolResult(structuredContent, {
     content: getArtifactResourceLinks(payload.artifactReferences),
   });

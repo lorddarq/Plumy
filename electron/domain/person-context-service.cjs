@@ -37,6 +37,7 @@ function createPersonContextService({
     return {
       ...person,
       kind,
+      availableForSubagentDelegation: kind === 'agentic' && person.availableForSubagentDelegation === true,
       agentInstructions: agentInstructions || undefined,
       agentOperationalInstructions: agentOperationalInstructions || undefined,
     };

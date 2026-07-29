@@ -11,6 +11,7 @@ const { makeStoreFromFixture } = require('./test-fixtures.cjs');
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
 const WORKSPACE_FACADE_EXPORTS = [
+  'COLLABORATION_SCHEMA_VERSION',
   'DEFAULT_MCP_CAPABILITY_PROFILE',
   'DEFAULT_MCP_HOST',
   'DEFAULT_MCP_PATH',
@@ -28,6 +29,7 @@ const WORKSPACE_FACADE_EXPORTS = [
   'PREFERENCES_KEY',
   'REQUIRES_HUMAN_REVIEW_STATUS_ID',
   'REQUIRES_HUMAN_REVIEW_STATUS_TITLE',
+  'TASK_CONTRIBUTION_ATTEMPTS_KEY',
   'addTaskActivityEntry',
   'addTaskComment',
   'appendMcpAuditLog',
@@ -81,6 +83,7 @@ const WORKSPACE_FACADE_EXPORTS = [
   'updateGoalProjectBindings',
   'updateMilestone',
   'updateTaskAgentSummary',
+  'updateTaskCollaboration',
   'updateTaskCompletionDescription',
   'updateTaskDescription',
   'updateTaskDetails',
@@ -127,6 +130,7 @@ const ADMIN_MCP_TOOLS = [
   'tasks_transition_under_review',
   'tasks_update',
   'tasks_update_agent_summary',
+  'tasks_update_collaboration',
   'tasks_update_completion_description',
   'tasks_update_description',
   'workspace_get_snapshot',

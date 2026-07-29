@@ -82,6 +82,36 @@ test('workspace backup preserves versioned Goal agent configuration through elec
   assert.deepEqual(repaired.electronStoreSnapshot['omvra.goals.v1'], [goal]);
 });
 
+test('workspace backup preserves valid collaboration extensions and omits invalid delegation', () => {
+  const people = [
+    { id: 'orchestrator', name: 'Arc', role: 'Lead', kind: 'agentic' as const },
+    { id: 'delegate', name: 'Edgar', role: 'Engineer', kind: 'agentic' as const, availableForSubagentDelegation: true },
+  ];
+  const baseTask = {
+    id: 'task-collaboration', title: 'Persist collaboration', status: 'open' as const, assigneeId: 'orchestrator',
+    collaboration: {
+      schemaVersion: 1 as const,
+      orchestratorId: 'orchestrator',
+      extension: { retained: true },
+      contributions: [{ id: 'contribution-1', personId: 'delegate', role: 'subagent' as const, scope: 'Persistence', state: 'pending' as const }],
+    },
+  };
+  const options = { fallbackStatusColumns, fallbackPreferences: createDefaultWorkspacePreferences(fallbackStatusColumns) };
+  const repaired = repairWorkspaceBackupPayload({
+    version: 2, tasks: [baseTask], milestones: [], projects: [], people, statusColumns: fallbackStatusColumns, preferences: {},
+  }, options);
+
+  assert.equal(repaired.tasks[0].collaboration?.extension && (repaired.tasks[0].collaboration.extension as { retained: boolean }).retained, true);
+  assert.equal(repaired.tasks[0].collaboration?.contributions[0].id, 'contribution-1');
+
+  const invalid = repairWorkspaceBackupPayload({
+    version: 2,
+    tasks: [{ ...baseTask, collaboration: { ...baseTask.collaboration, contributions: [baseTask.collaboration.contributions[0], { ...baseTask.collaboration.contributions[0], id: 'contribution-2' }] } }],
+    milestones: [], projects: [], people, statusColumns: fallbackStatusColumns, preferences: {},
+  }, options);
+  assert.equal(invalid.tasks[0].collaboration, undefined);
+});
+
 test('legacy Plumy backup storage keys are restored under the Omvra namespace', () => {
   const tasksJson = JSON.stringify([{ id: 'task-1', title: 'Legacy task', status: 'open' }]);
   const snapshot = getPortableStorageSnapshotFromEntries({

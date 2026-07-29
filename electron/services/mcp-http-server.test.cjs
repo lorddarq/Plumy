@@ -11,6 +11,7 @@ const {
   SENSITIVE_MCP_INPUTS,
   GOALS_KEY,
   TASKS_KEY,
+  PEOPLE_KEY,
   makeStoreFromFixture,
 } = require('./test-fixtures.cjs');
 
@@ -773,6 +774,72 @@ test('task_write creates a new task through the MCP write surface with metadata'
   assert.deepEqual(response.result.structuredContent.task.projectIds, ['lane-1']);
   assert.equal(response.result.structuredContent.task.priority, 'urgent');
   assert.equal(response.result.structuredContent.revision, 0);
+});
+
+test('tasks.update_collaboration persists a versioned projection and rejects stale writes', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PEOPLE_KEY, store.get(PEOPLE_KEY).concat({
+    id: 'agent-2',
+    name: 'Eligible contributor',
+    role: 'Agent',
+    kind: 'agentic',
+    availableForSubagentDelegation: true,
+  }));
+  const dispatch = createRequestDispatcher(store);
+  const collaboration = {
+    schemaVersion: 1,
+    orchestratorId: 'agent-1',
+    extension: { retained: true },
+    contributions: [{
+      id: 'contribution-1',
+      personId: 'agent-2',
+      role: 'subagent',
+      scope: 'Implement persistence',
+      state: 'pending',
+    }],
+  };
+
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'collaboration-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_update_collaboration',
+      arguments: { taskId: 'task-1', expectedRevision: 0, collaboration },
+    },
+  }, makeReq());
+
+  assert.equal(response.result.structuredContent.ok, true);
+  assert.equal(response.result.structuredContent.action, 'tasks.update_collaboration');
+  assert.equal(response.result.structuredContent.collaborationSchemaVersion, 1);
+  assert.equal(response.result.structuredContent.revision, 1);
+  assert.equal(response.result.structuredContent.task.collaboration.extension.retained, true);
+  assert.equal(store.get(TASKS_KEY)[0].collaboration.contributions[0].id, 'contribution-1');
+
+  const bypass = dispatch({
+    jsonrpc: '2.0', id: 'collaboration-bypass', method: 'tools/call',
+    params: { name: 'tasks.update', arguments: { taskId: 'task-1', expectedRevision: 1, assigneeId: 'person-1' } },
+  }, makeReq());
+  assert.equal(bypass.error.data.error, 'COLLABORATION_ASSIGNMENT_REQUIRES_ASSIGN_TOOL');
+
+  const stale = dispatch({
+    jsonrpc: '2.0',
+    id: 'collaboration-stale',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.update_collaboration',
+      arguments: { taskId: 'task-1', expectedRevision: 0, collaboration },
+    },
+  }, makeReq());
+  assert.equal(stale.error.code, -32602);
+  assert.equal(stale.error.data.error, 'REVISION_MISMATCH');
+
+  const cleared = dispatch({
+    jsonrpc: '2.0', id: 'collaboration-clear', method: 'tools/call',
+    params: { name: 'tasks.update_collaboration', arguments: { taskId: 'task-1', expectedRevision: 1, collaboration: null } },
+  }, makeReq());
+  assert.equal(cleared.result.structuredContent.revision, 2);
+  assert.equal(Object.prototype.hasOwnProperty.call(store.get(TASKS_KEY)[0], 'collaboration'), false);
 });
 
 test('underscore tool aliases dispatch to the canonical handlers', () => {

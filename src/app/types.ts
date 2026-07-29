@@ -51,6 +51,41 @@ export interface Person {
   color?: string;
   agentInstructions?: string;
   agentOperationalInstructions?: string;
+  availableForSubagentDelegation?: boolean;
+}
+
+export type TaskContributionRole = 'contributor' | 'subagent';
+export type TaskContributionState = 'pending' | 'working' | 'submitted' | 'revision-requested' | 'accepted' | 'blocked';
+
+export interface TaskContributionV1 {
+  id: string;
+  personId: string;
+  role: TaskContributionRole;
+  scope: string;
+  state: TaskContributionState;
+  latestAttemptId?: string;
+  evidenceRefs?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+  [extension: string]: unknown;
+}
+
+export interface TaskCollaborationV1 {
+  schemaVersion: 1;
+  orchestratorId: string;
+  contributions: TaskContributionV1[];
+  [extension: string]: unknown;
+}
+
+export interface TaskContributionAttemptV1 {
+  schemaVersion: 1;
+  id: string;
+  taskId: string;
+  contributionId: string;
+  state: 'handed-off' | 'acknowledged' | 'working' | 'submitted' | 'completed' | 'stopped' | 'failed';
+  createdAt: string;
+  updatedAt: string;
+  [extension: string]: unknown;
 }
 
 export interface Task {
@@ -70,6 +105,7 @@ export interface Task {
   swimlaneId?: string; // Which timeline swimlane row this task belongs to
   projectIds?: string[]; // Projects this task belongs to
   assigneeId?: string; // Person assigned to this task
+  collaboration?: TaskCollaborationV1;
   project?: string; // Project this task belongs to
   milestoneId?: string; // Primary roadmap milestone this task contributes to
   dependencyIds?: string[]; // Roadmap-only dependencies used for milestone planning arrows

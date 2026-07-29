@@ -437,6 +437,50 @@ const WRITE_TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'tasks.update_collaboration',
+    description: 'Replaces the versioned task collaboration projection with optimistic revision protection. The orchestrator is mirrored to assigneeId; execution/session lifecycle is intentionally separate.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        taskId: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        collaboration: {
+          anyOf: [{ type: 'null' }, {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            schemaVersion: { const: 1 },
+            orchestratorId: { type: 'string' },
+            contributions: {
+              type: 'array',
+              maxItems: 50,
+              items: {
+                type: 'object',
+                additionalProperties: true,
+                properties: {
+                  id: { type: 'string' },
+                  personId: { type: 'string' },
+                  role: { enum: ['contributor', 'subagent'] },
+                  scope: { type: 'string' },
+                  state: { enum: ['pending', 'working', 'submitted', 'revision-requested', 'accepted', 'blocked'] },
+                  latestAttemptId: { type: 'string' },
+                  evidenceRefs: { type: 'array', maxItems: 50, items: { type: 'string' } },
+                  createdAt: { type: 'string' },
+                  updatedAt: { type: 'string' },
+                },
+                required: ['id', 'personId', 'role', 'scope', 'state'],
+              },
+            },
+          },
+          required: ['schemaVersion', 'orchestratorId', 'contributions'],
+          }],
+        },
+      },
+      required: ['taskId', 'expectedRevision', 'collaboration'],
+    },
+  },
+  {
     name: 'tasks.attach_file',
     description: 'Adds a local file attachment reference to a task using an absolute path or file:// URL. This stores metadata only and does not copy or open the file.',
     inputSchema: {
@@ -775,6 +819,7 @@ const TOOL_NAME_ALIASES = new Map([
   ['tasks_create', 'tasks.create'],
   ['tasks_update', 'tasks.update'],
   ['tasks_update_description', 'tasks.update_description'],
+  ['tasks_update_collaboration', 'tasks.update_collaboration'],
   ['tasks_attach_file', 'tasks.attach_file'],
   ['tasks_remove_attachment', 'tasks.remove_attachment'],
   ['tasks_delete', 'tasks.delete'],

@@ -1,6 +1,7 @@
 import type { AgentWatchAction, LoadClassification, ProjectMilestone, RoadmapStage, Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn } from '../types.ts';
 import { buildLocalMcpAddress, normalizeMcpBindHost, normalizeMcpPort, normalizeMcpServerAddress } from '../constants/mcp.ts';
 import { getTaskProjectIds } from './roadmap.ts';
+import { normalizeTaskCollaboration } from './taskCollaboration.ts';
 import {
   DEFAULT_MARKDOWN_APPEARANCE,
   type MarkdownAppearance,
@@ -175,6 +176,7 @@ export function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
         .filter(entry => entry.minutes > 0)
       : [],
     attachments: normalizeTaskAttachments(task.attachments),
+    collaboration: normalizeTaskCollaboration(task.collaboration),
   };
 }
 
@@ -337,6 +339,7 @@ export function sanitizePeople(value: unknown, fallback: Person[] = []): Person[
         name: item.name,
         role: typeof item.role === 'string' ? item.role : 'Team Member',
         kind: (item.kind === 'agentic' ? 'agentic' : 'human') as Person['kind'],
+        availableForSubagentDelegation: item.kind === 'agentic' && item.availableForSubagentDelegation === true,
         avatar: typeof item.avatar === 'string' ? item.avatar : undefined,
         color: typeof item.color === 'string' ? item.color : defaultColors[index % defaultColors.length],
         agentInstructions: item.kind === 'agentic' && typeof item.agentInstructions === 'string'
