@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, Check, CheckCircle2, Download, FolderOpen, Upload } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, Download, Upload } from 'lucide-react';
 import { Person, RoadmapStage, StatusColumn, StorageMeter } from '../types';
 import { getDefaultGoalBudgetDimension, type GoalPolicyBudgetMode, type GoalPolicyDimension, type GoalPolicyV1 } from '../utils/goalPolicy';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
@@ -7,6 +7,7 @@ import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import { AgentBoardWatchSettings } from './settings/AgentBoardWatchSettings';
 import { AgentIcon } from './icons/AgentIcon';
+import { FolderIcon } from './icons/FolderIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { WorkflowsIcon } from './icons/WorkflowsIcon';
 import { EmptyStateCard } from './EmptyStateCard';
@@ -238,7 +239,7 @@ export function WorkflowSettingsSection({
               if (directory) onGoalAuditArchiveDirectoryChange(directory);
             }}
           >
-            <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
+            <FolderIcon className="h-3.5 w-3.5" aria-hidden="true" />
             Choose folder
           </button>
         </div>
@@ -264,7 +265,7 @@ export function WorkflowSettingsSection({
               if (directory) onExternalSkillsDirectoryChange(directory);
             }}
           >
-            <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
+            <FolderIcon className="h-3.5 w-3.5" aria-hidden="true" />
             Choose folder
           </button>
         </div>

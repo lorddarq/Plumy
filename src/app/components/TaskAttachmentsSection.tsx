@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Folder } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import type { TaskAttachment } from '../types';
 import { AttachmentIcon } from './icons/AttachmentIcon';
+import { FolderIcon } from './icons/FolderIcon';
 import { EmptyStateCard } from './EmptyStateCard';
 
 interface TaskAttachmentsSectionProps {
@@ -88,7 +89,7 @@ export function TaskAttachmentsSection({
                   onClick={() => onRevealAttachment(attachment.path)}
                   disabled={!canReveal || isMissing}
                 >
-                  <Folder className="size-4" />
+                  <FolderIcon className="size-4" />
                   Show
                 </button>
               </div>

@@ -214,7 +214,7 @@ export function TaskAssignmentPopover({ value, people, onApply, onOpenChange, lo
               }}
               className="flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-[min(420px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border-black/10 p-0 shadow-[0_16px_40px_rgba(0,0,0,0.14)]"
             >
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
                 <div className="space-y-1">
                   <h3 className="text-sm font-semibold text-[#27272a]">Contributors</h3>
                   <p className="text-xs leading-5 text-[#71717a]">Choose people for {orchestrator?.name ?? 'the overseer'} to coordinate.</p>
