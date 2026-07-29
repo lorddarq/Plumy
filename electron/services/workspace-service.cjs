@@ -7,6 +7,7 @@ const { createPersonContextService } = require('../domain/person-context-service
 const { createTaskService } = require('../domain/task-service.cjs');
 const { createTaskCollaborationService, COLLABORATION_SCHEMA_VERSION } = require('../domain/task-collaboration-service.cjs');
 const { createTaskCollaborationLifecycleService } = require('../domain/task-collaboration-lifecycle-service.cjs');
+const { createTaskContextLedgerService, TASK_CONTEXT_SCHEMA_VERSION } = require('../domain/task-context-ledger-service.cjs');
 const { migrateGoalRecords, normalizeAgentConfiguration, normalizeGoalInputs, normalizeGoalCapabilities, normalizeGoalProjectBindings } = require('./goal-state-service.cjs');
 const { isAgentMutationAllowed } = require('./goal-policy.cjs');
 
@@ -14,6 +15,7 @@ const PREFERENCES_KEY = 'omvra.preferences.v1';
 const TASKS_KEY = 'omvra.tasks.v1';
 const TASK_CONTRIBUTION_ATTEMPTS_KEY = 'omvra.taskContributionAttempts.v1';
 const TASK_COLLABORATION_EVENTS_KEY = 'omvra.taskCollaborationEvents.v1';
+const TASK_CONTEXT_ENTRIES_KEY = 'omvra.taskContextEntries.v1';
 const MILESTONES_KEY = 'omvra.milestones.v1';
 const PEOPLE_KEY = 'omvra.people.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
@@ -1795,6 +1797,13 @@ const taskCollaborationLifecycleService = createTaskCollaborationLifecycleServic
   normalizeString,
 });
 
+const taskContextLedgerService = createTaskContextLedgerService({
+  getTaskById: (...args) => taskService.getTaskById(...args),
+  readEntries: store => store.get(TASK_CONTEXT_ENTRIES_KEY),
+  writeEntries: (store, entries) => store.set(TASK_CONTEXT_ENTRIES_KEY, entries),
+  normalizeString,
+});
+
 const {
   normalizePerson: normalizePersonForMcp,
   resolveTaskExecutionContext,
@@ -1831,6 +1840,12 @@ const {
 } = taskCollaborationLifecycleService;
 
 const {
+  append: appendTaskContextEntry,
+  get: getTaskContextEntry,
+  list: listTaskContextEntries,
+} = taskContextLedgerService;
+
+const {
   listMilestones,
   getMilestoneById,
   createMilestone,
@@ -1843,6 +1858,8 @@ module.exports = {
   PREFERENCES_KEY,
   TASK_CONTRIBUTION_ATTEMPTS_KEY,
   TASK_COLLABORATION_EVENTS_KEY,
+  TASK_CONTEXT_ENTRIES_KEY,
+  TASK_CONTEXT_SCHEMA_VERSION,
   COLLABORATION_SCHEMA_VERSION,
   MILESTONES_KEY,
   MCP_PROTOCOL_VERSION,
@@ -1884,6 +1901,9 @@ module.exports = {
   listAssignedWorkForAgent,
   getTaskById,
   getTaskCollaborationHistory,
+  listTaskContextEntries,
+  getTaskContextEntry,
+  appendTaskContextEntry,
   resolveTaskExecutionContext,
   listKanbanCards,
   listTimelineCards,

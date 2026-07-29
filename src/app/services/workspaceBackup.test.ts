@@ -82,6 +82,37 @@ test('workspace backup preserves versioned Goal agent configuration through elec
   assert.deepEqual(repaired.electronStoreSnapshot['omvra.goals.v1'], [goal]);
 });
 
+test('workspace backup preserves immutable task context ledger records and unknown fields', () => {
+  const entry = {
+    schemaVersion: 1,
+    id: 'task-context-1',
+    taskId: 'task-1',
+    kind: 'decision',
+    fromRevision: 2,
+    toRevision: 3,
+    summary: 'Keep context separate from the task projection.',
+    markers: ['architecture'],
+    changedFields: ['notes'],
+    provenance: 'agent-authored',
+    actor: 'agent-edgar',
+    sourceRefs: [{ type: 'attachment', id: 'architecture-doc', extension: { retained: true } }],
+    createdAt: '2026-07-29T20:00:00.000Z',
+    extension: { retained: true },
+  };
+  const payload = buildWorkspaceBackupPayload({
+    tasks: [], milestones: [], projects: [], people: [], statusColumns: fallbackStatusColumns,
+    preferences: createDefaultWorkspacePreferences(fallbackStatusColumns),
+    electronStore: { 'omvra.taskContextEntries.v1': [entry] },
+  });
+  const repaired = repairWorkspaceBackupPayload(payload, {
+    fallbackStatusColumns,
+    fallbackPreferences: createDefaultWorkspacePreferences(fallbackStatusColumns),
+  });
+
+  assert.equal(repaired.ok, true);
+  assert.deepEqual(repaired.electronStoreSnapshot['omvra.taskContextEntries.v1'], [entry]);
+});
+
 test('workspace backup preserves valid collaboration extensions and omits invalid delegation', () => {
   const people = [
     { id: 'orchestrator', name: 'Arc', role: 'Lead', kind: 'agentic' as const },

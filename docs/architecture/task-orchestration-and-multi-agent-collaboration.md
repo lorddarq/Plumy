@@ -128,16 +128,13 @@ interface TaskContributionAttemptV1 {
   contributionId: string;
   ordinal: number;
   state: TaskContributionAttemptState;
-  sessionBinding?: {
-    runtimeProfileId: string;
-    opaqueSessionRef: string;
-  };
+  sessionBindingId?: string;
   createdAt: string;
   updatedAt: string;
 }
 ```
 
-`sessionBinding` is an optional downstream ACP extension. Omvra treats `opaqueSessionRef` only as a correlation token owned by the selected runtime adapter. It is not an agent identity, credential, provider account, transcript locator, or authority signal. Missing session data leaves direct task execution unchanged.
+`sessionBindingId` is an optional downstream ACP extension defined by [`acp-runtime-session-lifecycle-contract.md`](./acp-runtime-session-lifecycle-contract.md). Runtime profile data and the runtime-owned opaque session reference live in that separate versioned binding record, never on the task or collaboration projection. Missing session data leaves direct task execution unchanged.
 
 An attempt reaching `completed` means the external process ended normally. It does not imply durable submission, accepted contribution, or completed task unless those distinct transitions have also succeeded.
 
