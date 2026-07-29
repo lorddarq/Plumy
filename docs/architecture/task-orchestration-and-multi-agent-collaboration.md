@@ -38,6 +38,14 @@ An agent profile may be marked **Available for subagent delegation**. This contr
 
 An unchecked agent may still be assigned directly as an orchestrator or ordinary task assignee.
 
+### Agent identity and execution runtime
+
+An Omvra agent profile defines accountable identity, persona, instructions, assignment, and delegation eligibility. It is not the installed runtime that executes the work. Codex, Claude Code, Kimi, or another verified ACP adapter is selected separately as an **agent runtime**.
+
+The runtime resolves from an explicit task or Goal-node choice, then a project default, then the Omvra global default. The resolved runtime must be visible before execution and must not silently change when unavailable. Authentication and provider billing remain owned by the selected runtime; Omvra stores no provider credentials.
+
+A user-initiated external handoff may open the task in the selected runtime without creating an ACP session. A handoff records intent only and cannot move contributor or aggregate task state. Structured execution begins only when a runtime session or existing lifecycle acknowledgement is durably correlated with the contribution or execution attempt.
+
 ## Lifecycle
 
 1. A task receives an orchestrator and optional contributors.
@@ -66,6 +74,8 @@ Task cards should keep the compact surface: show the orchestrator identity and a
 - MCP task reads and writes expose the collaboration metadata through versioned contracts.
 - Orchestration owns delegation, supervision, contributor state, integration, and final handoff.
 - Agent profiles own delegation eligibility; eligibility is not execution.
+- Runtime settings own the exact executable or adapter and deterministic global/project/task selection; agent profiles remain provider-neutral identities.
+- Missing or incompatible runtimes fail explicitly. Omvra does not silently substitute another runtime or manage its provider credentials.
 - Existing task status remains the aggregate task state and must not be inferred from one contributor status.
 - Audit records should identify assignment, delegation, submission, revision, acceptance, and blocking events without persisting raw prompt or response payloads.
 
@@ -105,6 +115,8 @@ The multi-agent arm should separately measure delegation quality: useful scope d
 - A task can retain one accountable orchestrator and multiple scoped contributors.
 - Existing single-assignee tasks continue to load and behave correctly.
 - Agent profiles expose and persist subagent-delegation eligibility.
+- Agent identity remains separate from execution runtime, with a visible deterministic runtime resolution and no silent provider failover.
+- External handoff, runtime acknowledgement, contributor submission, and task completion remain distinct lifecycle events.
 - Assignment UI supports one orchestrator and multiple contributors with accessible controls.
 - Contributor lifecycle states are visible and do not masquerade as aggregate task completion.
 - The orchestrator can review, steer, accept, or request revision for contributor work.

@@ -2,7 +2,7 @@ import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { LinkIcon as Link2 } from '../icons/LinkIcon';
 import type { GoalAgentConfiguration, GoalAgentMode, GoalElement, GoalRecord, GoalRetryExhaustionPolicy, Person, TimelineSwimlane } from '../../types.ts';
-import type { GoalSchedule } from '../../types.ts';
+import type { GoalSchedule, GoalScheduleOccurrence } from '../../types.ts';
 import { scheduleStatus } from '../../utils/goalSchedules.ts';
 
 interface GoalsAgentSectionProps {
@@ -157,12 +157,13 @@ export function GoalsConditionSection({ element, positiveLabel, negativeLabel, o
 
 interface GoalsScheduleSectionProps {
   schedule?: GoalSchedule;
+  latestOccurrence?: GoalScheduleOccurrence;
   onCreate: () => void;
   onUpdate: (updates: Partial<GoalSchedule> | { rule: Partial<GoalSchedule['rule']> }) => void;
   onDelete: () => void;
 }
 
-export function GoalsScheduleSection({ schedule, onCreate, onUpdate, onDelete }: GoalsScheduleSectionProps) {
+export function GoalsScheduleSection({ schedule, latestOccurrence, onCreate, onUpdate, onDelete }: GoalsScheduleSectionProps) {
   return <section className="mt-5 border-t border-slate-100 pt-4">
     <div className="flex items-center justify-between gap-2"><div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Schedule</p><p className="mt-1 text-[11px] text-slate-400">Runs create independent lifecycle attempts in the captured timezone.</p></div>{!schedule && <button type="button" onClick={onCreate} className="rounded-md border border-blue-200 px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50">Add</button>}</div>
     {schedule ? <div className="mt-3 space-y-3">
@@ -175,6 +176,7 @@ export function GoalsScheduleSection({ schedule, onCreate, onUpdate, onDelete }:
       <label className="block text-xs font-medium text-slate-600">Time<Input type="time" value={schedule.rule.time} onChange={event => onUpdate({ rule: { time: event.target.value } })} className="mt-1" /></label>
       <label className="block text-xs font-medium text-slate-600">Temporal mode<select value={schedule.temporalMode} onChange={event => onUpdate({ temporalMode: event.target.value as GoalSchedule['temporalMode'] })} className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs"><option value="anchored">Anchored data window</option><option value="latest">Latest data on retry</option></select></label>
       <div className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500"><span className="font-semibold text-slate-700">Timezone:</span> {schedule.timezone}<br /><span className="font-semibold text-slate-700">Status:</span> {scheduleStatus(schedule)}</div>
+      {latestOccurrence && <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[11px] text-slate-500"><span className="font-semibold text-slate-700">Latest occurrence:</span> {latestOccurrence.state.replace(/-/g, ' ')} · {latestOccurrence.attempts} attempt{latestOccurrence.attempts === 1 ? '' : 's'}<br /><span className="font-semibold text-slate-700">Scheduled for:</span> {latestOccurrence.scheduledFor}{latestOccurrence.error && <><br /><span className="font-semibold text-red-700">Outcome:</span> {latestOccurrence.error}</>}</div>}
       <div className="grid grid-cols-2 gap-2"><label className="block text-xs font-medium text-slate-600">Starts<input type="date" value={schedule.startsAt?.slice(0, 10) ?? ''} onChange={event => onUpdate({ startsAt: event.target.value || undefined })} className="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-xs" /></label><label className="block text-xs font-medium text-slate-600">Ends<input type="date" value={schedule.endsAt?.slice(0, 10) ?? ''} onChange={event => onUpdate({ endsAt: event.target.value || undefined })} className="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-xs" /></label></div>
       <button type="button" onClick={onDelete} className="text-xs font-medium text-red-600 hover:text-red-700">Remove schedule</button>
     </div> : <p className="mt-3 rounded-md border border-dashed border-slate-200 px-2.5 py-2 text-[11px] text-slate-400">No schedule configured. Add one to distinguish one-time and recurring execution.</p>}

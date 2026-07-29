@@ -208,7 +208,7 @@ declare global {
         resetExecution: (payload: { goalId: string }) => Promise<{ ok: boolean; reset?: boolean; execution?: any; abandonedExecutionId?: string | null; error?: string; message?: string }>;
         update: (payload: { goalId: string; title?: string; elements?: any[]; overseerAgentId?: string; expectedRevision: number }) => Promise<{ ok: boolean; goal?: any; revision?: number; error?: string; currentRevision?: number; message?: string }>;
         updateArtifacts: (payload: { goalId: string; elementId: string; artifactReferences: any[]; expectedRevision: number; idempotencyKey: string }) => Promise<{ ok: boolean; goal?: any; revision?: number; error?: string; currentRevision?: number; message?: string; idempotent?: boolean }>;
-        onRuntimeChanged: (listener: (payload: { eventId: string; scope: 'graph' | 'execution' | 'policy' | 'conflict' | 'reconciliation'; goalId: string; revision: number; actor: string; changeType: string; occurredAt: string; errorCode?: string; details?: Record<string, unknown> }) => void) => () => void;
+        onRuntimeChanged: (listener: (payload: { eventId: string; scope: 'graph' | 'execution' | 'policy' | 'conflict' | 'reconciliation' | 'schedule'; goalId: string; revision: number; actor: string; changeType: string; occurredAt: string; errorCode?: string; details?: Record<string, unknown> }) => void) => () => void;
       };
       onStoreChanged: (listener: (payload: { updatedAt: string }) => void) => () => void;
       app: {

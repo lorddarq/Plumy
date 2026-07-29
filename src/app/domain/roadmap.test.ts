@@ -99,6 +99,25 @@ test('isMilestoneComplete follows the shared milestone health semantics', () => 
   assert.equal(isMilestoneComplete(milestone, [{ id: 'task-done', title: 'Still working', status: 'in-progress' }]), false);
 });
 
+test('completed milestones stay complete when finished tasks were late', () => {
+  const milestone: ProjectMilestone = {
+    id: 'milestone-late-complete',
+    title: 'Late but completed milestone',
+    projectIds: ['project-1'],
+    endDate: '2026-07-10',
+    linkedTaskIds: ['task-late'],
+  };
+  const tasks: Task[] = [
+    { id: 'task-late', title: 'Finished after target', status: 'done', endDate: '2026-07-11' },
+  ];
+
+  const summary = summarizeMilestone(milestone, tasks);
+
+  assert.equal(summary.lateTasks.length, 1);
+  assert.equal(summary.health, 'complete');
+  assert.equal(isMilestoneComplete(milestone, tasks), true);
+});
+
 test('wouldCreateDependencyCycle catches loops across linked tasks', () => {
   const dependenciesByTaskId: Record<string, string[]> = {
     'task-1': ['task-2'],
@@ -134,7 +153,7 @@ test('getStatusVisual keeps class-based tokens available to non-roadmap views', 
 
   assert.equal(visual.backgroundClassName, 'bg-amber-500');
   assert.equal(visual.backgroundStyle, undefined);
-  assert.equal(visual.textClassName, 'text-white');
+  assert.equal(visual.textClassName, 'text-black');
 });
 
 test('getStatusVisual accepts an explicit color override for shared dependency surfaces', () => {

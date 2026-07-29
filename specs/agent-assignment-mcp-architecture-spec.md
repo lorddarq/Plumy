@@ -136,12 +136,31 @@ export interface UserIdentity {
 export interface AgentIdentity {
   id: string;
   name: string;
-  provider: "codex" | "claude" | "custom";
-  model?: string;
   enabled: boolean;
+  instructions?: string;
+}
+
+export interface AgentRuntimeProfile {
+  id: string;
+  name: string;
+  integrationMode: "external-handoff" | "acp";
+  executablePath?: string;
+  applicationUrlScheme?: string;
+  launchArgs?: string[];
+  transport?: "stdio";
+  enabled: boolean;
+}
+
+export interface AgentRuntimeObservation {
+  runtimeProfileId: string;
+  version?: string;
   capabilities?: string[];
+  authenticationState: "unknown" | "authenticated" | "required" | "error";
+  checkedAt: string;
 }
 ```
+
+`AgentIdentity` represents the accountable Omvra persona and remains provider-neutral. `AgentRuntimeProfile` addresses an exact installed application or ACP adapter. Provider, model, capabilities, authentication, and billing are properties reported or owned by that runtime; they are not part of the Omvra identity.
 
 ### 6.2 Project model
 
@@ -155,6 +174,7 @@ export interface Project {
   defaultBranch?: string;
   workspaceKind?: "electron" | "web" | "backend" | "library" | "fullstack";
   agentProfileId?: string;
+  defaultAgentRuntimeProfileId?: string;
   metadata?: Record<string, string>;
 }
 ```
@@ -164,6 +184,7 @@ Notes:
 - `repoPath` is the key field for local agent routing
 - `repoUrl` is optional and mostly useful later
 - `agentProfileId` allows future project-specific prompts or instructions
+- `defaultAgentRuntimeProfileId` selects an installed execution runtime without changing the assigned agent identity
 
 ### 6.3 Task model
 
@@ -258,6 +279,12 @@ export interface TaskActivity {
 This allows later expansion without repeatedly mutating the task schema.
 
 ## 7. Agent Workflow
+
+### 7.0 Runtime resolution
+
+Before an execution or external handoff, Omvra resolves the runtime from an explicit task-execution or Goal-node choice, then the project default, then the global default. The selected runtime is shown to the user and is never silently replaced when missing, incompatible, or signed out.
+
+The minimum integration is a user-initiated external handoff that opens the selected runtime with a bounded task prompt and workspace. ACP adds structured session control when the configured adapter passes protocol initialization. Authentication remains inside the installed runtime; Omvra does not integrate provider authentication libraries or store provider credentials.
 
 ### 7.1 Assignment flow
 
@@ -497,6 +524,9 @@ To support this architecture cleanly, a settings area should eventually expose:
 
 - current user identity
 - available agent identities
+- installed agent runtime profiles
+- one global default runtime and optional project defaults
+- runtime connection test, observed version, ACP capabilities, availability, and authentication state
 - default reporter behavior
 - available projects and repo mapping
 - backend mode
@@ -513,6 +543,9 @@ This settings model should also be backed by repository/config abstractions, not
 
 - all integrations must be opt-in
 - local-only mode must remain supported
+- provider authentication and credentials remain owned by the installed runtime
+- runtime launch uses an exact executable plus argument array without shell interpolation
+- missing or incompatible runtimes fail explicitly without automatic provider fallback or background retries
 - no task data should be transmitted externally unless a backend or MCP integration is explicitly enabled
 - MCP write actions should be constrained to safe task-level operations
 - repo paths should be treated as sensitive local configuration
@@ -540,6 +573,7 @@ This settings model should also be backed by repository/config abstractions, not
 - add settings UI
 - add project repo mapping
 - add agent identities
+- add one exact local runtime profile, global/project selection, and connection testing without provider credentials
 
 ### Phase 4
 

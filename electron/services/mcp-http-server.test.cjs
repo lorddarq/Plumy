@@ -431,6 +431,9 @@ test('goals expose the complete graph through tools, resources, and workspace sn
     attemptCount: 1,
     reason: 'artifact locked',
   }]);
+  store.set('omvra.goalScheduleOccurrences.v1', [{
+    id: 'occurrence-1', goalId: 'goal-1', scheduleId: 'schedule-1', scheduledFor: '2026-07-20T07:30@UTC', state: 'missed', attempts: 3,
+  }]);
   const dispatch = createRequestDispatcher(store);
   const call = (name, args = {}) => dispatch({
     jsonrpc: '2.0',
@@ -455,6 +458,7 @@ test('goals expose the complete graph through tools, resources, and workspace sn
   assert.equal(list[0].execution.cleanupStatus, 'partial-failure');
   assert.equal(list[0].execution.cleanupPending, true);
   assert.equal(call('goals.get', { goalId: 'goal-1' }).result.structuredContent.reconciliations[0].attemptCount, 1);
+  assert.equal(call('goals.get', { goalId: 'goal-1' }).result.structuredContent.scheduleOccurrences[0].state, 'missed');
   assert.equal(call('workspace.get_snapshot').result.structuredContent.workspace.goals.length, 1);
   const resource = dispatch({
     jsonrpc: '2.0', id: 'goal-resource-test', method: 'resources/read',
@@ -787,6 +791,20 @@ test('underscore tool aliases dispatch to the canonical handlers', () => {
   assert.equal(response.id, 'alias-list-1');
   assert.ok(Array.isArray(response.result.structuredContent));
   assert.ok(response.result.structuredContent.some(task => task.id === 'task-1'));
+
+  const summaryResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'alias-summary-1',
+    method: 'tools/call',
+    params: {
+      name: 'diagnostics_audit_summary',
+      arguments: {},
+    },
+  }, makeReq());
+
+  assert.equal(summaryResponse.jsonrpc, '2.0');
+  assert.equal(summaryResponse.id, 'alias-summary-1');
+  assert.equal(summaryResponse.result.structuredContent.schemaVersion, 1);
 });
 
 test('tasks.list returns a successful Not found result for an empty filtered result set', () => {

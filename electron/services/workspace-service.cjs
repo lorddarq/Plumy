@@ -14,6 +14,7 @@ const GOALS_KEY = 'omvra.goals.v1';
 const GOAL_EXECUTIONS_KEY = 'omvra.goalExecutions.v1';
 const GOAL_RECONCILIATIONS_KEY = 'omvra.goalReconciliations.v1';
 const GOAL_EVIDENCE_KEY = 'omvra.goalEvidence.v1';
+const GOAL_SCHEDULE_OCCURRENCES_KEY = 'omvra.goalScheduleOccurrences.v1';
 const MCP_BOARD_WATCHERS_KEY = 'omvra.mcp.boardWatchers.v1';
 const REQUIRES_HUMAN_REVIEW_STATUS_ID = 'requires-human-review';
 const REQUIRES_HUMAN_REVIEW_STATUS_TITLE = 'Requires human review';
@@ -1112,6 +1113,26 @@ function withGoalExecutionReadModel(store, goal) {
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     }));
+  const scheduleOccurrences = readArray(store, GOAL_SCHEDULE_OCCURRENCES_KEY)
+    .filter(item => item?.goalId === goal?.id)
+    .map(item => ({
+      id: item.id,
+      scheduleId: item.scheduleId,
+      scheduledFor: item.scheduledFor,
+      temporalMode: item.temporalMode,
+      state: item.state,
+      attempts: item.attempts || 0,
+      retryable: item.retryable === true,
+      error: item.error,
+      message: item.message,
+      executionId: item.executionId,
+      createdAt: item.createdAt,
+      lastAttemptAt: item.lastAttemptAt,
+      startedAt: item.startedAt,
+      blockedAt: item.blockedAt,
+      missedAt: item.missedAt,
+      expiredAt: item.expiredAt,
+    }));
   return {
     ...goal,
     execution: execution ? {
@@ -1131,6 +1152,7 @@ function withGoalExecutionReadModel(store, goal) {
       updatedAt: execution.updatedAt,
     } : null,
     reconciliations,
+    scheduleOccurrences,
   };
 }
 

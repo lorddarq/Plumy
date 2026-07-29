@@ -24,3 +24,13 @@ test('reset executions remain historical but disappear from the current runtime 
   const runtime = createGoalRuntimeService({ store: db });
   assert.equal(runtime.get('goal-1').execution, null);
 });
+
+test('runtime projection exposes durable schedule occurrence outcomes', () => {
+  const db = store({
+    'omvra.goals.v1': [{ id: 'goal-1', revision: 1 }],
+    'omvra.goalScheduleOccurrences.v1': [{ id: 'occurrence-1', goalId: 'goal-1', scheduleId: 'schedule-1', state: 'missed', attempts: 3 }],
+  });
+  const projection = createGoalRuntimeService({ store: db }).get('goal-1');
+  assert.equal(projection.scheduleOccurrences[0].state, 'missed');
+  assert.equal(projection.scheduleOccurrences[0].attempts, 3);
+});

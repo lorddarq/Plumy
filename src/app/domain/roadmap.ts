@@ -113,10 +113,10 @@ export function summarizeMilestone(milestone: ProjectMilestone, tasks: Task[], s
   const completionPercent = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
   let health: MilestoneHealth = 'empty';
-  if (totalTasks > 0 && lateTasks.length > 0) {
-    health = 'at-risk';
-  } else if (totalTasks > 0 && completedTasks === totalTasks) {
+  if (totalTasks > 0 && completedTasks === totalTasks) {
     health = 'complete';
+  } else if (totalTasks > 0 && lateTasks.length > 0) {
+    health = 'at-risk';
   } else if (stageCounts['in-progress'] > 0 || stageCounts['in-review'] > 0) {
     health = 'in-progress';
   } else if (totalTasks > 0) {

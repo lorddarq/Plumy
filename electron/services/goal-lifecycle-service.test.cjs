@@ -386,6 +386,31 @@ test('stale revisions fail and repeated command ids are idempotent', () => {
   assert.equal(store.get(EVENTS_KEY).length, 1);
 });
 
+test('scheduled dispatch survives a lost response without duplicating lifecycle work', () => {
+  const store = makeStore();
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const scheduledFor = '2026-07-20T07:30@UTC';
+  lifecycle.execute({
+    goalId: 'goal-1', command: 'start', expectedRevision: 0,
+    commandId: `schedule:schedule-1:${scheduledFor}`,
+    payload: { scheduleId: 'schedule-1', occurrenceId: 'occurrence-1', scheduledFor, temporalMode: 'anchored' },
+  });
+  lifecycle.execute({
+    goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1,
+    commandId: `schedule:schedule-1:${scheduledFor}:acknowledge`, payload: { contractRevision: 0 },
+  });
+
+  const commandId = `schedule:schedule-1:${scheduledFor}:dispatch`;
+  const committed = lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId });
+  assert.equal(committed.execution.state, 'working');
+
+  const retried = lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId });
+  assert.equal(retried.idempotent, true);
+  assert.equal(retried.event.id, committed.event.id);
+  assert.equal(store.get(EXECUTIONS_KEY).length, 1);
+  assert.equal(store.get(EVENTS_KEY).filter(event => event.commandId === commandId).length, 1);
+});
+
 test('retry budget blocks further retries and cleanup runs after durable completion', () => {
   const store = makeStore();
   const cleanupCalls = [];

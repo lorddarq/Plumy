@@ -120,10 +120,11 @@ function startGoalScheduleRuntime() {
       resourcesPath: process.resourcesPath,
     }),
     userDataPath: app.getPath('userData'),
+    onRuntimeChange: goalRuntime.emit,
   });
   const tick = () => {
     try {
-      const result = runDueSchedules({ store, lifecycle });
+      const result = runDueSchedules({ store, lifecycle, onRuntimeChange: goalRuntime.emit });
       if (result.occurrences.length) console.log(`[goals] scheduled ${result.occurrences.length} occurrence(s)`);
     } catch (error) {
       console.error('[goals] schedule runtime failed:', error?.message || error);

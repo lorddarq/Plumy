@@ -126,6 +126,7 @@ export interface GoalRuntimeProjection {
   executionAttemptId?: string | null;
   agentAvailability?: Array<{ elementId: string; available: boolean; errorCode?: string | null }>;
   policyImpacts?: Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>;
+  scheduleOccurrences?: GoalScheduleOccurrence[];
   lastChange?: { scope?: string; errorCode?: string; changeType?: string } | null;
 }
 
@@ -332,6 +333,28 @@ export interface GoalSchedule {
   endsAt?: string;
   temporalMode: 'anchored' | 'latest';
   updatedAt: string;
+}
+
+export type GoalScheduleOccurrenceState = 'pending' | 'retrying' | 'blocked' | 'started' | 'missed' | 'expired';
+
+export interface GoalScheduleOccurrence {
+  id: string;
+  scheduleId: string;
+  goalId?: string;
+  scheduledFor: string;
+  temporalMode: 'anchored' | 'latest';
+  state: GoalScheduleOccurrenceState;
+  attempts: number;
+  retryable?: boolean;
+  error?: string;
+  message?: string;
+  executionId?: string;
+  createdAt?: string;
+  lastAttemptAt?: string;
+  startedAt?: string;
+  blockedAt?: string;
+  missedAt?: string;
+  expiredAt?: string;
 }
 
 export type Swimlane = StatusColumn;

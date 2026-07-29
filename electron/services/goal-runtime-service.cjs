@@ -8,8 +8,9 @@ const POLICY_KEY = 'omvra.goalPolicy.v1';
 const POLICY_IMPACTS_KEY = 'omvra.goalPolicyImpacts.v1';
 const RECONCILIATIONS_KEY = 'omvra.goalReconciliations.v1';
 const HANDOFFS_KEY = 'omvra.goalHandoffs.v1';
+const SCHEDULE_OCCURRENCES_KEY = 'omvra.goalScheduleOccurrences.v1';
 const PEOPLE_KEY = 'omvra.people.v1';
-const RUNTIME_SCOPES = new Set(['graph', 'execution', 'policy', 'conflict', 'reconciliation']);
+const RUNTIME_SCOPES = new Set(['graph', 'execution', 'policy', 'conflict', 'reconciliation', 'schedule']);
 
 function readArray(store, key) {
   const value = store.get(key);
@@ -76,6 +77,7 @@ function createGoalRuntimeService({ store, now = () => new Date().toISOString() 
       policyImpacts: readArray(store, POLICY_IMPACTS_KEY).filter(item => item?.goalId === goalId),
       reconciliations: readArray(store, RECONCILIATIONS_KEY).filter(item => item?.goalId === goalId),
       handoffs: readArray(store, HANDOFFS_KEY).filter(item => item?.goalId === goalId),
+      scheduleOccurrences: readArray(store, SCHEDULE_OCCURRENCES_KEY).filter(item => item?.goalId === goalId),
       lastChange: readArray(store, RUNTIME_EVENTS_KEY).filter(item => item?.goalId === goalId).at(-1) || null,
     };
   }
@@ -88,7 +90,7 @@ function createGoalRuntimeService({ store, now = () => new Date().toISOString() 
       emitter.on('changed', listener);
       return () => emitter.off('changed', listener);
     },
-    keys: { RUNTIME_EVENTS_KEY, GOALS_KEY, EXECUTIONS_KEY, POLICY_KEY, POLICY_IMPACTS_KEY, RECONCILIATIONS_KEY, HANDOFFS_KEY },
+    keys: { RUNTIME_EVENTS_KEY, GOALS_KEY, EXECUTIONS_KEY, POLICY_KEY, POLICY_IMPACTS_KEY, RECONCILIATIONS_KEY, HANDOFFS_KEY, SCHEDULE_OCCURRENCES_KEY },
   };
 }
 

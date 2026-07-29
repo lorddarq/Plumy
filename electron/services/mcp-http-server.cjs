@@ -823,6 +823,7 @@ const WRITE_TOOL_DEFINITIONS = [
 
 const TOOL_NAME_ALIASES = new Map([
   ['workspace_get_snapshot', 'workspace.get_snapshot'],
+  ['diagnostics_audit_summary', 'diagnostics.audit_summary'],
   ['goals_list', 'goals.list'],
   ['goals_get', 'goals.get'],
   ['goals_update', 'goals.update'],

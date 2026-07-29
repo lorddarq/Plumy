@@ -100,6 +100,27 @@ The Goal UI must provide a dedicated scheduling area during Goal setup and in th
 
 These choices are agreed. Implementation remains separately tracked from the workspace shell and must preserve the lifecycle, temporal-mode, retry, and missed/expired behavior above.
 
+### Scheduled occurrence resilience decision
+
+The scheduler owns a small occurrence-level retry envelope around the existing lifecycle boundary. It does not create a second workflow runtime.
+
+| Option | Benefit | Cost or risk | Decision |
+| --- | --- | --- | --- |
+| Retry the same durable occurrence and lifecycle `commandId` | Idempotent, restart-safe, and keeps schedule failures separate from Goal rework | Requires a durable scheduler checkpoint and typed occurrence outcomes | Selected |
+| Consume the Goal lifecycle retry budget | Reuses an existing budget | Conflates transport recovery with accepted workflow rework and can alter the Goal contract | Rejected |
+| Add an external queue/background service | Can execute while the desktop app is closed | Adds deployment and reconciliation ownership without a demonstrated need | Deferred |
+
+The selected behavior is:
+
+- The occurrence is persisted before lifecycle start. Connection failures can therefore retry the same occurrence and deterministic `schedule:{scheduleId}:{scheduledFor}` command without duplicating an execution.
+- Transport or assigned-agent availability failures are retryable. Each occurrence has three scheduler-owned start attempts; these attempts do not consume the Goal loop or rework budget because they repeat one idempotent lifecycle command.
+- A recurring occurrence remains blocked after its attempt budget is exhausted and becomes `missed` when the next occurrence boundary arrives. A one-time occurrence becomes `expired` when its attempt budget is exhausted. Non-transient lifecycle rejections remain `blocked` for inspection rather than being retried blindly.
+- The scheduler stores its last successful evaluation time. On restart it reconciles every due anchor since that checkpoint: older anchors are durably `missed`, while only the newest eligible occurrence starts. The captured IANA timezone continues to define calendar dates and DST behavior.
+- Every occurrence keeps its immutable `scheduledFor` and temporal mode. A later occurrence receives a distinct occurrence id and lifecycle command, so one missed or blocked run cannot consume it.
+- Occurrence state, attempt count, failure code, and timestamps are exposed in the renderer runtime projection, Goal MCP read model, and typed runtime audit events.
+
+This design recovers missed work when Omvra restarts; it does not claim to execute while the desktop app is closed. A continuously available external adapter remains optional if that operating requirement appears.
+
 ## Durable state and contracts
 
 The following must survive application restarts and workspace backup/restore:
