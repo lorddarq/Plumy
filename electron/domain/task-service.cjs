@@ -572,6 +572,29 @@ function createTaskService({
   
     return { ok: true, task: normalizeTaskForMcp(updated) };
   }
+
+  function getAggregateReviewBlockers(task) {
+    if (!task?.collaboration) return [];
+    return task.collaboration.contributions
+      .filter(contribution => contribution.state !== 'accepted')
+      .map(contribution => ({ id: contribution.id, personId: contribution.personId, state: contribution.state }));
+  }
+
+  function requireAcceptedContributions(store, taskId) {
+    const task = getTaskById(store, taskId);
+    if (!task) return { ok: false, error: 'TASK_NOT_FOUND', message: `Task "${taskId}" not found.` };
+    const blockers = getAggregateReviewBlockers(task);
+    if (blockers.length > 0) {
+      return {
+        ok: false,
+        error: 'CONTRIBUTIONS_NOT_ACCEPTED',
+        message: 'Every contribution must be accepted before aggregate review can be requested.',
+        blockers,
+        currentRevision: task[revisionField] || 0,
+      };
+    }
+    return { ok: true, task };
+  }
   
   function updateTaskDetails(store, options = {}) {
     const patch = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
@@ -821,7 +844,9 @@ function createTaskService({
       });
     }
 
-    const validation = collaborationService.validate(store, patch.collaboration);
+    const validation = collaborationService.validate(store, patch.collaboration, {
+      allowIneligibleExistingContributionIds: patch.allowIneligibleExistingContributionIds,
+    });
     if (!validation.ok) return validation;
 
     return updateTaskWithRevision(store, taskId, patch.expectedRevision, task => ({
@@ -1069,6 +1094,8 @@ function createTaskService({
   }
   
   function transitionTaskToUnderReview(store, { taskId, expectedRevision, actor = 'agent' }) {
+    const gate = requireAcceptedContributions(store, taskId);
+    if (!gate.ok) return gate;
     return updateTaskWithRevision(store, taskId, expectedRevision, (task) => {
       if (task.status !== 'in-progress') return null;
       const assignee = findPersonById(store, task.assigneeId);
@@ -1141,6 +1168,8 @@ function createTaskService({
   }
   
   function moveTaskToReadyForHumanReview(store, { taskId, expectedRevision, actor = 'agent' }) {
+    const gate = requireAcceptedContributions(store, taskId);
+    if (!gate.ok) return gate;
     const ensured = ensureReadyForHumanReviewStatusColumn(store);
     const result = moveTaskToStatus(store, {
       taskId,
@@ -1171,6 +1200,8 @@ function createTaskService({
         message: 'completion is required.',
       };
     }
+    const gate = requireAcceptedContributions(store, taskId);
+    if (!gate.ok) return gate;
   
     const ensured = ensureReadyForHumanReviewStatusColumn(store);
     const result = updateTaskWithRevision(store, taskId, expectedRevision, (task) => ({

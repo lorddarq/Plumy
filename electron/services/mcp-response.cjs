@@ -97,7 +97,7 @@ function makeWriteToolResult(action, payload = {}) {
     structuredContent.result = payload.result;
   }
 
-  for (const field of ['execution', 'event', 'cleanup']) {
+  for (const field of ['execution', 'event', 'cleanup', 'contribution', 'attempt', 'idempotent']) {
     if (Object.prototype.hasOwnProperty.call(payload, field)) {
       structuredContent[field] = payload[field];
     }

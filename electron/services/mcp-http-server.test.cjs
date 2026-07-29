@@ -842,6 +842,77 @@ test('tasks.update_collaboration persists a versioned projection and rejects sta
   assert.equal(Object.prototype.hasOwnProperty.call(store.get(TASKS_KEY)[0], 'collaboration'), false);
 });
 
+test('contribution lifecycle is MCP-visible, evidence-gated, audited, and cannot complete the aggregate task early', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PEOPLE_KEY, store.get(PEOPLE_KEY).concat({
+    id: 'agent-2', name: 'Contributor', role: 'Agent', kind: 'agentic', availableForSubagentDelegation: true,
+  }));
+  const dispatch = createRequestDispatcher(store);
+  const call = (name, args, id = name) => dispatch({
+    jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args },
+  }, makeReq({ 'x-mcp-client': 'Codex' }));
+
+  const collaboration = call('tasks_update_collaboration', {
+    taskId: 'task-1',
+    expectedRevision: 0,
+    collaboration: {
+      schemaVersion: 1,
+      orchestratorId: 'agent-1',
+      contributions: [{
+        id: 'contribution-1', personId: 'agent-2', role: 'subagent', scope: 'Implement lifecycle', state: 'pending',
+      }],
+    },
+  });
+  assert.equal(collaboration.result.structuredContent.revision, 1);
+
+  const premature = call('tasks_complete_and_request_review', {
+    taskId: 'task-1', expectedRevision: 1, completion: 'Should remain blocked.',
+  });
+  assert.equal(premature.error.data.error, 'CONTRIBUTIONS_NOT_ACCEPTED');
+  assert.equal(store.get(TASKS_KEY)[0].status, 'in-progress');
+
+  const handoff = call('tasks_transition_contribution', {
+    taskId: 'task-1', contributionId: 'contribution-1', command: 'handoff', actorPersonId: 'agent-1',
+    expectedRevision: 1, idempotencyKey: 'handoff-1',
+  });
+  assert.ok(handoff.result, JSON.stringify(handoff.error));
+  const attemptId = handoff.result.structuredContent.attempt.id;
+  assert.equal(handoff.result.structuredContent.contribution.state, 'pending');
+  assert.equal(handoff.result.structuredContent.attempt.state, 'handed-off');
+
+  const acknowledged = call('tasks_transition_contribution', {
+    taskId: 'task-1', contributionId: 'contribution-1', command: 'acknowledge', actorPersonId: 'agent-2',
+    expectedRevision: 2, idempotencyKey: 'ack-1', attemptId,
+  });
+  assert.equal(acknowledged.result.structuredContent.contribution.state, 'working');
+
+  const submitted = call('tasks_transition_contribution', {
+    taskId: 'task-1', contributionId: 'contribution-1', command: 'submit', actorPersonId: 'agent-2',
+    expectedRevision: 3, idempotencyKey: 'submit-1', attemptId, evidenceRefs: ['artifact-private-ref'],
+  });
+  assert.equal(submitted.result.structuredContent.contribution.state, 'submitted');
+  assert.equal(store.get(TASKS_KEY)[0].status, 'in-progress');
+
+  const accepted = call('tasks_transition_contribution', {
+    taskId: 'task-1', contributionId: 'contribution-1', command: 'accept', actorPersonId: 'agent-1',
+    expectedRevision: 4, idempotencyKey: 'accept-1',
+  });
+  assert.equal(accepted.result.structuredContent.contribution.state, 'accepted');
+  assert.equal(store.get(TASKS_KEY)[0].status, 'in-progress');
+
+  const history = call('tasks_collaboration_history', { taskId: 'task-1', contributionId: 'contribution-1' });
+  assert.equal(history.result.structuredContent.attempts.length, 1);
+  assert.equal(history.result.structuredContent.events.length, 4);
+  assert.equal(history.result.structuredContent.events.at(-1).type, 'accepted');
+
+  const completion = call('tasks_complete_and_request_review', {
+    taskId: 'task-1', expectedRevision: 5, completion: 'Integrated accepted contribution.',
+  });
+  assert.equal(completion.result.structuredContent.revision, 6);
+  assert.equal(completion.result.structuredContent.task.status, 'ready-human');
+  assert.equal(JSON.stringify(store.get('omvra.mcp.audit.v1')).includes('artifact-private-ref'), false);
+});
+
 test('underscore tool aliases dispatch to the canonical handlers', () => {
   const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
   const response = dispatch({

@@ -395,6 +395,47 @@ test('usePeopleActions deletes assignees and clears their agent watch config', a
   await harness.unmount();
 });
 
+test('usePeopleActions persists delegation eligibility only for agentic profiles', async () => {
+  let people: Person[] = [
+    { id: 'agent-1', name: 'Ted', role: 'Agent', kind: 'agentic' },
+  ];
+  const setPeople = (updater: React.SetStateAction<Person[]>) => {
+    people = typeof updater === 'function'
+      ? (updater as (prev: Person[]) => Person[])(people)
+      : updater;
+  };
+  const harness = await renderHook(
+    () => usePeopleActions({
+      setPeople,
+      setTasks: () => undefined,
+      onDeleteAgentWatchConfig: () => undefined,
+    }),
+    {}
+  );
+
+  harness.result().updatePerson('agent-1', {
+    name: 'Ted',
+    role: 'Agent',
+    kind: 'agentic',
+    agentInstructions: undefined,
+    agentOperationalInstructions: undefined,
+    availableForSubagentDelegation: true,
+  });
+  assert.equal(people[0].availableForSubagentDelegation, true);
+
+  harness.result().updatePerson('agent-1', {
+    name: 'Ted',
+    role: 'Engineer',
+    kind: 'human',
+    agentInstructions: undefined,
+    agentOperationalInstructions: undefined,
+    availableForSubagentDelegation: true,
+  });
+  assert.equal(people[0].availableForSubagentDelegation, false);
+
+  await harness.unmount();
+});
+
 test('useMcpPanelState tracks listener status, audit logs, and restart flow', async () => {
   let storeChangedListener: (() => void) | null = null;
   let auditLogCalls = 0;

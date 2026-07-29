@@ -58,12 +58,14 @@ export function PeopleManagementSections({
   const [newKind, setNewKind] = useState<PersonKind>('human');
   const [newAgentInstructions, setNewAgentInstructions] = useState('');
   const [newAgentOperationalInstructions, setNewAgentOperationalInstructions] = useState('');
+  const [newAvailableForSubagentDelegation, setNewAvailableForSubagentDelegation] = useState(false);
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('');
   const [editKind, setEditKind] = useState<PersonKind>('human');
   const [editAgentInstructions, setEditAgentInstructions] = useState('');
   const [editAgentOperationalInstructions, setEditAgentOperationalInstructions] = useState('');
+  const [editAvailableForSubagentDelegation, setEditAvailableForSubagentDelegation] = useState(false);
   const [pendingDeletePerson, setPendingDeletePerson] = useState<Person | null>(null);
   const [pendingDeleteImpact, setPendingDeleteImpact] = useState<{ taskCount: number; goalCount: number; goalNodeCount: number; goalTitles: string[]; loading: boolean } | null>(null);
   const [activeActionPersonId, setActiveActionPersonId] = useState<string | null>(null);
@@ -204,6 +206,7 @@ export function PeopleManagementSections({
     setNewKind(nextKind);
     setNewAgentInstructions('');
     setNewAgentOperationalInstructions('');
+    setNewAvailableForSubagentDelegation(false);
   }
 
   function startAdd(section: AddSection) {
@@ -232,6 +235,7 @@ export function PeopleManagementSections({
       kind: newKind,
       agentInstructions: newKind === 'agentic' ? newAgentInstructions.trim() || undefined : undefined,
       agentOperationalInstructions: newKind === 'agentic' ? newAgentOperationalInstructions.trim() || undefined : undefined,
+      availableForSubagentDelegation: newKind === 'agentic' && newAvailableForSubagentDelegation,
     });
     cancelAdd();
   }
@@ -243,6 +247,7 @@ export function PeopleManagementSections({
     setEditKind(person.kind === 'agentic' ? 'agentic' : 'human');
     setEditAgentInstructions(person.agentInstructions || '');
     setEditAgentOperationalInstructions(person.agentOperationalInstructions || '');
+    setEditAvailableForSubagentDelegation(person.kind === 'agentic' && person.availableForSubagentDelegation === true);
   }
 
   function cancelEditPerson() {
@@ -252,6 +257,7 @@ export function PeopleManagementSections({
     setEditKind('human');
     setEditAgentInstructions('');
     setEditAgentOperationalInstructions('');
+    setEditAvailableForSubagentDelegation(false);
   }
 
   function saveEditedPerson(personId: string) {
@@ -262,6 +268,7 @@ export function PeopleManagementSections({
       kind: editKind,
       agentInstructions: editKind === 'agentic' ? editAgentInstructions.trim() || undefined : undefined,
       agentOperationalInstructions: editKind === 'agentic' ? editAgentOperationalInstructions.trim() || undefined : undefined,
+      availableForSubagentDelegation: editKind === 'agentic' && editAvailableForSubagentDelegation,
     });
     cancelEditPerson();
   }
@@ -313,6 +320,7 @@ export function PeopleManagementSections({
         kind={editKind}
         agentInstructions={editAgentInstructions}
         agentOperationalInstructions={editAgentOperationalInstructions}
+        availableForSubagentDelegation={editAvailableForSubagentDelegation}
         agentInstructionsInputId={editInstructionsId}
         agentOperationalInstructionsInputId={editOperationalInstructionsId}
         onOpenChange={(open) => {
@@ -335,6 +343,7 @@ export function PeopleManagementSections({
         onKindChange={setEditKind}
         onAgentInstructionsChange={setEditAgentInstructions}
         onAgentOperationalInstructionsChange={setEditAgentOperationalInstructions}
+        onAvailableForSubagentDelegationChange={setEditAvailableForSubagentDelegation}
         onCancel={cancelEditPerson}
         onSubmit={() => saveEditedPerson(person.id)}
         onDelete={() => {
@@ -403,11 +412,13 @@ export function PeopleManagementSections({
             role={newRole}
             agentInstructions={newAgentInstructions}
             agentOperationalInstructions={newAgentOperationalInstructions}
+            availableForSubagentDelegation={newAvailableForSubagentDelegation}
             onOpenChange={(open) => setAddOpen('agents', open)}
             onNameChange={setNewName}
             onRoleChange={setNewRole}
             onAgentInstructionsChange={setNewAgentInstructions}
             onAgentOperationalInstructionsChange={setNewAgentOperationalInstructions}
+            onAvailableForSubagentDelegationChange={setNewAvailableForSubagentDelegation}
             onCancel={cancelAdd}
             onSubmit={handleAddPerson}
           />
@@ -543,11 +554,13 @@ interface AddAgentPopoverProps {
   role: string;
   agentInstructions: string;
   agentOperationalInstructions: string;
+  availableForSubagentDelegation: boolean;
   onOpenChange: (open: boolean) => void;
   onNameChange: (name: string) => void;
   onRoleChange: (role: string) => void;
   onAgentInstructionsChange: (instructions: string) => void;
   onAgentOperationalInstructionsChange: (instructions: string) => void;
+  onAvailableForSubagentDelegationChange: (available: boolean) => void;
   onCancel: () => void;
   onSubmit: () => void;
 }
@@ -558,11 +571,13 @@ function AddAgentPopover({
   role,
   agentInstructions,
   agentOperationalInstructions,
+  availableForSubagentDelegation,
   onOpenChange,
   onNameChange,
   onRoleChange,
   onAgentInstructionsChange,
   onAgentOperationalInstructionsChange,
+  onAvailableForSubagentDelegationChange,
   onCancel,
   onSubmit,
 }: AddAgentPopoverProps) {
@@ -612,6 +627,13 @@ function AddAgentPopover({
           />
         </div>
         <div className="px-4 pb-5">
+          <DelegationEligibilityField
+            id="settings-agent-delegation-eligibility"
+            checked={availableForSubagentDelegation}
+            onCheckedChange={onAvailableForSubagentDelegationChange}
+          />
+        </div>
+        <div className="px-4 pb-5">
           <AgentInstructionFields
             behaviorInstructions={agentInstructions}
             operationalInstructions={agentOperationalInstructions}
@@ -642,6 +664,7 @@ interface EditPersonPopoverProps {
   kind: PersonKind;
   agentInstructions: string;
   agentOperationalInstructions: string;
+  availableForSubagentDelegation: boolean;
   agentInstructionsInputId: string;
   agentOperationalInstructionsInputId: string;
   onOpenChange: (open: boolean) => void;
@@ -650,6 +673,7 @@ interface EditPersonPopoverProps {
   onKindChange: (kind: PersonKind) => void;
   onAgentInstructionsChange: (instructions: string) => void;
   onAgentOperationalInstructionsChange: (instructions: string) => void;
+  onAvailableForSubagentDelegationChange: (available: boolean) => void;
   onCancel: () => void;
   onSubmit: () => void;
   hideTrigger?: boolean;
@@ -663,6 +687,7 @@ function EditPersonPopover({
   kind,
   agentInstructions,
   agentOperationalInstructions,
+  availableForSubagentDelegation,
   agentInstructionsInputId,
   agentOperationalInstructionsInputId,
   onOpenChange,
@@ -671,6 +696,7 @@ function EditPersonPopover({
   onKindChange,
   onAgentInstructionsChange,
   onAgentOperationalInstructionsChange,
+  onAvailableForSubagentDelegationChange,
   onCancel,
   onSubmit,
   hideTrigger = false,
@@ -697,6 +723,7 @@ function EditPersonPopover({
           kind={kind}
           agentInstructions={agentInstructions}
           agentOperationalInstructions={agentOperationalInstructions}
+          availableForSubagentDelegation={availableForSubagentDelegation}
           agentInstructionsInputId={agentInstructionsInputId}
           agentOperationalInstructionsInputId={agentOperationalInstructionsInputId}
           onNameChange={onNameChange}
@@ -704,6 +731,7 @@ function EditPersonPopover({
           onKindChange={onKindChange}
           onAgentInstructionsChange={onAgentInstructionsChange}
           onAgentOperationalInstructionsChange={onAgentOperationalInstructionsChange}
+          onAvailableForSubagentDelegationChange={onAvailableForSubagentDelegationChange}
           onCancel={onCancel}
           onSubmit={onSubmit}
         />
@@ -719,6 +747,7 @@ function EditPersonPopoverContent({
   kind,
   agentInstructions,
   agentOperationalInstructions,
+  availableForSubagentDelegation,
   agentInstructionsInputId,
   agentOperationalInstructionsInputId,
   onNameChange,
@@ -726,6 +755,7 @@ function EditPersonPopoverContent({
   onKindChange,
   onAgentInstructionsChange,
   onAgentOperationalInstructionsChange,
+  onAvailableForSubagentDelegationChange,
   onCancel,
   onSubmit,
 }: Omit<EditPersonPopoverProps, 'open' | 'onOpenChange' | 'hideTrigger'>) {
@@ -770,19 +800,28 @@ function EditPersonPopoverContent({
         />
       </div>
       {kind === 'agentic' && (
-        <div className="px-4 pb-5">
-          <AgentInstructionFields
-            behaviorInstructions={agentInstructions}
-            operationalInstructions={agentOperationalInstructions}
-            behaviorInputId={agentInstructionsInputId}
-            operationalInputId={agentOperationalInstructionsInputId}
-            onBehaviorChange={onAgentInstructionsChange}
-            onOperationalChange={onAgentOperationalInstructionsChange}
-            fieldClassName={SETTINGS_POPOVER_PROMPT_CLASS}
-            labelClassName="text-xs font-medium leading-5 text-[#71717a]"
-            descriptionClassName="text-xs leading-5 text-[#71717a]"
-          />
-        </div>
+        <>
+          <div className="px-4 pb-5">
+            <DelegationEligibilityField
+              id={`settings-edit-person-delegation-eligibility-${person.id}`}
+              checked={availableForSubagentDelegation}
+              onCheckedChange={onAvailableForSubagentDelegationChange}
+            />
+          </div>
+          <div className="px-4 pb-5">
+            <AgentInstructionFields
+              behaviorInstructions={agentInstructions}
+              operationalInstructions={agentOperationalInstructions}
+              behaviorInputId={agentInstructionsInputId}
+              operationalInputId={agentOperationalInstructionsInputId}
+              onBehaviorChange={onAgentInstructionsChange}
+              onOperationalChange={onAgentOperationalInstructionsChange}
+              fieldClassName={SETTINGS_POPOVER_PROMPT_CLASS}
+              labelClassName="text-xs font-medium leading-5 text-[#71717a]"
+              descriptionClassName="text-xs leading-5 text-[#71717a]"
+            />
+          </div>
+        </>
       )}
       <SettingsPopoverActions
         addDisabled={!name.trim()}
@@ -809,6 +848,7 @@ function PersonCardActions({
   kind,
   agentInstructions,
   agentOperationalInstructions,
+  availableForSubagentDelegation,
   agentInstructionsInputId,
   agentOperationalInstructionsInputId,
   onOpenChange,
@@ -818,6 +858,7 @@ function PersonCardActions({
   onKindChange,
   onAgentInstructionsChange,
   onAgentOperationalInstructionsChange,
+  onAvailableForSubagentDelegationChange,
   onCancel,
   onSubmit,
   onDelete,
@@ -891,6 +932,7 @@ function PersonCardActions({
           kind={kind}
           agentInstructions={agentInstructions}
           agentOperationalInstructions={agentOperationalInstructions}
+          availableForSubagentDelegation={availableForSubagentDelegation}
           agentInstructionsInputId={agentInstructionsInputId}
           agentOperationalInstructionsInputId={agentOperationalInstructionsInputId}
           onNameChange={onNameChange}
@@ -898,6 +940,7 @@ function PersonCardActions({
           onKindChange={onKindChange}
           onAgentInstructionsChange={onAgentInstructionsChange}
           onAgentOperationalInstructionsChange={onAgentOperationalInstructionsChange}
+          onAvailableForSubagentDelegationChange={onAvailableForSubagentDelegationChange}
           onCancel={onCancel}
           onSubmit={onSubmit}
         />
@@ -991,6 +1034,41 @@ function SettingsPopoverField({
         className={SETTINGS_POPOVER_FIELD_CLASS}
       />
     </div>
+  );
+}
+
+function DelegationEligibilityField({
+  id,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  const descriptionId = `${id}-description`;
+  return (
+    <label
+      htmlFor={id}
+      className="flex min-h-10 cursor-pointer items-start gap-3 rounded-xl border border-black/10 bg-white/60 px-3 py-2.5"
+    >
+      <input
+        type="checkbox"
+        id={id}
+        checked={checked}
+        onChange={(event) => onCheckedChange(event.target.checked)}
+        aria-describedby={descriptionId}
+        className="mt-0.5 size-4 shrink-0 accent-[#1a60cb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2"
+      />
+      <span className="min-w-0">
+        <span className="block text-xs font-medium leading-5 text-[#303038]">
+          Available for subagent delegation
+        </span>
+        <span id={descriptionId} className="block text-xs leading-5 text-[#71717a]">
+          Allows this agent to appear in subagent selection. Omvra does not automatically spawn or assign work.
+        </span>
+      </span>
+    </label>
   );
 }
 

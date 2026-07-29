@@ -213,7 +213,7 @@ Current capabilities include:
 
 - read tools/resources:
   - `workspace_get_snapshot`
-  - `tasks_list`, `tasks_get`
+  - `tasks_list`, `tasks_get`, `tasks_collaboration_history`
   - `agent_resolve_task_context` (strict execution preflight)
   - `cards_kanban_list`, `cards_timeline_list`
   - `boards_watch_poll`
@@ -232,7 +232,7 @@ Current capabilities include:
     - `omvra://projects/{projectId}/tasks`
     - `omvra://boards/{statusId}/tasks`
 - gated safe write tools (capability-profile dependent):
-  - task lifecycle: `task_write`, `tasks_create`, `tasks_update`, `tasks_update_description`, `tasks_delete`
+  - task lifecycle: `task_write`, `tasks_create`, `tasks_update`, `tasks_update_description`, `tasks_update_collaboration`, `tasks_transition_contribution`, `tasks_delete`
   - task files: `tasks_attach_file`, `tasks_remove_attachment`
   - task effort: `tasks_log_time`
   - roadmap: `milestones_create`, `milestones_update`, `milestones_link_tasks`, `milestones_delete`

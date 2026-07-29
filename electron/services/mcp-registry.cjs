@@ -65,6 +65,20 @@ const READ_TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'tasks.collaboration_history',
+    description: 'Returns bounded contribution attempt and redacted lifecycle-event history for one task, optionally filtered to one contribution.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        taskId: { type: 'string' },
+        contributionId: { type: 'string' },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+      },
+      required: ['taskId'],
+    },
+  },
+  {
     name: 'agent.resolve_task_context',
     description: 'Strict execution preflight. Resolves a task by id, then its exact assignee id and required agent context. A failed result must prevent task work from starting.',
     inputSchema: {
@@ -481,6 +495,26 @@ const WRITE_TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'tasks.transition_contribution',
+    description: 'Applies one revision-protected, idempotent contribution or execution-attempt transition. It never changes aggregate task status or starts a runtime.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        taskId: { type: 'string' },
+        contributionId: { type: 'string' },
+        command: { enum: ['delegate', 'handoff', 'acknowledge', 'start', 'submit', 'request-revision', 'accept', 'block', 'unblock', 'stop', 'fail', 'complete'] },
+        actorPersonId: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        idempotencyKey: { type: 'string' },
+        attemptId: { type: 'string' },
+        evidenceRefs: { type: 'array', maxItems: 50, items: { type: 'string' } },
+        blockerRef: { type: 'string' },
+      },
+      required: ['taskId', 'contributionId', 'command', 'actorPersonId', 'expectedRevision', 'idempotencyKey'],
+    },
+  },
+  {
     name: 'tasks.attach_file',
     description: 'Adds a local file attachment reference to a task using an absolute path or file:// URL. This stores metadata only and does not copy or open the file.',
     inputSchema: {
@@ -810,6 +844,7 @@ const TOOL_NAME_ALIASES = new Map([
   ['goals_gc', 'goals.gc'],
   ['tasks_list', 'tasks.list'],
   ['tasks_get', 'tasks.get'],
+  ['tasks_collaboration_history', 'tasks.collaboration_history'],
   ['agent_resolve_task_context', 'agent.resolve_task_context'],
   ['cards_kanban_list', 'cards.kanban.list'],
   ['cards_timeline_list', 'cards.timeline.list'],
@@ -820,6 +855,7 @@ const TOOL_NAME_ALIASES = new Map([
   ['tasks_update', 'tasks.update'],
   ['tasks_update_description', 'tasks.update_description'],
   ['tasks_update_collaboration', 'tasks.update_collaboration'],
+  ['tasks_transition_contribution', 'tasks.transition_contribution'],
   ['tasks_attach_file', 'tasks.attach_file'],
   ['tasks_remove_attachment', 'tasks.remove_attachment'],
   ['tasks_delete', 'tasks.delete'],

@@ -54,6 +54,9 @@ test('collaboration service rejects duplicate, missing, self-conflicting, and in
   assert.equal(service.validate(null, collaboration([contribution({ id: '' })])).error, 'INCOMPLETE_CONTRIBUTION');
   assert.equal(service.validate(null, collaboration([contribution({ personId: 'orchestrator' })])).error, 'ORCHESTRATOR_CONTRIBUTOR_CONFLICT');
   assert.equal(service.validate(null, collaboration([contribution({ personId: 'agent-ineligible' })])).error, 'SUBAGENT_NOT_ELIGIBLE');
+  assert.equal(service.validate(null, collaboration([contribution({ personId: 'agent-ineligible' })]), {
+    allowIneligibleExistingContributionIds: new Set(['contribution-1']),
+  }).ok, true);
   assert.equal(service.validate(null, collaboration([contribution({ personId: 'human', role: 'contributor' })])).ok, true);
 });
 

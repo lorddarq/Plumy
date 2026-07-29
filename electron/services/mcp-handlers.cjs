@@ -12,6 +12,7 @@ const {
   getMilestoneById,
   listTasks,
   getTaskById,
+  getTaskCollaborationHistory,
   resolveTaskExecutionContext,
   listAssignedWorkForAgent,
   listKanbanCards,
@@ -21,6 +22,7 @@ const {
   updateTaskDetails,
   updateTaskDescription,
   updateTaskCollaboration,
+  transitionTaskContribution,
   attachTaskFile,
   removeTaskAttachment,
   deleteTask,
@@ -172,6 +174,18 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
         };
       }
       return { result: makeToolResult(getTaskById(store, taskId)) };
+    }
+
+    case 'tasks.collaboration_history': {
+      const taskId = parseTaskId(args);
+      if (!taskId) return { error: invalidParams('Invalid params: "taskId" is required.') };
+      const result = getTaskCollaborationHistory(store, {
+        taskId,
+        contributionId: args.contributionId,
+        limit: args.limit,
+      });
+      if (!result.ok) return { error: invalidParams(result.message, result) };
+      return { result: makeToolResult(result) };
     }
 
     case 'agent.resolve_task_context': {
@@ -642,6 +656,62 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
           auditId: audit?.auditId,
           collaborationSchemaVersion: result.task?.collaboration?.schemaVersion,
           task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'tasks.transition_contribution': {
+      const taskId = parseTaskId(args);
+      if (!taskId) return { error: invalidParams('Invalid params: "taskId" is required.') };
+      const result = transitionTaskContribution(store, {
+        taskId,
+        contributionId: args.contributionId,
+        command: args.command,
+        actorPersonId: args.actorPersonId,
+        expectedRevision: args.expectedRevision,
+        idempotencyKey: args.idempotencyKey,
+        attemptId: args.attemptId,
+        evidenceRefs: args.evidenceRefs,
+        blockerRef: args.blockerRef,
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+          contributionId: args.contributionId,
+          command: args.command,
+          actor: args.actorPersonId,
+          expectedRevision: args.expectedRevision,
+          currentRevision: result.currentRevision,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        contributionId: result.contribution?.id,
+        attemptId: result.attempt?.id,
+        command: args.command,
+        actor: args.actorPersonId,
+        previousState: result.event?.previousState,
+        nextState: result.event?.nextState,
+        eventType: result.event?.type,
+        nextRevision: result.task?.__mcpRevision,
+        idempotent: result.idempotent,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: !result.idempotent,
+          auditId: audit?.auditId,
+          idempotent: result.idempotent,
+          task: result.task,
+          contribution: result.contribution,
+          attempt: result.attempt,
+          event: result.event,
           revision: result.task?.__mcpRevision,
         }),
       };

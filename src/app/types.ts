@@ -82,9 +82,29 @@ export interface TaskContributionAttemptV1 {
   id: string;
   taskId: string;
   contributionId: string;
+  ordinal: number;
   state: 'handed-off' | 'acknowledged' | 'working' | 'submitted' | 'completed' | 'stopped' | 'failed';
   createdAt: string;
   updatedAt: string;
+  [extension: string]: unknown;
+}
+
+export interface TaskCollaborationEventV1 {
+  schemaVersion: 1;
+  id: string;
+  idempotencyKey: string;
+  taskId: string;
+  contributionId: string;
+  attemptId?: string;
+  actorPersonId: string;
+  command: string;
+  type: string;
+  previousState: TaskContributionState;
+  nextState: TaskContributionState;
+  baseTaskRevision: number;
+  nextTaskRevision: number;
+  outcome: 'applied';
+  occurredAt: string;
   [extension: string]: unknown;
 }
 

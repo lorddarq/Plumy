@@ -62,7 +62,7 @@ function createTaskCollaborationService({ findPersonById, normalizeString }) {
     return refs;
   }
 
-  function validateValue(store, value, verifyPeople) {
+  function validateValue(store, value, verifyPeople, options = {}) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return invalid('INVALID_COLLABORATION', 'collaboration must be an object.');
     }
@@ -112,7 +112,10 @@ function createTaskCollaborationService({ findPersonById, normalizeString }) {
 
       const person = verifyPeople ? findPersonById(store, personId) : null;
       if (verifyPeople && !person) return invalid('CONTRIBUTOR_NOT_FOUND', `Contributor "${personId}" was not found.`);
-      if (verifyPeople && role === 'subagent' && (person.kind !== 'agentic' || person.availableForSubagentDelegation !== true)) {
+      const preservesExistingSubagent = options.allowIneligibleExistingContributionIds instanceof Set
+        && options.allowIneligibleExistingContributionIds.has(id);
+      if (verifyPeople && role === 'subagent' && !preservesExistingSubagent
+        && (person.kind !== 'agentic' || person.availableForSubagentDelegation !== true)) {
         return invalid('SUBAGENT_NOT_ELIGIBLE', `Contributor "${personId}" is not available for subagent delegation.`);
       }
 
@@ -147,8 +150,8 @@ function createTaskCollaborationService({ findPersonById, normalizeString }) {
     };
   }
 
-  function validate(store, value) {
-    return validateValue(store, value, true);
+  function validate(store, value, options) {
+    return validateValue(store, value, true, options);
   }
 
   function normalizeStored(value) {

@@ -6,12 +6,14 @@ const { createMilestoneService } = require('../domain/milestone-service.cjs');
 const { createPersonContextService } = require('../domain/person-context-service.cjs');
 const { createTaskService } = require('../domain/task-service.cjs');
 const { createTaskCollaborationService, COLLABORATION_SCHEMA_VERSION } = require('../domain/task-collaboration-service.cjs');
+const { createTaskCollaborationLifecycleService } = require('../domain/task-collaboration-lifecycle-service.cjs');
 const { migrateGoalRecords, normalizeAgentConfiguration, normalizeGoalInputs, normalizeGoalCapabilities, normalizeGoalProjectBindings } = require('./goal-state-service.cjs');
 const { isAgentMutationAllowed } = require('./goal-policy.cjs');
 
 const PREFERENCES_KEY = 'omvra.preferences.v1';
 const TASKS_KEY = 'omvra.tasks.v1';
 const TASK_CONTRIBUTION_ATTEMPTS_KEY = 'omvra.taskContributionAttempts.v1';
+const TASK_COLLABORATION_EVENTS_KEY = 'omvra.taskCollaborationEvents.v1';
 const MILESTONES_KEY = 'omvra.milestones.v1';
 const PEOPLE_KEY = 'omvra.people.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
@@ -474,6 +476,8 @@ function buildMcpCapabilitySnapshot(store) {
             'tasks.transition_under_review',
             'tasks.update',
             'tasks.update_description',
+            'tasks.update_collaboration',
+            'tasks.transition_contribution',
             'tasks.attach_file',
             'tasks.remove_attachment',
             'tasks.delete',
@@ -1413,12 +1417,15 @@ function buildMcpAgentGuide() {
     commonTools: [
       'tasks.list',
       'tasks.get',
+      'tasks.collaboration_history',
       'cards.kanban.list',
       'cards.timeline.list',
       'boards.watch.poll',
       'task_write',
       'tasks.update',
       'tasks.update_description',
+      'tasks.update_collaboration',
+      'tasks.transition_contribution',
       'tasks.attach_file',
       'tasks.remove_attachment',
       'tasks.delete',
@@ -1483,6 +1490,7 @@ function buildMcpTaskExecutionSchema() {
     writeRules: [
       'Read the task first.',
       'Always pass expectedRevision on writes.',
+      'Contribution lifecycle writes also require an idempotencyKey and must use tasks.transition_contribution; attempt completion never implies contribution acceptance or aggregate task completion.',
       'Append the full handoff summary to the existing task description with tasks.update_description before moving the task to review; use the completion field only for a concise pointer of 240 characters or fewer.',
       'Prefer the narrowest write tool that matches the action.',
       'For roadmap membership and task dependencies, use milestones.link_tasks. Do not split the workflow across milestones.update and tasks.update.',
@@ -1777,6 +1785,16 @@ taskService = createTaskService({
   writeTasks: (store, tasks) => store.set(TASKS_KEY, tasks),
 });
 
+const taskCollaborationLifecycleService = createTaskCollaborationLifecycleService({
+  getTaskById: (...args) => taskService.getTaskById(...args),
+  updateTaskCollaboration: (...args) => taskService.updateTaskCollaboration(...args),
+  readAttempts: store => readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY),
+  writeAttempts: (store, attempts) => store.set(TASK_CONTRIBUTION_ATTEMPTS_KEY, attempts),
+  readEvents: store => readArray(store, TASK_COLLABORATION_EVENTS_KEY),
+  writeEvents: (store, events) => store.set(TASK_COLLABORATION_EVENTS_KEY, events),
+  normalizeString,
+});
+
 const {
   normalizePerson: normalizePersonForMcp,
   resolveTaskExecutionContext,
@@ -1808,6 +1826,11 @@ const {
 } = taskService;
 
 const {
+  listHistory: getTaskCollaborationHistory,
+  transition: transitionTaskContribution,
+} = taskCollaborationLifecycleService;
+
+const {
   listMilestones,
   getMilestoneById,
   createMilestone,
@@ -1819,6 +1842,7 @@ const {
 module.exports = {
   PREFERENCES_KEY,
   TASK_CONTRIBUTION_ATTEMPTS_KEY,
+  TASK_COLLABORATION_EVENTS_KEY,
   COLLABORATION_SCHEMA_VERSION,
   MILESTONES_KEY,
   MCP_PROTOCOL_VERSION,
@@ -1859,6 +1883,7 @@ module.exports = {
   listTasks,
   listAssignedWorkForAgent,
   getTaskById,
+  getTaskCollaborationHistory,
   resolveTaskExecutionContext,
   listKanbanCards,
   listTimelineCards,
@@ -1883,6 +1908,7 @@ module.exports = {
   updateTaskDetails,
   updateTaskDescription,
   updateTaskCollaboration,
+  transitionTaskContribution,
   attachTaskFile,
   removeTaskAttachment,
   logTaskTime,
