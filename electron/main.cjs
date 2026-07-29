@@ -13,6 +13,12 @@ try {
   console.warn('[updates] electron-updater is unavailable:', error?.message || error);
 }
 const { registerMcpIpcHandlers } = require('./ipc/mcp.cjs');
+const { registerStoreIpcHandlers } = require('./ipc/store.cjs');
+const { registerGoalIpcHandlers } = require('./ipc/goals.cjs');
+const { registerDocumentIpcHandlers } = require('./ipc/documents.cjs');
+const { registerAttachmentIpcHandlers } = require('./ipc/attachments.cjs');
+const { registerExternalLinkIpcHandlers } = require('./ipc/external-links.cjs');
+const { registerRuntimeIpcHandlers } = require('./ipc/runtime.cjs');
 const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
 const {
   createUpdateController,
@@ -200,16 +206,6 @@ function getDebugUpdateFixtureFromEnv() {
   };
 }
 
-function sanitizePdfFileName(value) {
-  const baseName = typeof value === 'string' && value.trim() ? value.trim() : 'task-details.pdf';
-  const safeName = baseName
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
-    .replace(/\s+/g, ' ')
-    .slice(0, 120);
-
-  return safeName.toLowerCase().endsWith('.pdf') ? safeName : `${safeName}.pdf`;
-}
-
 function getAppBundlePath() {
   const marker = '.app/Contents/MacOS/';
   const executablePath = typeof process.execPath === 'string' ? process.execPath : '';
@@ -268,65 +264,6 @@ function readCurrentMacCodeSignature() {
     teamIdentifier,
     details: null,
   };
-}
-
-async function exportHtmlToPdf(event, { html, defaultFileName } = {}) {
-  if (typeof html !== 'string' || !html.trim()) {
-    return { success: false, error: 'PDF content is missing.' };
-  }
-
-  const sourceWindow = BrowserWindow.fromWebContents(event.sender);
-  const saveDialogOptions = {
-    title: 'Export task as PDF',
-    defaultPath: sanitizePdfFileName(defaultFileName),
-    filters: [{ name: 'PDF', extensions: ['pdf'] }],
-    properties: ['createDirectory', 'showOverwriteConfirmation'],
-  };
-  const saveResult = sourceWindow
-    ? await dialog.showSaveDialog(sourceWindow, saveDialogOptions)
-    : await dialog.showSaveDialog(saveDialogOptions);
-
-  if (saveResult.canceled || !saveResult.filePath) {
-    return { success: false, canceled: true };
-  }
-
-  let exportWindow;
-
-  try {
-    exportWindow = new BrowserWindow({
-      show: false,
-      width: 794,
-      height: 1123,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: true,
-      },
-    });
-
-    await exportWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-    const pdfBuffer = await exportWindow.webContents.printToPDF({
-      printBackground: true,
-      pageSize: 'A4',
-      margins: {
-        marginType: 'custom',
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-      },
-    });
-
-    await fs.promises.writeFile(saveResult.filePath, pdfBuffer);
-    shell.showItemInFolder(saveResult.filePath);
-    return { success: true, filePath: saveResult.filePath };
-  } catch (err) {
-    return { success: false, error: err?.message || String(err) };
-  } finally {
-    if (exportWindow && !exportWindow.isDestroyed()) {
-      exportWindow.destroy();
-    }
-  }
 }
 
 function createWindow() {
@@ -494,214 +431,81 @@ app.on('before-quit', () => {
   }
 });
 
-// =====================
-// IPC: Store
-// =====================
-ipcMain.handle('store/get', (_, key) => store.get(key));
-ipcMain.handle('store/set', (_, key, value) => {
-  const result = store.set(key, value);
-  if (key === PREFERENCES_KEY && value?.goalAuditArchiveDirectory) {
+registerStoreIpcHandlers({
+  ipcMain,
+  store,
+  preferencesKey: PREFERENCES_KEY,
+  onPreferencesSet: (value) => {
+    if (!value?.goalAuditArchiveDirectory) return;
     archiveMcpAuditEntries(store, store.get('omvra.mcp.audit.v1'));
     createGoalLifecycleService({
       store,
       skillsRoot: getBundledSkillsRoot({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }),
       userDataPath: app.getPath('userData'),
     });
-  }
-  return result;
+  },
 });
-ipcMain.handle('store/delete', (_, key) => store.delete(key));
-ipcMain.handle('store/export', () => store.store);
-ipcMain.handle('goal-policy/record-impact', (_, payload) => {
-  const result = recordGoalPolicyChangeImpact(store, payload);
-  if (result.ok && result.changed) {
-    for (const impact of result.impacts || []) goalRuntime.emit({ scope: 'policy', goalId: impact.goalId, revision: impact.effectivePolicyRevision, actor: payload?.actor || 'workspace-settings', changeType: 'policy.impact-recorded' });
-  }
-  return result;
-});
-ipcMain.handle('goals/get-runtime', (_, goalId) => goalRuntime.get(goalId));
-ipcMain.handle('goals/reset-execution', (_, payload = {}) => {
-  const goalId = typeof payload.goalId === 'string' ? payload.goalId.trim() : '';
-  if (!goalId) return { ok: false, error: 'GOAL_ID_REQUIRED', message: 'goalId is required.' };
 
-  const lifecycle = createGoalLifecycleService({
+registerGoalIpcHandlers({
+  ipcMain,
+  goalRuntime,
+  recordPolicyImpact: (payload) => recordGoalPolicyChangeImpact(store, payload),
+  createLifecycle: () => createGoalLifecycleService({
     store,
     skillsRoot: getBundledSkillsRoot({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }),
     userDataPath: app.getPath('userData'),
     onRuntimeChange: goalRuntime.emit,
-  });
-  const current = lifecycle.getExecution(goalId);
-  if (!current) return { ok: true, reset: true, alreadyReset: true, execution: null };
-  const resetResult = lifecycle.execute({
-    command: 'reset',
-    goalId,
-    expectedRevision: current.revision,
-    commandId: `renderer-reset-${randomUUID()}`,
-    actor: 'human',
-    payload: { humanConfirmed: true, reason: 'user-requested-reset' },
-  });
-  if (!resetResult.ok) return resetResult;
-  return { ...resetResult, reset: true };
+  }),
+  updateGoal: (payload) => updateGoal(store, {
+    goalId: payload.goalId,
+    title: payload.title,
+    elements: payload.elements,
+    inputs: payload.inputs,
+    capabilities: payload.capabilities,
+    projectBindings: payload.projectBindings,
+    overseerAgentId: payload.overseerAgentId,
+    expectedRevision: payload.expectedRevision,
+    idempotencyKey: payload.idempotencyKey,
+    actor: 'renderer',
+    emitRuntimeChange: goalRuntime.emit,
+  }),
+  updateGoalArtifacts: (payload) => updateGoalArtifactReferences(store, {
+    goalId: payload.goalId,
+    elementId: payload.elementId,
+    artifactReferences: payload.artifactReferences,
+    expectedRevision: payload.expectedRevision,
+    actor: 'renderer',
+    emitRuntimeChange: goalRuntime.emit,
+  }),
+  createCommandId: () => `renderer-reset-${randomUUID()}`,
 });
-ipcMain.handle('goals/update', (_, payload = {}) => updateGoal(store, {
-  goalId: payload.goalId,
-  title: payload.title,
-  elements: payload.elements,
-  inputs: payload.inputs,
-  capabilities: payload.capabilities,
-  projectBindings: payload.projectBindings,
-  overseerAgentId: payload.overseerAgentId,
-  expectedRevision: payload.expectedRevision,
-  idempotencyKey: payload.idempotencyKey,
-  actor: 'renderer',
-  emitRuntimeChange: goalRuntime.emit,
-}));
-ipcMain.handle('goals/update-artifacts', (_, payload = {}) => updateGoalArtifactReferences(store, {
-  goalId: payload.goalId,
-  elementId: payload.elementId,
-  artifactReferences: payload.artifactReferences,
-  expectedRevision: payload.expectedRevision,
-  actor: 'renderer',
-  emitRuntimeChange: goalRuntime.emit,
-}));
-ipcMain.handle('app/get-runtime-info', () => ({
-  name: app.getName(),
-  version: app.getVersion(),
-  isPackaged: app.isPackaged,
-  electronVersion: process.versions.electron || 'unknown',
-  chromeVersion: process.versions.chrome || 'unknown',
-  nodeVersion: process.versions.node || 'unknown',
-  codeSignature: readCurrentMacCodeSignature(),
-}));
+
 registerUpdateIpcHandlers({
   ipcMain,
   app,
   getUpdateController: () => updateController,
   setStoredUpdateChannel,
 });
-ipcMain.handle('tasks/export-pdf', exportHtmlToPdf);
-ipcMain.handle('agent-configurations/export', async (event, { json, defaultFileName = 'omvra-agent-configurations.json' } = {}) => {
-  if (typeof json !== 'string' || !json.trim()) {
-    return { success: false, error: 'Agent configuration data is missing.' };
-  }
 
-  const sourceWindow = BrowserWindow.fromWebContents(event.sender);
-  const saveDialogOptions = {
-    title: 'Export agents',
-    defaultPath: defaultFileName,
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-    properties: ['createDirectory', 'showOverwriteConfirmation'],
-  };
-  const saveResult = sourceWindow
-    ? await dialog.showSaveDialog(sourceWindow, saveDialogOptions)
-    : await dialog.showSaveDialog(saveDialogOptions);
-
-  if (saveResult.canceled || !saveResult.filePath) {
-    return { success: false, canceled: true };
-  }
-
-  try {
-    await fs.promises.writeFile(saveResult.filePath, json, 'utf8');
-    shell.showItemInFolder(saveResult.filePath);
-    return { success: true, filePath: saveResult.filePath };
-  } catch (err) {
-    return { success: false, error: err?.message || String(err) };
-  }
-});
-ipcMain.handle('mcp/restart-server', () => {
-  try {
-    restartMcpServer();
-    if (!mcpHttpServer) {
-      return {
-        success: false,
-        error: 'MCP server is disabled. Enable mcpAgentAccessEnabled or set OMVRA_ENABLE_MCP_SERVER=1.',
-      };
-    }
-    return {
-      success: true,
-      listenerStatus: buildMcpListenerStatus(store, mcpRuntimeState),
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: err?.message || String(err),
-    };
-  }
+registerDocumentIpcHandlers({ ipcMain, BrowserWindow, dialog, fs, shell });
+registerAttachmentIpcHandlers({ ipcMain, app, dialog, fs, path, shell });
+registerExternalLinkIpcHandlers({ ipcMain, shell });
+registerRuntimeIpcHandlers({
+  ipcMain,
+  getAppRuntimeInfo: () => ({
+    name: app.getName(),
+    version: app.getVersion(),
+    isPackaged: app.isPackaged,
+    electronVersion: process.versions.electron || 'unknown',
+    chromeVersion: process.versions.chrome || 'unknown',
+    nodeVersion: process.versions.node || 'unknown',
+    codeSignature: readCurrentMacCodeSignature(),
+  }),
+  restartMcpServer,
+  isMcpServerRunning: () => Boolean(mcpHttpServer),
+  getMcpListenerStatus: () => buildMcpListenerStatus(store, mcpRuntimeState),
 });
 
-// =====================
-// IPC: Attachments
-// =====================
-ipcMain.handle('goal-audit/pick-directory', async () => {
-  const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
-  return result.canceled ? null : result.filePaths[0] || null;
-});
-
-ipcMain.handle('skills/pick-directory', async () => {
-  const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
-  return result.canceled ? null : result.filePaths[0] || null;
-});
-
-ipcMain.handle('attachments/pick', async () => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openFile', 'multiSelections'],
-  });
-  return result.canceled ? [] : result.filePaths;
-});
-
-ipcMain.handle('attachments/verify', async (_, filePath) => {
-  try {
-    const stats = await fs.promises.stat(filePath);
-    return { exists: true, size: stats.size, mtime: stats.mtimeMs, readable: true };
-  } catch (err) {
-    return { exists: false, error: err.message };
-  }
-});
-
-ipcMain.handle('attachments/embed', async (_, filePath) => {
-  try {
-    const attachmentsDir = path.join(app.getPath('userData'), 'attachments');
-    await fs.promises.mkdir(attachmentsDir, { recursive: true });
-    const base = path.basename(filePath);
-    const dest = path.join(attachmentsDir, `${Date.now()}-${base}`);
-    await fs.promises.copyFile(filePath, dest);
-    return { success: true, path: dest };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-});
-
-ipcMain.handle('attachments/reveal', async (_, filePath) => {
-  try {
-    if (typeof filePath !== 'string' || !filePath.trim()) {
-      throw new Error('Attachment path is required');
-    }
-
-    await fs.promises.stat(filePath);
-    shell.showItemInFolder(filePath);
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-});
-
-// =====================
-// IPC: Open external URLs (validate protocol)
-// =====================
-ipcMain.handle('open-external', async (_, urlStr) => {
-  try {
-    const url = new URL(urlStr);
-    if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) throw new Error('Invalid protocol');
-    await shell.openExternal(urlStr);
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-});
-
-// =====================
-// IPC: MCP bridge (read-only, gated)
-// =====================
 registerMcpIpcHandlers({
   ipcMain,
   store,

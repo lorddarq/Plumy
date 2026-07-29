@@ -287,3 +287,20 @@ test('preload invoke channels exactly match registered IPC handlers', () => {
     assert.match(preloadSource, new RegExp(eventChannel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 });
+
+test('Electron main composes IPC registrars while retaining application lifecycle ownership', () => {
+  const mainSource = read('electron/main.cjs');
+  const registrarSource = [
+    'store.cjs',
+    'goals.cjs',
+    'documents.cjs',
+    'attachments.cjs',
+    'external-links.cjs',
+    'runtime.cjs',
+  ].map(fileName => read(`electron/ipc/${fileName}`)).join('\n');
+
+  assert.doesNotMatch(mainSource, /ipcMain\.handle\(/);
+  assert.match(mainSource, /new BrowserWindow\(/);
+  assert.match(mainSource, /app\.whenReady\(\)/);
+  assert.doesNotMatch(registrarSource, /require\(['"]\.\.\/services\/(?:workspace|goal-[^'"]+)-service\.cjs['"]\)/);
+});

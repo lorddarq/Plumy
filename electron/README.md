@@ -33,6 +33,8 @@ Task attachment implementation:
 - Persistence normalization: `src/app/utils/workspaceSanitizers.ts`
 - Backup/import normalization: `src/app/services/workspaceBackup.ts`
 - Main/preload bridge: `electron/main.cjs`, `electron/preload.cjs`, and `src/electron.d.ts`
+- IPC registration by capability: `electron/ipc/store.cjs`, `electron/ipc/goals.cjs`, `electron/ipc/documents.cjs`, `electron/ipc/attachments.cjs`, `electron/ipc/external-links.cjs`, and `electron/ipc/runtime.cjs`
+- Electron composition and lifecycle ownership: `electron/main.cjs`
 - MCP mutation logic: `electron/services/workspace-service.cjs`
 - MCP tool/resource registry: `electron/services/mcp-registry.cjs`
 - MCP tool and resource handlers: `electron/services/mcp-handlers.cjs`, `electron/services/mcp-resource-handlers.cjs`
