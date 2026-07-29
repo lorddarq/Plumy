@@ -130,6 +130,53 @@ test('Codex connection test reports its native signed-out state without collecti
   assert.equal(JSON.stringify(store.get('omvra.agentRuntimeObservations.v1')).includes('credential'), false);
 });
 
+test('Claude connection test verifies its native stream-json CLI without consuming a model turn', async () => {
+  const store = createStore();
+  saveProfile(store, { id: 'claude', name: 'Claude', integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude', fixedArgs: ['--setting-sources', 'user,project'], enabled: true });
+  saveDefaults(store, { globalProfileId: 'claude', projectProfileIds: {} });
+  let writes = 0;
+  const child = createChild(() => { writes += 1; });
+  const resultPromise = testConnection(store, { workspacePath: '/tmp/workspace' }, {
+    spawnProcess: (command, args) => {
+      assert.equal(command, '/usr/bin/claude');
+      assert.deepEqual(args, ['--setting-sources', 'user,project', '--help']);
+      queueMicrotask(() => {
+        child.stdout.write('Usage: claude --print --input-format stream-json --output-format stream-json\n');
+        child.emit('exit', 0);
+      });
+      return child;
+    },
+    timeoutMs: 100,
+  });
+  const result = await resultPromise;
+
+  assert.equal(result.ok, true);
+  assert.equal(writes, 0);
+  assert.equal(result.observation.implementationName, 'Claude Code');
+  assert.equal(result.observation.authentication, 'unknown');
+  assert.equal(result.observation.adapterVersion, null);
+});
+
+test('OpenCode remains configurable through the generic native ACP profile', async () => {
+  const store = createStore();
+  saveProfile(store, { id: 'opencode', name: 'OpenCode', integrationMode: 'acp-local-stdio', executablePath: '/usr/bin/opencode', fixedArgs: ['acp'], enabled: true });
+  saveDefaults(store, { globalProfileId: 'opencode', projectProfileIds: {} });
+  const child = createChild(() => queueMicrotask(() => child.stdout.write(`${JSON.stringify({
+    jsonrpc: '2.0', id: 0, result: { protocolVersion: 1, authMethods: [], agentInfo: { name: 'OpenCode', version: '1.2.10' } },
+  })}\n`)));
+  const result = await testConnection(store, { workspacePath: '/tmp/workspace' }, {
+    spawnProcess: (command, args) => {
+      assert.equal(command, '/usr/bin/opencode');
+      assert.deepEqual(args, ['acp']);
+      return child;
+    },
+    timeoutMs: 100,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.observation.implementationName, 'OpenCode');
+});
+
 test('external executable handoff reports launch failures instead of leaving an unhandled process error', async () => {
   const store = createStore();
   saveProfile(store, { id: 'external', name: 'External', integrationMode: 'external-handoff', executablePath: '/missing/agent', enabled: true });

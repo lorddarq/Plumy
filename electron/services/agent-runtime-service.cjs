@@ -53,10 +53,12 @@ function testConnection(store, payload, options = {}) {
   const resolution = resolveProfile(store, payload);
   if (!resolution.ok) return Promise.resolve(resolution);
   const { profile } = resolution;
-  if (!['acp-local-stdio', 'codex-app-server-stdio'].includes(profile.integrationMode)) {
+  if (!['acp-local-stdio', 'claude-stream-json-stdio', 'codex-app-server-stdio'].includes(profile.integrationMode)) {
     return Promise.resolve({ ok: false, state: 'unsupported', profile, error: 'Connection testing is only available for local stdio runtime profiles.' });
   }
   const isCodexAppServer = profile.integrationMode === 'codex-app-server-stdio';
+  const isClaudeStreamJson = profile.integrationMode === 'claude-stream-json-stdio';
+  const runtimeName = isCodexAppServer ? 'Codex app-server' : isClaudeStreamJson ? 'Claude Code' : 'ACP';
   const workspacePath = cleanWorkspacePath(payload.workspacePath);
   const spawnProcess = options.spawnProcess || spawn;
   const now = options.now || (() => new Date().toISOString());
@@ -67,6 +69,7 @@ function testConnection(store, payload, options = {}) {
     let child;
     let settled = false;
     let stdout = '';
+    let rawStdout = '';
     let stderr = '';
     let timer;
     let initializationResult;
@@ -84,6 +87,8 @@ function testConnection(store, payload, options = {}) {
     try {
       const args = isCodexAppServer
         ? [...(profile.fixedArgs || []), 'app-server', '--stdio']
+        : isClaudeStreamJson
+          ? [...(profile.fixedArgs || []), '--help']
         : profile.fixedArgs || [];
       child = spawnProcess(profile.executablePath, args, {
         cwd: workspacePath,
@@ -99,7 +104,7 @@ function testConnection(store, payload, options = {}) {
     timer = setTimeout(() => finish({
       ok: false,
       state: 'unavailable',
-      error: `${isCodexAppServer ? 'Codex app-server' : 'ACP'} initialization timed out after ${timeoutMs} ms.`,
+      error: `${runtimeName} initialization timed out after ${timeoutMs} ms.`,
     }), timeoutMs);
 
     child.once('error', error => finish({
@@ -110,7 +115,9 @@ function testConnection(store, payload, options = {}) {
     }));
     child.stderr?.on('data', chunk => { stderr = `${stderr}${chunk}`.slice(-2048); });
     child.stdout?.on('data', chunk => {
-      stdout += chunk.toString();
+      const text = chunk.toString();
+      rawStdout = `${rawStdout}${text}`.slice(-32768);
+      stdout += text;
       const lines = stdout.split(/\r?\n/);
       stdout = lines.pop() || '';
       for (const line of lines) {
@@ -183,10 +190,34 @@ function testConnection(store, payload, options = {}) {
       }
     });
     child.once('exit', (code) => {
-      if (!settled) finish({ ok: false, state: 'unavailable', error: `${isCodexAppServer ? 'Codex app-server' : 'ACP agent'} exited before initialization (${code ?? 'unknown'}).${stderr ? ` ${stderr.trim()}` : ''}` });
+      if (settled) return;
+      if (isClaudeStreamJson && code === 0) {
+        const supportsStreamJson = ['--print', '--input-format', '--output-format', 'stream-json'].every(value => rawStdout.includes(value));
+        if (!supportsStreamJson) {
+          finish({ ok: false, state: 'incompatible', error: 'Claude Code does not advertise the required stream-json stdio interface.' });
+          return;
+        }
+        const observation = {
+          availability: 'available',
+          authentication: 'unknown',
+          capabilities: 'supported',
+          implementationName: 'Claude Code',
+          adapterVersion: null,
+          providerName: 'anthropic',
+          modelOrMode: null,
+          agentCapabilities: { streamJson: true, sessionResume: true },
+          authMethodCount: 0,
+          observedAt,
+          state: 'ready',
+        };
+        finish({ ok: true, state: observation.state, observation });
+        return;
+      }
+      finish({ ok: false, state: 'unavailable', error: `${runtimeName} exited before initialization (${code ?? 'unknown'}).${stderr ? ` ${stderr.trim()}` : ''}` });
     });
 
     try {
+      if (isClaudeStreamJson) return;
       child.stdin.write(`${JSON.stringify({
         ...(!isCodexAppServer && { jsonrpc: '2.0' }),
         id: 0,

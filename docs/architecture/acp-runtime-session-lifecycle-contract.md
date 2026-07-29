@@ -10,9 +10,9 @@ Add local agent runtimes as protocol-specific clients inside the existing Electr
 
 ACP owns live interaction. Existing task collaboration, Goal lifecycle, context ledger, evidence, revision, acceptance, archive, backup, and audit contracts remain authoritative. A session ending never submits, accepts, completes, archives, or abandons Omvra work.
 
-The first release supports explicitly configured local stdio runtimes using either native ACP or the native Codex app-server protocol, plus a user-invoked external handoff. Omvra launches the installed runtime directly; it does not require a separately installed protocol-conversion executable. Stdio is a locality and process-lifecycle choice, not a single-agent restriction: Omvra may coordinate multiple concurrent sessions in one capable runtime and/or multiple explicitly started runtime subprocesses. Distributed runtime pools and remote transports remain deferred.
+The first release supports explicitly configured local stdio runtimes using native ACP, native Codex app-server, or native Claude stream-json, plus a user-invoked external handoff. Omvra launches the installed runtime directly; it does not require a separately installed protocol-conversion executable. Generic ACP profiles remain application-neutral: any conforming runtime can be configured with its exact executable and fixed launch arguments, including OpenCode with `acp`. Stdio is a locality and process-lifecycle choice, not a single-agent restriction: Omvra may coordinate multiple concurrent sessions in one capable runtime and/or multiple explicitly started runtime subprocesses. Distributed runtime pools and remote transports remain deferred.
 
-Agent-runtime and MCP transports are independent. ACP or Codex app-server carries runtime/session control over local stdio; MCP carries governed Omvra reads and writes through a separately negotiated, session-scoped connection. The first release does not give a runtime the existing workspace-wide HTTP bearer token or unrestricted stdio MCP access. Codex authentication remains owned by Codex and is only observed through `account/read`; Omvra does not collect provider credentials. The release does not add automatic spawning, watcher dispatch, remote gateways, arbitrary runtime plugins, or silent failover.
+Agent-runtime and MCP transports are independent. ACP, Codex app-server, or Claude stream-json carries runtime/session control over local stdio; MCP carries governed Omvra reads and writes through a separately negotiated, session-scoped connection. The first release does not give a runtime the existing workspace-wide HTTP bearer token or unrestricted stdio MCP access. Authentication remains owned by the selected runtime and Omvra does not collect provider credentials. Codex exposes authentication during model-free preflight through `account/read`; Claude authentication remains `unknown` until an explicitly started session reports it because its CLI exposes no model-free authentication handshake. The release does not add automatic spawning, watcher dispatch, remote gateways, arbitrary runtime plugins, or silent failover.
 
 ## Decision drivers
 
@@ -48,10 +48,10 @@ Agent-runtime and MCP transports are independent. ACP or Codex app-server carrie
 | Option | Structure | Benefits | Costs and risks | Conditions |
 | --- | --- | --- | --- | --- |
 | Keep runtime/session data on collaboration, Goal nodes, or tasks | Add provider fields to current projections | Smallest initial lookup path | Couples identity to runtime, leaks runtime concerns into durable work, grows current records, conflicts with existing validation | Rejected |
-| Separate runtime profiles and session bindings behind in-process protocol clients | New versioned records; native ACP and Codex clients call existing task/Goal/context/evidence domains | Preserves ownership, supports multiple runtimes without external conversion tools, bounded migration, reuses current deployment | Requires correlated writes, explicit recovery, and maintained protocol-specific clients | **Selected** |
+| Separate runtime profiles and session bindings behind in-process protocol clients | New versioned records; native ACP, Codex, and Claude clients call existing task/Goal/context/evidence domains | Preserves ownership, supports multiple runtimes without external conversion tools, bounded migration, reuses current deployment | Requires correlated writes, explicit recovery, and maintained protocol-specific clients | **Selected** |
 | Separate runtime service or arbitrary plugin host | New process/service owns runtime profiles and sessions | Strong isolation and extension flexibility | Adds authentication, synchronization, deployment, and plugin security cost before a demonstrated need | Rejected for the first release |
 
-The selected option uses local stdio because Omvra owns the child process and can correlate launch, exit, crash, cancellation, and cleanup without opening a listening endpoint. ACP-capable runtimes use ACP directly. Codex uses its native `codex app-server --stdio` JSONL protocol directly; Omvra does not route Codex through a Codex-to-ACP executable. HTTP or WebSocket becomes useful when a runtime must live on another machine, be shared independently of the desktop process, or scale as a distributed pool. No transport supplies orchestration: Omvra remains responsible for delegation, concurrency, dependencies, evidence, retries, budgets, and acceptance.
+The selected option uses local stdio because Omvra owns the child process and can correlate launch, exit, crash, cancellation, and cleanup without opening a listening endpoint. ACP-capable runtimes use ACP directly; OpenCode is the first verified generic example through `opencode acp`. Codex uses `codex app-server --stdio`, while Claude uses `claude -p --input-format stream-json --output-format stream-json --verbose`. Omvra speaks each native protocol directly and does not route either application through a conversion executable. HTTP or WebSocket becomes useful when a runtime must live on another machine, be shared independently of the desktop process, or scale as a distributed pool. No transport supplies orchestration: Omvra remains responsible for delegation, concurrency, dependencies, evidence, retries, budgets, and acceptance.
 
 ## Recommendation
 
@@ -61,7 +61,7 @@ Use separate in-process protocol clients and versioned records. This is the smal
 
 Evidence: current collaboration validation already excludes runtime data; stable attempt IDs and lifecycle transitions exist; Goal policy/evidence and MCP audit boundaries are implemented; Electron main-process composition already hosts local protocol adapters.
 
-Assumptions to validate during each protocol-client spike: the runtime exposes stable initialization/capability behavior, its opaque session reference can be restored reliably, and process-level interruption can be distinguished from an acknowledged cancellation. Codex app-server schemas are version-specific, so the installed executable remains the source of truth. Failure of any assumption narrows resume or capability support; it does not justify simulated behavior or silent fallback.
+Assumptions to validate during each protocol-client spike: the runtime exposes stable initialization/capability behavior, its opaque session reference can be restored reliably, and process-level interruption can be distinguished from an acknowledged cancellation. Codex app-server schemas and Claude stream-json messages are version-specific, so the installed executable remains the source of truth. Failure of any assumption narrows resume or capability support; it does not justify simulated behavior or silent fallback.
 
 ## Identity and ownership boundaries
 
@@ -81,7 +81,7 @@ No identity implies another. Assigning Arc, Codex, or any other Omvra persona do
 Runtime profiles are stored separately under `omvra.agentRuntimeProfiles.v1`. Defaults are workspace settings, not person fields.
 
 ```ts
-type RuntimeIntegrationMode = 'external-handoff' | 'acp-local-stdio' | 'codex-app-server-stdio';
+type RuntimeIntegrationMode = 'external-handoff' | 'acp-local-stdio' | 'claude-stream-json-stdio' | 'codex-app-server-stdio';
 
 interface AgentRuntimeProfileV1 {
   schemaVersion: 1;
@@ -284,8 +284,10 @@ Active and interrupted bindings retain the opaque reference so a supported resum
 
 ## Local-stdio first-release boundary
 
-- Native ACP and Codex app-server clients run in the Electron main process behind the existing domain facades; neither is a domain dependency or imports MCP internals.
+- Native ACP, Codex app-server, and Claude stream-json clients run in the Electron main process behind the existing domain facades; none is a domain dependency or imports MCP internals.
 - Codex profiles launch the configured Codex executable with `app-server --stdio`. Omvra speaks Codex JSONL directly, sends `initialize`/`initialized`, and observes existing authentication with `account/read`; no Codex-to-ACP executable is installed or invoked.
+- Claude profiles launch the configured Claude executable in print-mode stream-json input/output. Model-free preflight validates that the exact executable advertises the required flags without sending a user message; version, session initialization, and authentication are observed only after an explicit execution request.
+- Generic ACP profiles accept any conforming executable and fixed arguments. OpenCode uses its installed executable with `acp`; its advertised ACP version, capabilities, and authentication methods are handled by the same generic client.
 - Launch requires an explicit user or already-governed Goal action. Assignment, delegation eligibility, watcher changes, and board polling cannot launch it.
 - The executable path is exact, fixed arguments are an array, the workspace directory is validated, and no shell interpolation is used.
 - Only the selected runtime receives the bounded context pack and session-scoped Omvra MCP connection configuration required for the scope.
@@ -347,7 +349,7 @@ No failure class authorizes fallback, lifecycle advancement, or data deletion. R
 2. Add normalized runtime-profile/default validation and persistence without launching processes.
 3. Add connection preflight and explicit external handoff with redacted audit.
 4. Add the separate session-binding/event store and `sessionBindingId` attempt extension.
-5. Add native local-stdio ACP and Codex app-server clients with focused initialization/capability/auth tests.
+5. Add native local-stdio ACP, Codex app-server, and Claude stream-json clients with focused initialization/capability/auth tests.
 6. Add the session-scoped MCP grant/gateway boundary; prove that both negotiated transports deny out-of-scope and expired access without broader fallback.
 7. Bind one user-initiated task attempt; pass bounded context plus scoped MCP configuration.
 8. Add steering, input, permission, cancel, close, crash, and resume behavior only where negotiated capabilities support them.
@@ -393,7 +395,7 @@ Rollback preserves runtime profiles, bindings, attempts, events, and unknown fie
 
 ## Remaining product decisions
 
-- The second native runtime protocol used to prove portability beyond ACP and Codex app-server.
+- The next native runtime protocol used to prove portability beyond ACP, Codex app-server, and Claude stream-json.
 - Which installed applications support a safe review-before-send external handoff.
 - The later user-configurable retention duration for normalized closed-session events.
 - Whether provider-reported cost is warning-only or may trigger a governed cancellation threshold.

@@ -35,6 +35,9 @@ test('runtime profiles validate executable paths, schemes, and credential-like a
   assert.equal(saveProfile(store, {
     id: 'codex', name: 'Codex', integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', enabled: true,
   }).integrationMode, 'codex-app-server-stdio');
+  assert.equal(saveProfile(store, {
+    id: 'claude', name: 'Claude', integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude', enabled: true,
+  }).integrationMode, 'claude-stream-json-stdio');
 });
 
 test('runtime resolution is deterministic and never silently falls back', () => {

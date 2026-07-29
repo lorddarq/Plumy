@@ -290,7 +290,7 @@ declare global {
     schemaVersion: 1;
     id: string;
     name: string;
-    integrationMode: 'acp-local-stdio' | 'codex-app-server-stdio' | 'external-handoff';
+    integrationMode: 'acp-local-stdio' | 'claude-stream-json-stdio' | 'codex-app-server-stdio' | 'external-handoff';
     executablePath?: string;
     fixedArgs: string[];
     externalUrlScheme?: string;
