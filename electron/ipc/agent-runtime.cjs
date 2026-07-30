@@ -23,6 +23,7 @@ function registerAgentRuntimeIpcHandlers({
   appendAgentRuntimeOutcome,
   confirmAgentExecutionStart,
   createAgentRuntimeSessionBinding,
+  evaluateAgentRuntimeGovernance,
   listAgentRuntimeSessions,
   prepareAgentExecution,
   prepareAgentRuntimeSessionArchive,
@@ -52,6 +53,7 @@ function registerAgentRuntimeIpcHandlers({
   ipcMain.handle('agent-runtime/sessions/create-binding', (_, payload) => createAgentRuntimeSessionBinding(payload));
   ipcMain.handle('agent-runtime/sessions/update-binding', (_, payload) => updateAgentRuntimeSessionBinding(payload));
   ipcMain.handle('agent-runtime/sessions/append-event', (_, payload) => appendAgentRuntimeEvent(payload));
+  ipcMain.handle('agent-runtime/sessions/evaluate-governance', (_, payload) => evaluateAgentRuntimeGovernance(payload));
   ipcMain.handle('agent-runtime/sessions/append-outcome', (_, payload) => appendAgentRuntimeOutcome(payload));
   ipcMain.handle('agent-runtime/sessions/prepare-archive', (_, bindingId) => prepareAgentRuntimeSessionArchive(bindingId));
   ipcMain.handle('agent-runtime/test-connection', async (_, payload) => {

@@ -101,7 +101,12 @@ test('agent runtime registrar validates writes and keeps custom schemes behind i
   const values = new Map();
   const store = { get: key => values.get(key), set: (key, value) => values.set(key, value) };
   let opened;
-  registerAgentRuntimeIpcHandlers({ ipcMain, store, shell: { openExternal: async url => { opened = url; } } });
+  registerAgentRuntimeIpcHandlers({
+    ipcMain,
+    store,
+    shell: { openExternal: async url => { opened = url; } },
+    evaluateAgentRuntimeGovernance: payload => ({ ok: true, bindingId: payload.bindingId, action: 'warn' }),
+  });
 
   const saved = handlers.get('agent-runtime/save-profile')(null, {
     id: 'external', name: 'Codex', integrationMode: 'external-handoff', externalUrlScheme: 'codex', enabled: true,
@@ -114,6 +119,7 @@ test('agent runtime registrar validates writes and keeps custom schemes behind i
   assert.equal(handoff.ok, true);
   assert.equal(new URL(opened).protocol, 'codex:');
   assert.equal(handlers.has('agent-runtime/test-connection'), true);
+  assert.deepEqual(handlers.get('agent-runtime/sessions/evaluate-governance')(null, { bindingId: 'binding-1' }), { ok: true, bindingId: 'binding-1', action: 'warn' });
 });
 
 test('task context registrar keeps reads targeted and checkpoints human-authored', () => {

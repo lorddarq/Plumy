@@ -269,6 +269,7 @@ declare global {
           createBinding: (payload: Record<string, unknown>) => Promise<any>;
           updateBinding: (payload: Record<string, unknown>) => Promise<any>;
           appendEvent: (payload: Record<string, unknown>) => Promise<any>;
+          evaluateGovernance: (payload: Record<string, unknown>) => Promise<any>;
           appendOutcome: (payload: Record<string, unknown>) => Promise<any>;
           prepareArchive: (bindingId: string) => Promise<any>;
         };

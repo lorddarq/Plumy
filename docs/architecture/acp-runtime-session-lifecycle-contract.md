@@ -312,7 +312,15 @@ ACP receives the latest accepted checkpoint and bounded history index from Omvra
 
 ### Audit and telemetry
 
-Use a bounded ACP session-event stream correlated by binding ID, runtime profile ID, work-scope IDs, and attempt ID. Audit records omit `opaqueSessionRef`, prompts, responses, transcripts, tool payloads, credentials, evidence bodies, and hidden reasoning. Usage/cost fields retain missing-versus-zero semantics and a `reported` provenance label.
+Use a bounded ACP session-event stream correlated by binding ID, runtime profile ID, work-scope IDs, and attempt ID. Audit records omit `opaqueSessionRef`, prompts, responses, transcripts, tool payloads, credentials, evidence bodies, and hidden reasoning. Usage/cost fields retain missing-versus-zero semantics and a `provider-reported` provenance label.
+
+Native runtime events remain separate from `omvra.mcp.audit.v1`. Every stored event identifies its normalized kind, native protocol and event type, binding, runtime profile, task/contribution or Goal-node scope, execution attempt, source revision, observed time, and bounded outcome/capability facts. Protocol-specific events that have no shared semantic remain `unsupported-event`; they are not relabelled as ACP events. Permission records retain only request correlation, capability ID, `requested|allowed|denied|cancelled|unknown`, and `authority: runtime-provider`. They do not represent Omvra scope approval, evidence acceptance, destructive-operation consent, or budget widening.
+
+Usage records are optional provider reports. Each declares `aggregation: cumulative|delta|unknown`; only cumulative values or complete delta series may be compared with a threshold. Missing, delayed, or aggregation-unknown usage remains unknown rather than becoming zero. Context usage, input/output/total tokens, cost, and currency are independent optional fields, and no projection claims to predict or guarantee the provider's final bill.
+
+The session domain evaluates wall-time, turn, tool-call, workspace concurrency, work-scope attempt, reported-token, and reported-cost thresholds. Each configured threshold returns `allow`, `warn`, `pause`, or `cancel`; reported token/cost thresholds default to warning, while a caller must opt into stronger action. Missing or delayed provider usage may warn or pause, never cancel by default. A governance decision is advisory to the runtime controller and cannot mutate task/Goal acceptance state. Pause/cancel results set no automatic retry, so the same threshold cannot create a retry loop.
+
+Every native runtime event and runtime-authored context outcome carries a non-dispatchable origin marker tied to its execution attempt. Watchers and future automatic-dispatch policy must suppress this causal chain. A human-authored later revision may steer or pause the existing session, but storing an event, usage report, permission fact, or agent-authored checkpoint never launches another attempt.
 
 ### Archive, backup, and restore
 

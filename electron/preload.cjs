@@ -98,6 +98,7 @@ contextBridge.exposeInMainWorld('electron', {
       createBinding: (payload) => ipcRenderer.invoke('agent-runtime/sessions/create-binding', payload),
       updateBinding: (payload) => ipcRenderer.invoke('agent-runtime/sessions/update-binding', payload),
       appendEvent: (payload) => ipcRenderer.invoke('agent-runtime/sessions/append-event', payload),
+      evaluateGovernance: (payload) => ipcRenderer.invoke('agent-runtime/sessions/evaluate-governance', payload),
       appendOutcome: (payload) => ipcRenderer.invoke('agent-runtime/sessions/append-outcome', payload),
       prepareArchive: (bindingId) => ipcRenderer.invoke('agent-runtime/sessions/prepare-archive', bindingId),
     },

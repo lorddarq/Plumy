@@ -20,6 +20,18 @@ const STATE_TRANSITIONS = new Map([
 const MAX_EVENTS = 2_000;
 const MAX_READ_LIMIT = 100;
 const FORBIDDEN_KEYS = new Set(['authorization', 'body', 'chainOfThought', 'cookie', 'credential', 'evidenceBody', 'hiddenReasoning', 'messages', 'opaqueSessionRef', 'password', 'prompt', 'rawPrompt', 'response', 'secret', 'token', 'toolPayload', 'toolResponse', 'transcript']);
+const RUNTIME_PROTOCOLS = new Set(['acp', 'codex-app-server', 'claude-stream-json', 'unknown']);
+const PERMISSION_STATES = new Set(['requested', 'allowed', 'denied', 'cancelled', 'unknown']);
+const GOVERNANCE_ACTIONS = new Set(['warn', 'pause', 'cancel']);
+const GOVERNANCE_THRESHOLDS = {
+  wallTimeMs: { defaultAction: 'cancel' },
+  turns: { defaultAction: 'pause' },
+  toolCalls: { defaultAction: 'pause' },
+  concurrency: { defaultAction: 'pause' },
+  attempts: { defaultAction: 'pause' },
+  reportedTokens: { defaultAction: 'warn', providerReported: true },
+  reportedCost: { defaultAction: 'warn', providerReported: true },
+};
 
 function createAgentRuntimeSessionService({
   readBindings,
@@ -39,6 +51,22 @@ function createAgentRuntimeSessionService({
 
   const failure = (error, message, details = {}) => ({ ok: false, error, message, ...details });
   const clone = value => JSON.parse(JSON.stringify(value));
+
+  function safeIdentifier(value, maxLength = 160) {
+    const normalized = normalizeString(value);
+    return normalized && normalized.length <= maxLength && /^[a-zA-Z0-9._:/-]+$/.test(normalized) ? normalized : '';
+  }
+
+  function finiteNonNegative(value) {
+    if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : null;
+  }
+
+  function validTimestamp(value) {
+    const normalized = normalizeString(value);
+    return normalized && !Number.isNaN(Date.parse(normalized)) ? normalized : '';
+  }
 
   function forbiddenPath(value, path = 'value') {
     if (!value || typeof value !== 'object') return null;
@@ -172,30 +200,200 @@ function createAgentRuntimeSessionService({
       session: 'session-state', turn: 'turn-state', plan: 'plan-update', message: 'message-observed', tool: 'tool-state',
       permission: 'permission-request', input: 'input-request', elicitation: 'input-request', usage: 'usage-reported', cancellation: 'cancellation-state', close: 'session-closed', closure: 'session-closed',
     };
-    const sourceKind = normalizeString(input.kind);
+    const sourceKind = safeIdentifier(input.kind, 80);
     const type = kindMap[sourceKind] || 'unsupported-event';
+    const observedAt = input.observedAt === undefined ? now() : validTimestamp(input.observedAt);
+    const startedAt = input.startedAt === undefined ? '' : validTimestamp(input.startedAt);
+    const finishedAt = input.finishedAt === undefined ? '' : validTimestamp(input.finishedAt);
+    if (!observedAt || (input.startedAt !== undefined && !startedAt) || (input.finishedAt !== undefined && !finishedAt)) {
+      return failure('INVALID_ACP_EVENT_TIMESTAMP', 'Runtime event timestamps must be valid ISO-compatible timestamps.');
+    }
+    if (startedAt && finishedAt && Date.parse(finishedAt) < Date.parse(startedAt)) {
+      return failure('INVALID_ACP_EVENT_TIMESTAMP', 'finishedAt cannot precede startedAt.');
+    }
+    const sourceProtocol = RUNTIME_PROTOCOLS.has(input.sourceProtocol) ? input.sourceProtocol : 'unknown';
+    const nativeEventType = safeIdentifier(input.nativeEventType || sourceKind, 160) || 'unknown';
+    const capabilityId = safeIdentifier(input.capabilityId, 128);
+    const eventId = input.id === undefined ? createId('acp-event') : safeIdentifier(input.id);
+    if (!eventId) return failure('INVALID_ACP_EVENT', 'Runtime event id must be a bounded identifier.');
     const event = {
       schemaVersion: SESSION_SCHEMA_VERSION,
-      id: normalizeString(input.id) || createId('acp-event'),
+      id: eventId,
       bindingId: normalizeString(input.bindingId),
       runtimeProfileId: normalizeString(input.runtimeProfileId),
       type,
       sourceKind: sourceKind || 'unknown',
-      observedAt: normalizeString(input.observedAt) || now(),
-      ...(normalizeString(input.state) ? { state: normalizeString(input.state).slice(0, 80) } : {}),
-      ...(normalizeString(input.outcome) ? { outcome: normalizeString(input.outcome).slice(0, 80) } : {}),
-      ...(normalizeString(input.requestId) ? { requestId: normalizeString(input.requestId).slice(0, 160) } : {}),
-      ...(normalizeString(input.toolName) ? { toolName: normalizeString(input.toolName).slice(0, 160) } : {}),
+      sourceProtocol,
+      nativeEventType,
+      origin: 'native-runtime',
+      dispatchEligible: false,
+      observedAt,
+      ...(startedAt ? { startedAt } : {}),
+      ...(finishedAt ? { finishedAt } : {}),
+      ...(startedAt && finishedAt ? { durationMs: Date.parse(finishedAt) - Date.parse(startedAt) } : {}),
+      ...(safeIdentifier(input.state, 80) ? { state: safeIdentifier(input.state, 80) } : {}),
+      ...(safeIdentifier(input.outcome, 80) ? { outcome: safeIdentifier(input.outcome, 80) } : {}),
+      ...(safeIdentifier(input.requestId) ? { requestId: safeIdentifier(input.requestId) } : {}),
+      ...(safeIdentifier(input.toolName) ? { toolName: safeIdentifier(input.toolName) } : {}),
+      ...(capabilityId ? { capabilityId } : {}),
     };
     if (!event.bindingId || !event.runtimeProfileId) return failure('INVALID_ACP_EVENT', 'bindingId and runtimeProfileId are required.');
+    if (sourceKind === 'permission') {
+      event.permission = {
+        authority: 'runtime-provider',
+        state: PERMISSION_STATES.has(input.permissionState) ? input.permissionState : 'unknown',
+        ...(capabilityId ? { capabilityId } : {}),
+      };
+    }
     if (sourceKind === 'usage') {
-      event.usage = { provenance: 'reported' };
-      for (const field of ['inputTokens', 'outputTokens', 'contextTokens', 'cost']) {
-        if (Number.isFinite(Number(input[field]))) event.usage[field] = Number(input[field]);
+      event.usage = {
+        provenance: 'provider-reported',
+        optional: true,
+        aggregation: ['cumulative', 'delta'].includes(input.usageAggregation) ? input.usageAggregation : 'unknown',
+      };
+      for (const field of ['inputTokens', 'outputTokens', 'totalTokens', 'contextTokens', 'cost']) {
+        const value = finiteNonNegative(input[field]);
+        if (value !== null) event.usage[field] = value;
       }
-      if (normalizeString(input.currency)) event.usage.currency = normalizeString(input.currency).slice(0, 16);
+      if (safeIdentifier(input.currency, 16)) event.usage.currency = safeIdentifier(input.currency, 16);
     }
     return { ok: true, event };
+  }
+
+  function correlateEvent(event, binding) {
+    const scope = binding.scope || {};
+    return {
+      ...event,
+      ...(scope.kind === 'task' ? {
+        workScope: 'task',
+        taskId: scope.taskId,
+        ...(scope.contributionId ? { contributionId: scope.contributionId } : {}),
+        executionAttemptId: scope.executionAttemptId,
+        sourceRevision: scope.taskRevision,
+      } : {
+        workScope: 'goal-node',
+        goalId: scope.goalId,
+        goalElementId: scope.goalElementId,
+        goalExecutionId: scope.goalExecutionId,
+        executionAttempt: scope.executionAttempt,
+        sourceRevision: scope.goalRevision,
+      }),
+    };
+  }
+
+  function normalizeThreshold(value, definition) {
+    const limit = finiteNonNegative(typeof value === 'object' && value !== null ? value.limit : value);
+    if (limit === null) return failure('INVALID_ACP_GOVERNANCE_POLICY', 'Governance thresholds require a non-negative numeric limit.');
+    const requestedAction = typeof value === 'object' && value !== null ? value.action : undefined;
+    if (requestedAction !== undefined && !GOVERNANCE_ACTIONS.has(requestedAction)) {
+      return failure('INVALID_ACP_GOVERNANCE_POLICY', `Unsupported governance action "${requestedAction}".`);
+    }
+    const action = GOVERNANCE_ACTIONS.has(requestedAction) ? requestedAction : definition.defaultAction;
+    return { ok: true, threshold: { limit, action, providerReported: definition.providerReported === true } };
+  }
+
+  function sameWorkScope(left, right) {
+    if (left?.kind !== right?.kind) return false;
+    if (left.kind === 'task') return left.taskId === right.taskId && (left.contributionId || null) === (right.contributionId || null);
+    return left.goalId === right.goalId && left.goalElementId === right.goalElementId;
+  }
+
+  function reportedTokenValue(usage) {
+    const total = finiteNonNegative(usage?.totalTokens);
+    if (total !== null) return total;
+    const input = finiteNonNegative(usage?.inputTokens);
+    const output = finiteNonNegative(usage?.outputTokens);
+    return input === null && output === null ? null : (input ?? 0) + (output ?? 0);
+  }
+
+  function evaluateGovernance(store, input = {}) {
+    const bindingId = normalizeString(input.bindingId);
+    const bindings = Array.isArray(readBindings(store)) ? readBindings(store) : [];
+    const binding = bindings.find(item => item.id === bindingId);
+    if (!binding) return failure('ACP_SESSION_NOT_FOUND', 'Session binding was not found.');
+    const events = (Array.isArray(readEvents(store)) ? readEvents(store) : []).filter(item => item.bindingId === bindingId);
+    const evaluatedAt = input.evaluatedAt === undefined ? now() : validTimestamp(input.evaluatedAt);
+    if (!evaluatedAt) return failure('INVALID_ACP_GOVERNANCE_POLICY', 'evaluatedAt must be a valid timestamp.');
+    const latestUsage = [...events].reverse().find(event => event.type === 'usage-reported');
+    const usageEvents = events.filter(event => event.type === 'usage-reported');
+    const usageAggregation = latestUsage?.usage?.aggregation || 'unknown';
+    const tokenValue = usageAggregation === 'cumulative'
+      ? reportedTokenValue(latestUsage?.usage)
+      : usageAggregation === 'delta' && usageEvents.every(event => reportedTokenValue(event.usage) !== null)
+        ? usageEvents.reduce((total, event) => total + reportedTokenValue(event.usage), 0)
+        : null;
+    const costValue = usageAggregation === 'cumulative'
+      ? finiteNonNegative(latestUsage?.usage?.cost)
+      : usageAggregation === 'delta' && usageEvents.every(event => finiteNonNegative(event.usage?.cost) !== null)
+        ? usageEvents.reduce((total, event) => total + finiteNonNegative(event.usage.cost), 0)
+        : null;
+    const metrics = {
+      wallTimeMs: Number.isNaN(Date.parse(binding.createdAt)) ? null : Math.max(0, Date.parse(evaluatedAt) - Date.parse(binding.createdAt)),
+      turns: events.filter(event => event.type === 'turn-state').length,
+      toolCalls: events.filter(event => event.type === 'tool-state').length,
+      concurrency: bindings.filter(item => ACTIVE_STATES.has(item.state)).length,
+      attempts: bindings.filter(item => sameWorkScope(item.scope, binding.scope)).length,
+      reportedTokens: tokenValue,
+      reportedCost: costValue,
+    };
+    if (input.thresholds !== undefined && (!input.thresholds || typeof input.thresholds !== 'object' || Array.isArray(input.thresholds))) {
+      return failure('INVALID_ACP_GOVERNANCE_POLICY', 'thresholds must be an object.');
+    }
+    const unknownThreshold = Object.keys(input.thresholds || {}).find(dimension => !GOVERNANCE_THRESHOLDS[dimension]);
+    if (unknownThreshold) return failure('INVALID_ACP_GOVERNANCE_POLICY', `Unsupported governance threshold "${unknownThreshold}".`);
+    const thresholds = {};
+    for (const [dimension, value] of Object.entries(input.thresholds || {})) {
+      const normalized = normalizeThreshold(value, GOVERNANCE_THRESHOLDS[dimension]);
+      if (!normalized.ok) return normalized;
+      thresholds[dimension] = normalized.threshold;
+    }
+    const breaches = [];
+    const unknown = [];
+    for (const [dimension, threshold] of Object.entries(thresholds)) {
+      const value = metrics[dimension];
+      if (value === null) {
+        unknown.push({ dimension, reason: 'missing-or-ambiguous-provider-report' });
+      } else if (value > threshold.limit) {
+        breaches.push({ dimension, value, limit: threshold.limit, action: threshold.action, providerReported: threshold.providerReported });
+      }
+    }
+    const latestUsageAt = latestUsage ? Date.parse(latestUsage.observedAt) : null;
+    const maxUsageAgeMs = finiteNonNegative(input.maxUsageAgeMs);
+    if (input.maxUsageAgeMs !== undefined && maxUsageAgeMs === null) {
+      return failure('INVALID_ACP_GOVERNANCE_POLICY', 'maxUsageAgeMs must be a non-negative number.');
+    }
+    const usageDelayed = latestUsageAt !== null && maxUsageAgeMs !== null && Date.parse(evaluatedAt) - latestUsageAt > maxUsageAgeMs;
+    if (input.missingUsageAction !== undefined && !['warn', 'pause'].includes(input.missingUsageAction)) {
+      return failure('INVALID_ACP_GOVERNANCE_POLICY', 'missingUsageAction must be warn or pause.');
+    }
+    if (input.delayedUsageAction !== undefined && !['warn', 'pause'].includes(input.delayedUsageAction)) {
+      return failure('INVALID_ACP_GOVERNANCE_POLICY', 'delayedUsageAction must be warn or pause.');
+    }
+    const missingUsageAction = ['warn', 'pause'].includes(input.missingUsageAction) ? input.missingUsageAction : 'warn';
+    const delayedUsageAction = ['warn', 'pause'].includes(input.delayedUsageAction) ? input.delayedUsageAction : 'warn';
+    if (unknown.length) breaches.push({ dimension: 'providerUsage', action: missingUsageAction, reason: 'missing-or-ambiguous' });
+    if (usageDelayed) breaches.push({ dimension: 'providerUsage', action: delayedUsageAction, reason: 'delayed' });
+    const actions = ['cancel', 'pause', 'warn'];
+    const action = actions.find(candidate => breaches.some(breach => breach.action === candidate)) || 'allow';
+    return {
+      ok: true,
+      bindingId,
+      evaluatedAt,
+      metrics,
+      thresholds,
+      unknown,
+      usage: {
+        available: Boolean(latestUsage),
+        aggregation: usageAggregation,
+        delayed: usageDelayed,
+        providerReported: true,
+        providerBillGuaranteed: false,
+      },
+      breaches,
+      action,
+      automaticRetry: false,
+      dispatchEligible: false,
+    };
   }
 
   function appendEvent(store, input = {}) {
@@ -205,14 +403,14 @@ function createAgentRuntimeSessionService({
     const binding = bindings.find(item => item.id === normalized.event.bindingId);
     if (!binding || binding.runtimeProfileId !== normalized.event.runtimeProfileId) return failure('ACP_SESSION_NOT_FOUND', 'The event does not match a known session binding.');
     const events = Array.isArray(readEvents(store)) ? readEvents(store) : [];
-    const idempotencyKey = normalizeString(input.idempotencyKey).slice(0, 160);
+    const idempotencyKey = safeIdentifier(input.idempotencyKey);
     if (!idempotencyKey) return failure('IDEMPOTENCY_KEY_REQUIRED', 'idempotencyKey is required.');
     const existing = events.find(item => item.bindingId === binding.id && item.idempotencyKey === idempotencyKey);
     if (existing) {
       if (existing.type !== normalized.event.type || existing.sourceKind !== normalized.event.sourceKind) return failure('IDEMPOTENCY_CONFLICT', 'idempotencyKey was already used for a different runtime event.');
       return { ok: true, idempotent: true, event: clone(existing) };
     }
-    const event = { ...normalized.event, idempotencyKey };
+    const event = { ...correlateEvent(normalized.event, binding), idempotencyKey };
     writeEvents(store, events.concat(event).slice(-MAX_EVENTS));
     return { ok: true, idempotent: false, event: clone(event) };
   }
@@ -245,7 +443,7 @@ function createAgentRuntimeSessionService({
       fromRevision: input.fromRevision,
       toRevision: input.toRevision,
       summary: normalizeString(input.summary),
-      markers: input.markers,
+      markers: [...new Set([...(Array.isArray(input.markers) ? input.markers : []), 'native-runtime', 'dispatch-suppressed'])],
       changedFields: input.changedFields,
       provenance: 'agent-authored',
       actor: normalizeString(input.actor),
@@ -277,7 +475,7 @@ function createAgentRuntimeSessionService({
     return result.ok ? { ...result, changed: true } : result;
   }
 
-  return { appendDurableOutcome, appendEvent, createBinding, list, normalizeEvent, prepareArchive, reconcileInterrupted, updateBinding };
+  return { appendDurableOutcome, appendEvent, createBinding, evaluateGovernance, list, normalizeEvent, prepareArchive, reconcileInterrupted, updateBinding };
 }
 
 module.exports = {
