@@ -46,6 +46,7 @@ export function SwimlaneDialog({
   const [name, setName] = useState('');
   const [color, setColor] = useState(FALLBACK_SWIMLANE_COLOR);
   const [description, setDescription] = useState('');
+  const [repositoryFolder, setRepositoryFolder] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -53,10 +54,12 @@ export function SwimlaneDialog({
       setName(swimlane.name);
       setColor(swimlane.color || FALLBACK_SWIMLANE_COLOR);
       setDescription(swimlane.description || swimlane.subtitle || '');
+      setRepositoryFolder(swimlane.repositoryFolder || '');
     } else {
       setName('');
       setColor(FALLBACK_SWIMLANE_COLOR);
       setDescription('');
+      setRepositoryFolder('');
     }
   }, [isOpen, swimlane?.id]);
 
@@ -70,6 +73,7 @@ export function SwimlaneDialog({
       name: name.trim(),
       description: description.trim() || undefined,
       color: normalizedColor,
+      repositoryFolder: repositoryFolder.trim() || undefined,
     };
 
     onSave(swimlaneData);
@@ -145,6 +149,18 @@ export function SwimlaneDialog({
             <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">
               Assign a default color for the swimlane to help you identify timeline rows faster.
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="swimlane-repository-folder" className="text-[15px] font-medium text-[#67676f]">Repository folder</Label>
+            <Input
+              id="swimlane-repository-folder"
+              value={repositoryFolder}
+              onChange={(event) => setRepositoryFolder(event.target.value)}
+              placeholder="/absolute/path/to/project"
+              className="h-9 rounded-[13px] border-[#d9d9df] bg-white px-3 text-[14px] text-[#3d3d45] shadow-none focus-visible:border-[#d0d0d7] focus-visible:ring-2 focus-visible:ring-black/5"
+            />
+            <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">Default working folder for task execution. A task-level override takes precedence.</p>
           </div>
 
           <div className="space-y-2">

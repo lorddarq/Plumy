@@ -40,6 +40,7 @@ export function createDuplicatedTask(source: Task, taskId = `${Date.now()}-copy`
     timeEntries: [],
     attachments: [],
     comments: [],
+    repositoryFolder: source.repositoryFolder,
     mcpUpdatedAt: undefined,
     mcpLastActor: undefined,
   };

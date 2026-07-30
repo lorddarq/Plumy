@@ -23,6 +23,7 @@ import {
   MilestoneSummaryCard,
 } from '../MilestoneSections';
 import { TaskDetailsActionMenu } from '../TaskDetailsActionMenu';
+import { MilestoneExecutionAction } from '../MilestoneExecutionAction';
 import { buildMilestonePdfExportHtml, createMilestonePdfFileName } from '../../utils/milestonePdfExport';
 import { formatMilestoneDetailsForClipboard } from '../../utils/milestoneClipboard';
 import { exportPdfDocument } from '../../utils/pdfExport';
@@ -58,6 +59,7 @@ export function MilestoneDetailsDialog({
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [startWorkRequest, setStartWorkRequest] = useState(0);
   const enrichedMilestone = milestone ? readModel?.milestonesById.get(milestone.id) : undefined;
   const milestoneProjects = enrichedMilestone?.projects ?? (milestone
     ? projects.filter(item => getMilestoneProjectIds(milestone).includes(item.id))
@@ -91,6 +93,7 @@ export function MilestoneDetailsDialog({
     if (!isOpen) return;
     setTaskSearchQuery('');
     setIsDescriptionExpanded(false);
+    setStartWorkRequest(0);
   }, [isOpen, milestone?.id]);
 
   const handleDelete = () => {
@@ -208,6 +211,7 @@ export function MilestoneDetailsDialog({
                 onEdit={milestone ? () => onEdit(milestone) : undefined}
                 onCopy={handleCopyMilestoneDetails}
                 onExportPdf={handleExportPdf}
+                onStartWork={() => setStartWorkRequest(request => request + 1)}
               />
             </div>
           </div>
@@ -280,6 +284,7 @@ export function MilestoneDetailsDialog({
               )}
             </DialogSurfaceBody>
           )}
+          {milestone && <MilestoneExecutionAction milestone={milestone} tasks={tasks} projects={milestoneProjects} trigger={null} openRequest={startWorkRequest} />}
 
           <DialogSurfaceFooter className="border-t-0 bg-white px-8 pb-6 pt-2">
             <Button

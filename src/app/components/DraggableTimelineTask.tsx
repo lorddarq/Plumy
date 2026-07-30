@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-react';
 import { Task } from '../types';
 import { PenWritingIcon } from './icons/PenWritingIcon';
 import { FilesCopyIcon } from './icons/FilesCopyIcon';
+import { TaskExecutionAction } from './TaskExecutionAction';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -28,6 +29,7 @@ interface DraggableTimelineTaskProps {
   onTaskEdit: (task: Task) => void;
   onTaskDelete: (taskId: string) => void;
   onTaskDuplicate: (task: Task) => void;
+  repositoryFolder?: string;
   resizingTaskId: string | null;
 }
 
@@ -40,6 +42,7 @@ export function DraggableTimelineTask({
   onTaskEdit,
   onTaskDelete,
   onTaskDuplicate,
+  repositoryFolder,
   resizingTaskId,
 }: DraggableTimelineTaskProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -163,6 +166,7 @@ export function DraggableTimelineTask({
           <PenWritingIcon />
           Edit
         </ContextMenuItem>
+        <TaskExecutionAction task={task} repositoryFolder={repositoryFolder} />
         <ContextMenuItem variant="destructive" onSelect={() => onTaskDelete(task.id)}>
           <Trash2 />
           Delete

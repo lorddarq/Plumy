@@ -115,6 +115,20 @@ Resolution returns the selected profile ID and source (`execution`, `project`, o
 
 Connection testing launches the exact executable and argument array without shell interpolation, performs ACP initialization plus capability/authentication discovery, then terminates without creating an execution attempt, session, or model turn.
 
+### Working-directory resolution
+
+The runtime working directory is execution-scope metadata, not a global connection setting and not part of a runtime profile. A single manually entered workspace path would incorrectly assume that an agent works in only one project.
+
+The accepted first-release model is:
+
+1. **Swimlane information** may define a repository folder as the default working directory for tasks in that swimlane.
+2. A task may define an optional repository-folder override when its work belongs elsewhere.
+3. Preflight resolves the task override first, then the swimlane default. If neither is configured, start is blocked with an explicit configuration-required state; Omvra does not guess, scan the filesystem, or reuse a folder from another task.
+4. The task execution surface shows the resolved folder and whether it came from task or swimlane information before starting the runtime.
+5. One execution/session retains one primary working directory. An agent may cycle through projects by starting or resuming each task in its independently resolved directory; Omvra does not silently change the directory of a live session.
+
+Additional repository folders for one task are deferred until a demonstrated multi-repository workflow requires them. If added, they must be explicit allowed roots rather than an implicit search scope. The current global `workspacePath` connection input is therefore transitional and should be removed when this resolution model is implemented, not merely renamed.
+
 ## Runtime observation and capability contract
 
 Observations are refreshed during connection and session preflight. Persist only the latest bounded observation plus normalized session events.

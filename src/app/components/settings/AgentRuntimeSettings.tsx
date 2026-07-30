@@ -178,7 +178,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
 
       <section className="space-y-4 border-t border-[#ececf0] pt-6" aria-labelledby="runtime-actions-title">
         <h3 id="runtime-actions-title" className="text-base font-medium text-[#5f6068]">Connection and handoff</h3>
-        <label className="block space-y-1"><span className="text-xs font-semibold text-[#71717a]">Workspace path</span><Input value={workspacePath} placeholder="/absolute/path/to/workspace" onChange={event => setWorkspacePath(event.target.value)} className={FIELD_CLASS} /></label>
+        <label className="block space-y-1"><span className="text-xs font-semibold text-[#71717a]">Project/repository folder</span><Input value={workspacePath} placeholder="/absolute/path/to/project" onChange={event => setWorkspacePath(event.target.value)} className={FIELD_CLASS} /><span className="block text-xs leading-5 text-[#7f8796]">Local folder used as the agent runtime's working directory.</span></label>
         {!resolved ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">Configure an enabled runtime before testing or handing off.</p>
         ) : resolved.integrationMode !== 'external-handoff' ? (

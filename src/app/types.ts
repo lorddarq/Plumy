@@ -135,6 +135,7 @@ export interface Task {
   timeEntries?: TaskTimeEntry[]; // Optional append-only approximate time log
   attachments?: TaskAttachment[]; // Local file references attached to this task
   comments?: TaskComment[];
+  repositoryFolder?: string;
   mcpUpdatedAt?: string;
   mcpLastActor?: string;
 }
@@ -422,6 +423,7 @@ export interface TimelineSwimlane {
   description?: string;
   subtitle?: string;
   color?: string;
+  repositoryFolder?: string;
 }
 
 export interface StorageMeter {

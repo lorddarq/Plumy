@@ -272,6 +272,14 @@ declare global {
           evaluateGovernance: (payload: Record<string, unknown>) => Promise<any>;
           appendOutcome: (payload: Record<string, unknown>) => Promise<any>;
           prepareArchive: (bindingId: string) => Promise<any>;
+          start: (payload: Record<string, unknown>) => Promise<any>;
+          startGoalNode: (payload: Record<string, unknown>) => Promise<any>;
+          prompt: (payload: { bindingId: string; text: string }) => Promise<any>;
+          steer: (payload: { bindingId: string; text: string }) => Promise<any>;
+          cancel: (payload: { bindingId: string }) => Promise<any>;
+          respond: (payload: { bindingId: string; requestId: string | number; result?: unknown; error?: unknown }) => Promise<any>;
+          close: (bindingId: string) => Promise<any>;
+          resume: (payload: Record<string, unknown>) => Promise<any>;
         };
       };
       tasks: {

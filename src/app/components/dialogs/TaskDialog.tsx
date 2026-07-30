@@ -138,6 +138,7 @@ export function TaskDialog({
   const [isAssignmentOpen, setIsAssignmentOpen] = useState(false);
   const [assignmentSourceToken, setAssignmentSourceToken] = useState('');
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [repositoryFolder, setRepositoryFolder] = useState('');
   const [attachmentAvailabilityByPath, setAttachmentAvailabilityByPath] = useState<Record<string, boolean | undefined>>({});
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const hasInvalidDateRange = Boolean(startDate && endDate && endDate < startDate);
@@ -228,6 +229,7 @@ export function TaskDialog({
       setCollaboration(task.collaboration);
       setAssignmentSourceToken(getAssignmentSourceToken(task));
       setAttachments(Array.isArray(task.attachments) ? task.attachments : []);
+      setRepositoryFolder(task.repositoryFolder || '');
     } else {
       const initialProjectIds = defaultSwimlaneId ? [defaultSwimlaneId] : [];
       setTitle('');
@@ -245,6 +247,7 @@ export function TaskDialog({
       setCollaboration(undefined);
       setAssignmentSourceToken('');
       setAttachments([]);
+      setRepositoryFolder('');
       
       if (defaultDate) {
         const dateStr = toLocalISODate(defaultDate);
@@ -362,6 +365,7 @@ export function TaskDialog({
       milestoneId: milestoneId === NO_MILESTONE_VALUE ? undefined : milestoneId,
       dependencyIds: milestoneId === NO_MILESTONE_VALUE ? [] : dependencyIds,
       attachments,
+      repositoryFolder: repositoryFolder.trim() || undefined,
     };
 
     taskData.startDate = startDate || todayISO;
@@ -739,6 +743,20 @@ export function TaskDialog({
                   <span className="text-[#a1a1aa]">None</span>
                 )}
               </div>
+            </div>
+          </AnchoredPanelSection>
+
+          <AnchoredPanelSection id="task-edit-execution" title="Execution">
+            <div className="space-y-1">
+              <Label htmlFor="task-repository-folder" className={taskEditLabelClassName}>Repository folder override</Label>
+              <Input
+                id="task-repository-folder"
+                value={repositoryFolder}
+                onChange={(event) => setRepositoryFolder(event.target.value)}
+                placeholder="Use the timeline project default"
+                className={taskEditFieldClassName}
+              />
+              <p className="text-xs leading-4 text-[#71717a]">Used before the selected timeline project’s default working folder.</p>
             </div>
           </AnchoredPanelSection>
 

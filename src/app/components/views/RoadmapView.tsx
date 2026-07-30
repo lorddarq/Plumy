@@ -526,19 +526,19 @@ export function RoadmapView({
                           const roadmapProgress = getRoadmapStageProgress(getRoadmapStage(statusColumns, task.status));
                           return (
                             <button
-                              key={task.id}
-                              type="button"
-                              onClick={() => onTaskClick(task)}
-                              className={`absolute z-20 flex h-8 items-center overflow-hidden rounded-md border bg-white text-left text-sm shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 ${
+                                  key={task.id}
+                                  type="button"
+                                  onClick={() => onTaskClick(task)}
+                                  className={`absolute z-20 flex h-8 items-center overflow-hidden rounded-md border bg-white text-left text-sm shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 ${
                                 isLate ? 'border-red-300' : 'border-gray-300'
-                              }`}
-                              style={{
-                                left,
-                                top: MILESTONE_ROW_HEIGHT + index * TASK_ROW_HEIGHT + 9,
-                                width,
-                              }}
-                              title={`${task.title} - ${statusVisual.label}`}
-                            >
+                                  }`}
+                                  style={{
+                                    left,
+                                    top: MILESTONE_ROW_HEIGHT + index * TASK_ROW_HEIGHT + 9,
+                                    width,
+                                  }}
+                                  title={`${task.title} - ${statusVisual.label}`}
+                                >
                               <span
                                 className={`absolute inset-y-0 left-0 opacity-45 ${statusVisual.backgroundClassName || ''}`}
                                 style={{
@@ -553,7 +553,7 @@ export function RoadmapView({
                                   <TriangleAlert className="size-3.5" />
                                 </span>
                               )}
-                            </button>
+                                </button>
                           );
                         })}
                       </div>

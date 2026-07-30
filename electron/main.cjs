@@ -20,6 +20,8 @@ const { registerAttachmentIpcHandlers } = require('./ipc/attachments.cjs');
 const { registerExternalLinkIpcHandlers } = require('./ipc/external-links.cjs');
 const { registerRuntimeIpcHandlers } = require('./ipc/runtime.cjs');
 const { registerAgentRuntimeIpcHandlers } = require('./ipc/agent-runtime.cjs');
+const { createAgentRuntimeSessionRunner } = require('./services/agent-runtime-session-runner.cjs');
+const { resolveProfile: resolveAgentRuntimeProfile } = require('./domain/agent-runtime-profile-service.cjs');
 const { registerTaskContextIpcHandlers } = require('./ipc/task-context.cjs');
 const { captureMeaningfulTaskCheckpoints } = require('./domain/task-context-checkpoint-service.cjs');
 const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
@@ -67,6 +69,16 @@ app.setName(APP_NAME);
 app.setPath('userData', userDataPath);
 const store = new Store({ name: storeName });
 reconcileInterruptedAgentRuntimeSessions(store);
+const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
+  store,
+  resolveProfile: resolveAgentRuntimeProfile,
+  confirmStart: (runtimeStore, payload) => confirmAgentExecutionStart(runtimeStore, payload),
+  transitionContribution: (runtimeStore, payload) => require('./services/workspace-service.cjs').transitionTaskContribution(runtimeStore, payload),
+  createBinding: (runtimeStore, payload) => createAgentRuntimeSessionBinding(runtimeStore, payload),
+  updateBinding: (runtimeStore, payload) => updateAgentRuntimeSessionBinding(runtimeStore, payload),
+  appendEvent: (runtimeStore, payload) => appendAgentRuntimeEvent(runtimeStore, payload),
+  listSessions: (runtimeStore, payload) => listAgentRuntimeSessions(runtimeStore, payload),
+});
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';
 const GOAL_RUNTIME_CHANGED_CHANNEL = 'goals/runtime-changed';
@@ -538,6 +550,12 @@ registerAgentRuntimeIpcHandlers({
   prepareAgentExecution: (payload) => prepareAgentExecution(store, payload),
   prepareAgentRuntimeSessionArchive: (bindingId) => prepareAgentRuntimeSessionArchive(store, bindingId),
   updateAgentRuntimeSessionBinding: (payload) => updateAgentRuntimeSessionBinding(store, payload),
+  startAgentRuntimeSession: (payload) => agentRuntimeSessionRunner.start(payload),
+  startGoalAgentRuntimeSession: (payload) => agentRuntimeSessionRunner.startGoalNode(payload),
+  invokeAgentRuntimeSession: (bindingId, method, text) => agentRuntimeSessionRunner.invoke(bindingId, method, text),
+  respondAgentRuntimeSession: (bindingId, requestId, result, error) => agentRuntimeSessionRunner.respond(bindingId, requestId, result, error),
+  closeAgentRuntimeSession: (bindingId) => agentRuntimeSessionRunner.close(bindingId),
+  resumeAgentRuntimeSession: (bindingId, payload) => agentRuntimeSessionRunner.resume(bindingId, payload),
 });
 registerRuntimeIpcHandlers({
   ipcMain,

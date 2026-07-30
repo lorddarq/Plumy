@@ -28,6 +28,12 @@ function registerAgentRuntimeIpcHandlers({
   prepareAgentExecution,
   prepareAgentRuntimeSessionArchive,
   updateAgentRuntimeSessionBinding,
+  startAgentRuntimeSession,
+  startGoalAgentRuntimeSession,
+  invokeAgentRuntimeSession,
+  respondAgentRuntimeSession,
+  closeAgentRuntimeSession,
+  resumeAgentRuntimeSession,
 }) {
   ipcMain.handle('agent-runtime/get-state', () => resultOf(() => getState(store)));
   ipcMain.handle('agent-runtime/save-profile', (_, profile) => resultOf(() => saveProfile(store, profile)));
@@ -56,6 +62,14 @@ function registerAgentRuntimeIpcHandlers({
   ipcMain.handle('agent-runtime/sessions/evaluate-governance', (_, payload) => evaluateAgentRuntimeGovernance(payload));
   ipcMain.handle('agent-runtime/sessions/append-outcome', (_, payload) => appendAgentRuntimeOutcome(payload));
   ipcMain.handle('agent-runtime/sessions/prepare-archive', (_, bindingId) => prepareAgentRuntimeSessionArchive(bindingId));
+  ipcMain.handle('agent-runtime/sessions/start', async (_, payload) => startAgentRuntimeSession(payload));
+  ipcMain.handle('agent-runtime/sessions/start-goal-node', async (_, payload) => startGoalAgentRuntimeSession(payload));
+  ipcMain.handle('agent-runtime/sessions/prompt', async (_, payload) => invokeAgentRuntimeSession(payload.bindingId, 'prompt', payload.text));
+  ipcMain.handle('agent-runtime/sessions/steer', async (_, payload) => invokeAgentRuntimeSession(payload.bindingId, 'steer', payload.text));
+  ipcMain.handle('agent-runtime/sessions/cancel', async (_, payload) => invokeAgentRuntimeSession(payload.bindingId, 'cancel'));
+  ipcMain.handle('agent-runtime/sessions/respond', async (_, payload) => respondAgentRuntimeSession(payload.bindingId, payload.requestId, payload.result, payload.error));
+  ipcMain.handle('agent-runtime/sessions/close', async (_, bindingId) => closeAgentRuntimeSession(bindingId));
+  ipcMain.handle('agent-runtime/sessions/resume', async (_, payload) => resumeAgentRuntimeSession(payload.bindingId, payload));
   ipcMain.handle('agent-runtime/test-connection', async (_, payload) => {
     try {
       return await testConnection(store, payload);

@@ -17,6 +17,7 @@ import { TaskCommentsSection } from '../TaskCommentsSection';
 import { TaskDescriptionSection } from '../TaskDescriptionSection';
 import { TaskContextHistorySection } from '../TaskContextHistorySection';
 import { TaskDetailsActionMenu } from '../TaskDetailsActionMenu';
+import { TaskExecutionAction } from '../TaskExecutionAction';
 import { TaskFooterActions } from '../TaskFooterActions';
 import { TaskDependencyDetailsSection, TaskLoadDetailsSection, TaskSummarySection } from '../TaskSummarySection';
 import { AnchoredPanel, AnchoredPanelSection } from '../AnchoredPanel';
@@ -67,6 +68,7 @@ export function TaskDetailsDialog({
   milestones = [],
   readModel,
 }: TaskDetailsDialogProps) {
+  const [startWorkRequest, setStartWorkRequest] = useState(0);
   const [newComment, setNewComment] = useState('');
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -309,6 +311,7 @@ export function TaskDetailsDialog({
               onEdit={handleEditTask}
               onCopy={handleCopyTaskDetails}
               onExportPdf={handleExportPdf}
+              onStartWork={() => setStartWorkRequest(request => request + 1)}
             />
           )}
           footer={(
@@ -428,6 +431,7 @@ export function TaskDetailsDialog({
             />
           </AnchoredPanelSection>
         </AnchoredPanel>
+        {task && <TaskExecutionAction task={task} openRequest={startWorkRequest} trigger={null} />}
       </DialogSurface>
     </Dialog>
   );

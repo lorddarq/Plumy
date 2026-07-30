@@ -659,6 +659,7 @@ export function DraggableSwimlaneRow({
                             onTaskEdit={onTaskEdit}
                             onTaskDelete={onTaskDelete}
                             onTaskDuplicate={onTaskDuplicate}
+                            repositoryFolder={swimlane.repositoryFolder}
                             resizingTaskId={resizingTaskId}
                           />
                         </div>

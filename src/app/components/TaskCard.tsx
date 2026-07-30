@@ -48,6 +48,7 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
             </p>
           </div>
 
+          <div className="flex shrink-0 items-center gap-1">
           {onEdit && (
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(); }}
@@ -57,6 +58,7 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
               Edit
             </button>
           )}
+          </div>
         </div>
 
         {bodyPreview ? (

@@ -101,13 +101,13 @@ export function RoadmapMilestoneSidebar({
             );
 
             return (
-              <button
-                key={row.milestone.id}
-                type="button"
-                onClick={() => onMilestoneClick(row.milestone)}
-                className="absolute left-0 flex w-full flex-col gap-3 border-t border-black/5 bg-white px-3 py-3 text-left hover:bg-[#fcfcfd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
-                style={{ top: row.top - headerHeight, height: row.height }}
-              >
+              <div key={row.milestone.id} className="absolute inset-x-0" style={{ top: row.top - headerHeight, height: row.height }}>
+                  <button
+                    type="button"
+                    onClick={() => onMilestoneClick(row.milestone)}
+                    className="absolute left-0 flex w-full flex-col gap-3 border-t border-black/5 bg-white px-3 py-3 text-left hover:bg-[#fcfcfd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
+                    style={{ height: row.height }}
+                  >
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="size-3 shrink-0 rounded-full" style={milestoneProjectVisual.markerStyle} aria-hidden="true" />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-black">{row.milestone.title}</span>
@@ -157,7 +157,8 @@ export function RoadmapMilestoneSidebar({
                     </Badge>
                   </div>
                 </div>
-              </button>
+                  </button>
+              </div>
             );
           })}
         </div>

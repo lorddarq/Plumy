@@ -311,7 +311,7 @@ export function SwimlanesView({
                   onMoveTask={onMoveTask}
                   onDropTask={handleDropTask}
                   onUpdateColumn={onUpdateColumn}
-                  onDeleteColumn={onDeleteColumn}
+        onDeleteColumn={onDeleteColumn}
                   onReorderColumns={onReorderColumns}
                   onColumnDragHover={onColumnDragHover}
                   onColumnDropIndicatorChange={setColumnDropIndicator}

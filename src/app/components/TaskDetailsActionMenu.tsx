@@ -3,6 +3,7 @@ import { OverflowActionMenu } from './OverflowActionMenu';
 import { PenWritingIcon } from './icons/PenWritingIcon';
 import { FilesCopyIcon } from './icons/FilesCopyIcon';
 import { DesktopArrowDownIcon } from './icons/DesktopArrowDownIcon';
+import { Play } from 'lucide-react';
 
 type CopyState = 'idle' | 'copied' | 'failed';
 
@@ -16,6 +17,7 @@ interface TaskDetailsActionMenuProps {
   onEdit?: () => void;
   onCopy: () => void;
   onExportPdf?: () => void;
+  onStartWork?: () => void;
 }
 
 export function TaskDetailsActionMenu({
@@ -28,6 +30,7 @@ export function TaskDetailsActionMenu({
   onEdit,
   onCopy,
   onExportPdf,
+  onStartWork,
 }: TaskDetailsActionMenuProps) {
   const CopyIcon = copyState === 'copied' ? Check : copyState === 'failed' ? TriangleAlert : FilesCopyIcon;
 
@@ -36,6 +39,7 @@ export function TaskDetailsActionMenu({
       menuLabel={menuLabel}
       items={[
         ...(canEdit ? [{ label: 'Edit', icon: PenWritingIcon, onSelect: onEdit }] : []),
+        ...(onStartWork ? [{ label: 'Start work', icon: Play, onSelect: onStartWork }] : []),
         {
           label: copyLabel,
           icon: CopyIcon,

@@ -119,17 +119,19 @@ export function DraggableTaskCard({
       ref={ref}
       className={`kanban-task-card-frame ${isDragging ? 'is-dragging' : ''}`}
     >
-      <TaskCard
-        title={task.title}
-        notes={task.notes}
-        color={task.color}
-        project={task.project}
-        priority={task.priority}
-        orchestratorName={assignmentSummary.orchestratorName === 'Unassigned' ? undefined : assignmentSummary.orchestratorName}
-        contributorCount={assignmentSummary.contributorCount}
-        onClick={() => onTaskClick(task)}
-        onEdit={onEditTask ? () => onEditTask(task) : undefined}
-      />
+      <div>
+        <TaskCard
+              title={task.title}
+              notes={task.notes}
+              color={task.color}
+              project={task.project}
+              priority={task.priority}
+              orchestratorName={assignmentSummary.orchestratorName === 'Unassigned' ? undefined : assignmentSummary.orchestratorName}
+              contributorCount={assignmentSummary.contributorCount}
+              onClick={() => onTaskClick(task)}
+              onEdit={onEditTask ? () => onEditTask(task) : undefined}
+        />
+      </div>
     </div>
   );
 }

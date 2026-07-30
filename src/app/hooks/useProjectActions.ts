@@ -25,6 +25,7 @@ export function useProjectActions({
       name: swimlaneData.name!,
       description: swimlaneData.description,
       color: swimlaneData.color,
+      repositoryFolder: swimlaneData.repositoryFolder,
     };
     setTimelineSwimlanes(previousSwimlanes => [...previousSwimlanes, newSwimlane]);
   }, [setTimelineSwimlanes]);
