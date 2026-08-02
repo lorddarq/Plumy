@@ -16,6 +16,8 @@ function createAgentRuntimeSessionRunner({
   getTaskById = null,
   listTaskContext = null,
   getTaskContextEntry = null,
+  issueMcpGrant = null,
+  revokeMcpGrant = null,
   createClient = createNativeRuntimeClient,
   now = () => new Date().toISOString(),
   logger = null,
@@ -29,6 +31,17 @@ function createAgentRuntimeSessionRunner({
   const failure = (error, message, details = {}) => ({ ok: false, error, message, ...details });
   const log = (level, event, details = {}) => logger?.[level]?.(`[agent-runtime] ${event}`, details);
   const requestKey = (bindingId, requestId) => `${bindingId}:${typeof requestId}:${String(requestId)}`;
+
+  function prepareMcp(profile, scope) {
+    if (typeof issueMcpGrant !== 'function') return { ok: true, grant: null, configuration: {} };
+    const issued = issueMcpGrant(store, { scope });
+    if (!issued?.ok) return issued || failure('ACP_MCP_GRANT_FAILED', 'A scoped MCP grant could not be issued.');
+    return {
+      ok: true,
+      grant: issued,
+      configuration: require('./agent-runtime-mcp-grant.cjs').buildProviderMcpConfiguration(issued, profile.integrationMode),
+    };
+  }
 
   function sanitizedElicitation(bindingId, message) {
     if (message?.method !== 'mcpServer/elicitation/request' || message.id === undefined || message.id === null) return null;
@@ -185,6 +198,9 @@ function createAgentRuntimeSessionRunner({
       ? buildContextPack(store, confirmed.contractSnapshot)
       : { ok: true, pack: null, text: '' };
     if (!contextPack.ok) return failure(contextPack.error, contextPack.message, { preflight: confirmed });
+    const scope = { kind: 'task', taskId: confirmed.contractSnapshot.taskId };
+    const mcp = prepareMcp(profile, scope);
+    if (!mcp.ok) return failure(mcp.error, mcp.message, { preflight: confirmed });
     const actorPersonId = payload.actorPersonId || confirmed.task?.assigneeId || confirmed.context?.assignee?.id;
     const latestRevision = Number(confirmed.task?.__mcpRevision || confirmed.contractSnapshot.taskRevision);
     const transitionBase = {
@@ -225,8 +241,12 @@ function createAgentRuntimeSessionRunner({
         taskRevision: Number(started.task?.__mcpRevision || latestRevision),
       },
       capabilities: [],
+      ...(mcp.grant ? { mcpGrantId: mcp.grant.grantId } : {}),
     });
-    if (!bindingResult.ok) return failure(bindingResult.error, bindingResult.message || 'The runtime session binding could not be created.', { preflight: confirmed });
+    if (!bindingResult.ok) {
+      if (mcp.grant && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, mcp.grant.grantId);
+      return failure(bindingResult.error, bindingResult.message || 'The runtime session binding could not be created.', { preflight: confirmed });
+    }
 
     const binding = bindingResult.binding;
     log('info', 'binding.created', { taskId: payload.taskId, bindingId: binding.id, runtimeProfileId: profile.id });
@@ -237,7 +257,7 @@ function createAgentRuntimeSessionRunner({
       const negotiated = await client.initialize();
       log('info', 'runtime.initialized', { bindingId: binding.id, authentication: negotiated.authentication || 'unknown', capabilities: Object.keys(negotiated.capabilities || {}).filter(key => negotiated.capabilities[key] === true) });
       client.onNotification?.(message => recordNotification(binding, message));
-      const session = await client.startSession({});
+      const session = await client.startSession(mcp.configuration);
       log('info', 'session.created', { bindingId: binding.id });
       const ready = updateBinding(store, {
         bindingId: binding.id,
@@ -247,7 +267,7 @@ function createAgentRuntimeSessionRunner({
         capabilities: Object.entries(negotiated.capabilities || {}).filter(([, supported]) => supported === true).map(([id]) => ({ id, support: 'supported' })),
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The runtime session could not be marked ready.'), { code: ready.error });
-      clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profile.id });
+      clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profile.id, mcpGrantId: mcp.grant?.grantId || null });
       if (contextPack.text) {
         log('info', 'context.prompting', { bindingId: binding.id, contextEntryCount: confirmed.contractSnapshot.contextEntryIds?.length || 0 });
         appendEvent(store, { bindingId: binding.id, runtimeProfileId: profile.id, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${binding.id}:task-instructions` });
@@ -259,6 +279,7 @@ function createAgentRuntimeSessionRunner({
       return { ok: true, state: current.state, binding: current, attempt, task: started.task, preflight: confirmed };
     } catch (error) {
       client?.close?.();
+      if (mcp.grant && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, mcp.grant.grantId);
       const current = bindingFor(binding.id) || binding;
       updateBinding(store, { bindingId: binding.id, expectedRevision: current.revision, state: 'failed', terminalReason: 'protocol-error' });
       log('error', 'start.failed', { taskId: payload.taskId, bindingId: binding.id, code: error.code || 'ACP_RUNTIME_UNAVAILABLE', message: error.message || String(error), stack: error.stack || null });
@@ -281,11 +302,16 @@ function createAgentRuntimeSessionRunner({
     if (activeExisting) return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'This Goal agent-node already has an active runtime session.', { bindingId: activeExisting.id, binding: activeExisting });
     const profileResolution = resolveProfile(store, payload);
     if (!profileResolution.ok || !profileResolution.profile) return failure('ACP_RUNTIME_NOT_CONFIGURED', 'The selected runtime profile could not be resolved.');
+    const mcp = prepareMcp(profileResolution.profile, {
+      kind: 'goal-node', goalId: payload.goalId, goalElementId: payload.goalElementId, goalExecutionId: payload.goalExecutionId,
+    });
+    if (!mcp.ok) return mcp;
     const bindingResult = createBinding(store, {
       runtimeProfileId: profileResolution.profile.id,
       idempotencyKey: `${payload.idempotencyKey || `goal-${payload.goalExecutionId}-${payload.goalElementId}`}:binding`,
       scope: { kind: 'goal-node', goalId: payload.goalId, goalElementId: payload.goalElementId, goalExecutionId: payload.goalExecutionId, executionAttempt, goalRevision },
       capabilities: [],
+      ...(mcp.grant ? { mcpGrantId: mcp.grant.grantId } : {}),
     });
     if (!bindingResult.ok) return bindingResult;
     const binding = bindingResult.binding;
@@ -294,7 +320,7 @@ function createAgentRuntimeSessionRunner({
       client = createClient(profileResolution.profile, { workspacePath: payload.workspacePath, logger });
       const negotiated = await client.initialize();
       client.onNotification?.(message => recordNotification(binding, message));
-      const session = await client.startSession({});
+      const session = await client.startSession(mcp.configuration);
       const ready = updateBinding(store, {
         bindingId: binding.id,
         expectedRevision: binding.revision,
@@ -303,10 +329,11 @@ function createAgentRuntimeSessionRunner({
         capabilities: Object.entries(negotiated.capabilities || {}).filter(([, supported]) => supported === true).map(([id]) => ({ id, support: 'supported' })),
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The Goal runtime session could not be marked ready.'), { code: ready.error });
-      clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profileResolution.profile.id });
+      clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profileResolution.profile.id, mcpGrantId: mcp.grant?.grantId || null });
       return { ok: true, state: 'ready', binding: ready.binding };
     } catch (error) {
       client?.close?.();
+      if (mcp.grant && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, mcp.grant.grantId);
       updateBinding(store, { bindingId: binding.id, expectedRevision: binding.revision, state: 'failed', terminalReason: 'protocol-error' });
       return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The Goal runtime session could not be started.', { binding });
     }
@@ -357,11 +384,13 @@ function createAgentRuntimeSessionRunner({
       : { ok: true, binding: current };
     if (!starting.ok) return starting;
     let client;
+    const mcp = prepareMcp(profileResolution.profile, current.scope);
+    if (!mcp.ok) return mcp;
     try {
       client = createClient(profileResolution.profile, { workspacePath, logger });
       const negotiated = await client.initialize();
       client.onNotification?.(message => recordNotification(starting.binding, message));
-      await client.resumeSession(current.opaqueSessionRef, {});
+      await client.resumeSession(current.opaqueSessionRef, mcp.configuration);
       const ready = updateBinding(store, {
         bindingId,
         expectedRevision: starting.binding.revision,
@@ -370,7 +399,7 @@ function createAgentRuntimeSessionRunner({
         capabilities: Object.entries(negotiated.capabilities || {}).filter(([, supported]) => supported === true).map(([id]) => ({ id, support: 'supported' })),
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The session could not be resumed.'), { code: ready.error });
-      clients.set(bindingId, { client, workspacePath, profileId: current.runtimeProfileId });
+      clients.set(bindingId, { client, workspacePath, profileId: current.runtimeProfileId, mcpGrantId: mcp.grant?.grantId || null });
       const contextPack = buildCurrentTaskContext(ready.binding);
       if (!contextPack.ok) throw Object.assign(new Error(contextPack.message), { code: contextPack.error });
       if (contextPack.text) {
@@ -380,6 +409,7 @@ function createAgentRuntimeSessionRunner({
       return { ...ready, binding: bindingFor(bindingId) || ready.binding };
     } catch (error) {
       client?.close?.();
+      if (mcp.grant && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, mcp.grant.grantId);
       const latest = bindingFor(bindingId) || starting.binding;
       updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'failed', terminalReason: 'protocol-error' });
       return failure(error.code || 'ACP_SESSION_RESUME_UNSUPPORTED', error.message || 'The runtime session could not be resumed.');
@@ -394,6 +424,7 @@ function createAgentRuntimeSessionRunner({
       await session.client.closeSession(current.opaqueSessionRef);
       const result = updateBinding(store, { bindingId, expectedRevision: current.revision, state: 'closed', terminalReason: 'closed' });
       session.client.close?.();
+      if (session.mcpGrantId && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, session.mcpGrantId);
       clients.delete(bindingId);
       return result;
     } catch (error) {

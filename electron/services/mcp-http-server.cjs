@@ -36,6 +36,7 @@ const {
   handleToolCall,
 } = require('./mcp-handlers.cjs');
 const { getResourceForUri } = require('./mcp-resource-handlers.cjs');
+const { findScopedMcpGrant, isScopedToolCallAllowed } = require('./agent-runtime-mcp-grant.cjs');
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const ALLOWED_CORS_HEADERS = 'Content-Type, Accept, Authorization, X-MCP-Token, Mcp-Session-Id';
@@ -167,9 +168,12 @@ function createRequestDispatcher(store, { skillsRoot, userSkillsRoot, emitRuntim
       });
     }
 
+    const providedToken = extractBearerToken(req);
+    const scopedGrant = findScopedMcpGrant(providedToken);
+    if (scopedGrant) req._mcpGrant = scopedGrant;
     const token = currentServerConfig.accessToken;
     const isStdioTransport = req?.transport === 'stdio';
-    if (token && !isStdioTransport) {
+    if (token && !isStdioTransport && !scopedGrant) {
       if (isMcpAccessTokenExpired(currentServerConfig)) {
         if (normalizedMethod === 'tools/call') {
           recordToolAttempt(store, req, {
@@ -291,6 +295,21 @@ function createRequestDispatcher(store, { skillsRoot, userSkillsRoot, emitRuntim
     }
 
     if (normalizedMethod === 'tools/call') {
+      if (scopedGrant && !isScopedToolCallAllowed(scopedGrant, toolPayload?.name, toolPayload?.args)) {
+        recordToolAttempt(store, req, {
+          outcome: 'denied',
+          reason: 'scope_denied',
+          capabilityProfile: scopedGrant.capabilityProfile,
+          toolName: toolPayload?.name || null,
+          target: getAuditTargetFromArgs(toolPayload?.args),
+        });
+        return respond({
+          error: createJsonRpcError(JSON_RPC_ERROR.MCP_WRITE_FORBIDDEN, 'The runtime MCP grant does not permit this tool or task scope.', {
+            reason: 'scope_denied',
+            scope: scopedGrant.scope,
+          }),
+        });
+      }
       let toolResponse;
       try {
         toolResponse = handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRuntimeChange });

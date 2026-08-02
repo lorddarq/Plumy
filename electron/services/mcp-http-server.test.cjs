@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { createRequestDispatcher } = require('./mcp-http-server.cjs');
+const { issueScopedMcpGrant, _resetForTests } = require('./agent-runtime-mcp-grant.cjs');
 const {
   MILESTONES_KEY,
   PREFERENCES_KEY,
@@ -24,6 +25,21 @@ function makeReq(headers = {}, transport = 'http') {
     },
   };
 }
+
+test.afterEach(() => _resetForTests());
+
+test('scoped runtime grants authorize only the bound task and reject workspace reads', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const grant = issueScopedMcpGrant({ endpoint: 'http://127.0.0.1:3456/mcp', scope: { kind: 'task', taskId: 'task-1' }, capabilityProfile: 'task_write' });
+  const dispatch = createRequestDispatcher(store);
+  const request = (id, name, argumentsValue) => dispatch({
+    jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: argumentsValue },
+  }, makeReq({ authorization: `Bearer ${grant.token}` }));
+
+  assert.equal(request('same-task', 'tasks.get', { taskId: 'task-1' }).result.structuredContent.id, 'task-1');
+  assert.equal(request('other-task', 'tasks.get', { taskId: 'task-2' }).error.code, -32003);
+  assert.equal(request('workspace', 'workspace.get_snapshot', {}).error.code, -32003);
+});
 
 test('tools call audit events capture normalized metadata without payloads', () => {
   const store = makeStoreFromFixture('workspace-basic');

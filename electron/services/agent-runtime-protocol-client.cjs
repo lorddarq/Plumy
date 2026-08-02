@@ -1,6 +1,8 @@
 const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 
 const ACP_PROTOCOL_VERSION = 1;
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -368,24 +370,35 @@ class ClaudeStreamJsonClient {
     });
   }
 
-  startSession({ sessionId = randomUUID(), mcpConfigPath } = {}) {
+  createMcpConfigPath(mcpServers) {
+    if (!mcpServers || typeof mcpServers !== 'object') return null;
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-mcp-'));
+    const configPath = path.join(directory, 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ mcpServers }), { encoding: 'utf8', mode: 0o600 });
+    this.mcpConfigDirectory = directory;
+    return configPath;
+  }
+
+  startSession({ sessionId = randomUUID(), mcpConfigPath, mcpServers } = {}) {
     this.sessionId = validateSessionRef(sessionId);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(this.sessionId)) {
       throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session ID must be a UUID.');
     }
     const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId];
-    if (mcpConfigPath) args.push('--mcp-config', validateWorkspacePath(mcpConfigPath));
+    const configPath = mcpConfigPath || this.createMcpConfigPath(mcpServers);
+    if (configPath) args.push('--mcp-config', validateWorkspacePath(configPath));
     this.transport = new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath });
     return Promise.resolve({ sessionId: this.sessionId });
   }
 
-  resumeSession(sessionId, { mcpConfigPath } = {}) {
+  resumeSession(sessionId, { mcpConfigPath, mcpServers } = {}) {
     this.sessionId = validateSessionRef(sessionId);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(this.sessionId)) {
       throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session ID must be a UUID.');
     }
     const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--resume', this.sessionId];
-    if (mcpConfigPath) args.push('--mcp-config', validateWorkspacePath(mcpConfigPath));
+    const configPath = mcpConfigPath || this.createMcpConfigPath(mcpServers);
+    if (configPath) args.push('--mcp-config', validateWorkspacePath(configPath));
     this.transport = new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath });
     return Promise.resolve({ sessionId: this.sessionId });
   }
@@ -404,7 +417,13 @@ class ClaudeStreamJsonClient {
   steer(sessionId, text) { return this.prompt(sessionId, text); }
   cancel() { this.close(); return Promise.resolve({ acknowledged: false }); }
   closeSession() { this.close(); return Promise.resolve({ acknowledged: true }); }
-  close() { this.transport?.close(); }
+  close() {
+    this.transport?.close();
+    if (this.mcpConfigDirectory) {
+      fs.rmSync(this.mcpConfigDirectory, { recursive: true, force: true });
+      this.mcpConfigDirectory = null;
+    }
+  }
 }
 
 function createNativeRuntimeClient(profile, options = {}) {
