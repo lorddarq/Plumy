@@ -40,6 +40,7 @@ interface SessionBinding {
   id: string;
   state: string;
   revision: number;
+  workspacePath?: string;
   opaqueSessionRef?: string;
   capabilities?: Array<{ id: string; support: string }>;
   scope?: { taskId?: string };
@@ -214,7 +215,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       setSessionLoaded(true);
       return;
     }
-    const nextBinding = (index.bindings || []).find((candidate: SessionBinding) => candidate.scope?.taskId === task.id) || null;
+    const nextBinding = (index.bindings || []).findLast((candidate: SessionBinding) => candidate.scope?.taskId === task.id) || null;
     if (!nextBinding) {
       setBinding(null);
       setEvents([]);
@@ -232,12 +233,16 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setSessionLoaded(true);
   };
 
-  const startWork = async () => {
+  const startWork = async (replaceBinding = false) => {
     if (!resolvedRepositoryFolder || !resolution?.profile || blockers.length > 0 || operationBusy) return;
     setOperationBusy(true);
     setError(null);
     console.info('[agent-runtime:ui] session-start.requested', { taskId: task.id, executionProfileId: resolution.profile.id });
     try {
+      if (replaceBinding && binding) {
+        const closed = await window.electron?.agentRuntime?.sessions?.close?.(binding.id);
+        if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The stale runtime session could not be replaced.');
+      }
       const result = await window.electron?.agentRuntime?.sessions?.start?.({
         confirmed: true,
         taskId: task.id,
@@ -346,6 +351,22 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     }
   };
 
+  const continueTaskSession = async () => {
+    if (!binding || operationBusy) return;
+    setOperationBusy(true);
+    setError(null);
+    try {
+      const result = await window.electron?.agentRuntime?.sessions?.continueTask?.(binding.id);
+      if (!result?.ok) throw new Error(result?.message || result?.error || 'The runtime session could not be continued.');
+      await refreshSession();
+      toast.success('Codex continued work', { description: task.title });
+    } catch (caught) {
+      reportRuntimeError('session-continue-task', caught, 'The runtime session could not be continued.');
+    } finally {
+      setOperationBusy(false);
+    }
+  };
+
   const openExternal = async () => {
     if (!resolution?.profile || !resolvedRepositoryFolder || operationBusy) return;
     setOperationBusy(true);
@@ -371,7 +392,12 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     if (!open || !startRequested || loading || !sessionLoaded || operationBusy) return;
     if (binding) {
       setStartRequested(false);
+      if (binding.workspacePath !== resolvedRepositoryFolder && !activeAttempt && ['ready', 'interrupted'].includes(binding.state)) {
+        void startWork(true);
+        return;
+      }
       if (binding.state === 'interrupted') void resumeSession();
+      else if (binding.state === 'ready') void continueTaskSession();
       return;
     }
     if (!preflight || !resolution?.profile || !workspace) return;
@@ -381,7 +407,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       return;
     }
     void startWork();
-  }, [binding?.id, binding?.state, loading, open, operationBusy, preflight, resolution?.profile?.id, sessionLoaded, startRequested, workspace]);
+  }, [activeAttempt, binding?.id, binding?.state, binding?.workspacePath, loading, open, operationBusy, preflight, resolution?.profile?.id, resolvedRepositoryFolder, sessionLoaded, startRequested, workspace]);
 
   return (
     <>

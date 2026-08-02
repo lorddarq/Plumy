@@ -568,6 +568,7 @@ registerAgentRuntimeIpcHandlers({
   respondAgentRuntimeSession: (bindingId, requestId, result, error) => agentRuntimeSessionRunner.respond(bindingId, requestId, result, error),
   listAgentRuntimeSessionRequests: (bindingId) => agentRuntimeSessionRunner.listRequests(bindingId),
   closeAgentRuntimeSession: (bindingId) => agentRuntimeSessionRunner.close(bindingId),
+  continueAgentRuntimeTaskSession: (bindingId) => agentRuntimeSessionRunner.continueTask(bindingId),
   resumeAgentRuntimeSession: (bindingId, payload) => agentRuntimeSessionRunner.resume(bindingId, payload),
   resolveManagedWorkspace: (taskId) => {
     if (typeof taskId !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(taskId)) {

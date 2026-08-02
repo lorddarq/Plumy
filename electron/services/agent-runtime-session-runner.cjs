@@ -241,6 +241,7 @@ function createAgentRuntimeSessionRunner({
         taskRevision: Number(started.task?.__mcpRevision || latestRevision),
       },
       capabilities: [],
+      extensions: { workspacePath: payload.workspacePath.trim() },
       ...(mcp.grant ? { mcpGrantId: mcp.grant.grantId } : {}),
     });
     if (!bindingResult.ok) {
@@ -356,6 +357,24 @@ function createAgentRuntimeSessionRunner({
     }
   }
 
+  async function continueTask(bindingId) {
+    const current = bindingFor(bindingId);
+    const session = clients.get(bindingId);
+    if (!current || !session) return failure('ACP_SESSION_NOT_FOUND', 'The runtime session is not active in this app process.');
+    if (current.scope?.kind !== 'task') return failure('ACP_CAPABILITY_UNSUPPORTED', 'Only task sessions can be continued from Start work.');
+    if (current.state !== 'ready') return failure('ACP_SESSION_BUSY', `Session is ${current.state}.`);
+    const contextPack = buildCurrentTaskContext(current);
+    if (!contextPack.ok) return contextPack;
+    const text = contextPack.text || 'Continue working on the assigned task. Re-read its current state before making changes.';
+    try {
+      appendEvent(store, { bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${randomUUID()}` });
+      await session.client.prompt(current.opaqueSessionRef, text);
+      return { ok: true, binding: bindingFor(bindingId) || current };
+    } catch (error) {
+      return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The runtime session could not be continued.');
+    }
+  }
+
   async function respond(bindingId, requestId, result, error) {
     const current = bindingFor(bindingId);
     const session = clients.get(bindingId);
@@ -419,20 +438,31 @@ function createAgentRuntimeSessionRunner({
   async function close(bindingId) {
     const current = bindingFor(bindingId);
     const session = clients.get(bindingId);
-    if (!current || !session) return failure('ACP_SESSION_NOT_FOUND', 'The runtime session is not active in this app process.');
+    if (!current) return failure('ACP_SESSION_NOT_FOUND', 'The runtime session binding was not found.');
+    if (session) {
+      try {
+        await session.client.closeSession(current.opaqueSessionRef);
+      } catch (error) {
+        if (error.code !== 'ACP_CAPABILITY_UNSUPPORTED') {
+          return failure(error.code || 'ACP_CAPABILITY_UNSUPPORTED', error.message || 'The runtime session could not be closed.');
+        }
+      }
+    }
     try {
-      await session.client.closeSession(current.opaqueSessionRef);
-      const result = updateBinding(store, { bindingId, expectedRevision: current.revision, state: 'closed', terminalReason: 'closed' });
-      session.client.close?.();
-      if (session.mcpGrantId && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, session.mcpGrantId);
+      const latest = bindingFor(bindingId) || current;
+      const result = updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'closed', terminalReason: 'closed' });
+      if (!result.ok) return result;
+      session?.client.close?.();
+      const mcpGrantId = session?.mcpGrantId || latest.mcpGrantId;
+      if (mcpGrantId && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, mcpGrantId);
       clients.delete(bindingId);
       return result;
     } catch (error) {
-      return failure(error.code || 'ACP_CAPABILITY_UNSUPPORTED', error.message || 'The runtime does not support closing this session.');
+      return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The runtime session could not be closed.');
     }
   }
 
-  return { close, invoke, listRequests, respond, resume, start, startGoalNode };
+  return { close, continueTask, invoke, listRequests, respond, resume, start, startGoalNode };
 }
 
 module.exports = { createAgentRuntimeSessionRunner };

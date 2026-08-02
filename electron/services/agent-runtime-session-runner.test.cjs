@@ -29,6 +29,7 @@ test('does not start a second active task session', async () => {
 
 test('injects the bounded Omvra context pack into a new native session', async () => {
   const prompts = [];
+  const bindingInputs = [];
   const updates = [];
   const events = [];
   const logs = [];
@@ -61,7 +62,8 @@ test('injects the bounded Omvra context pack into a new native session', async (
       contractDigest: 'digest',
     }),
     transitionContribution: () => ({ ok: true }),
-    createBinding: () => {
+    createBinding: (_store, input) => {
+      bindingInputs.push(input);
       storedBinding = { id: 'binding-1', revision: 0, runtimeProfileId: 'runtime-1', state: 'starting', scope: { kind: 'task', taskId: 'task-1' } };
       return { ok: true, binding: storedBinding };
     },
@@ -79,6 +81,7 @@ test('injects the bounded Omvra context pack into a new native session', async (
 
   const result = await runner.start({ confirmed: true, taskId: 'task-1', workspacePath: '/tmp/workspace', idempotencyKey: 'start-1' });
   assert.equal(result.ok, true);
+  assert.equal(bindingInputs[0].extensions.workspacePath, '/tmp/workspace');
   assert.equal(prompts.length, 1);
   assert.match(prompts[0], /Continue from accepted checkpoint/);
   assert.equal(result.binding.state, 'active');
@@ -139,4 +142,65 @@ test('resuming interrupted task work immediately sends the current authoritative
   assert.match(prompts[0], /Title: Test task/);
   assert.match(prompts[0], /Update the task description with the agent details/);
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent'), true);
+  notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+  assert.equal((await runner.continueTask('binding-resume')).ok, true);
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[1], /Update the task description with the agent details/);
+});
+
+test('closing a Codex session retires the binding when remote thread close is unsupported', async () => {
+  let binding = { id: 'binding-1', revision: 3, runtimeProfileId: 'runtime-1', state: 'interrupted', opaqueSessionRef: 'thread-1', scope: { kind: 'task', taskId: 'task-1' } };
+  let transportClosed = false;
+  const runner = createAgentRuntimeSessionRunner({
+    store: {},
+    resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'codex-app-server-stdio' } }),
+    confirmStart: () => ({ canStart: false }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: () => ({ ok: false }),
+    updateBinding: (_store, input) => {
+      binding = { ...binding, ...input, revision: input.expectedRevision + 1 };
+      return { ok: true, binding };
+    },
+    appendEvent: () => ({ ok: true }),
+    listSessions: () => ({ bindings: [binding], events: [] }),
+    createClient: () => ({
+      initialize: async () => ({ capabilities: {} }),
+      onNotification: () => {},
+      resumeSession: async () => ({ sessionId: 'thread-1' }),
+      prompt: async () => ({ turnId: 'turn-1' }),
+      closeSession: () => { throw Object.assign(new Error('No remote close.'), { code: 'ACP_CAPABILITY_UNSUPPORTED' }); },
+      close: () => { transportClosed = true; },
+    }),
+  });
+
+  const resumed = await runner.resume('binding-1', { workspacePath: '/tmp/workspace' });
+  assert.equal(resumed.ok, true, JSON.stringify(resumed));
+  const result = await runner.close('binding-1');
+  assert.equal(result.ok, true);
+  assert.equal(result.binding.state, 'closed');
+  assert.equal(transportClosed, true);
+});
+
+test('closing an orphaned interrupted binding allows replacement after app restart', async () => {
+  let binding = { id: 'binding-orphaned', revision: 5, runtimeProfileId: 'runtime-1', state: 'interrupted', opaqueSessionRef: 'thread-old', mcpGrantId: 'grant-old', scope: { kind: 'task', taskId: 'task-1' } };
+  let revokedGrantId = null;
+  const runner = createAgentRuntimeSessionRunner({
+    store: {},
+    resolveProfile: () => ({ ok: false }),
+    confirmStart: () => ({ canStart: false }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: () => ({ ok: false }),
+    updateBinding: (_store, input) => {
+      binding = { ...binding, ...input, revision: input.expectedRevision + 1 };
+      return { ok: true, binding };
+    },
+    appendEvent: () => ({ ok: true }),
+    listSessions: () => ({ bindings: [binding], events: [] }),
+    revokeMcpGrant: (_store, grantId) => { revokedGrantId = grantId; },
+  });
+
+  const result = await runner.close('binding-orphaned');
+  assert.equal(result.ok, true);
+  assert.equal(result.binding.state, 'closed');
+  assert.equal(revokedGrantId, 'grant-old');
 });

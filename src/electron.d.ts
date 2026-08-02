@@ -281,6 +281,7 @@ declare global {
           cancel: (payload: { bindingId: string }) => Promise<any>;
           respond: (payload: { bindingId: string; requestId: string | number; result?: unknown; error?: unknown }) => Promise<any>;
           close: (bindingId: string) => Promise<any>;
+          continueTask: (bindingId: string) => Promise<any>;
           resume: (payload: Record<string, unknown>) => Promise<any>;
         };
       };

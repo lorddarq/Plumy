@@ -192,6 +192,7 @@ const IPC_INVOKE_CHANNELS = [
   'agent-runtime/sessions/append-outcome',
   'agent-runtime/sessions/cancel',
   'agent-runtime/sessions/close',
+  'agent-runtime/sessions/continue-task',
   'agent-runtime/sessions/prepare-archive',
   'agent-runtime/sessions/prompt',
   'agent-runtime/sessions/requests',

@@ -34,6 +34,7 @@ function registerAgentRuntimeIpcHandlers({
   respondAgentRuntimeSession,
   listAgentRuntimeSessionRequests,
   closeAgentRuntimeSession,
+  continueAgentRuntimeTaskSession,
   resumeAgentRuntimeSession,
   resolveManagedWorkspace,
   logger = null,
@@ -96,6 +97,7 @@ function registerAgentRuntimeIpcHandlers({
   ipcMain.handle('agent-runtime/sessions/cancel', async (_, payload) => invokeAgentRuntimeSession(payload.bindingId, 'cancel'));
   ipcMain.handle('agent-runtime/sessions/respond', async (_, payload) => respondAgentRuntimeSession(payload.bindingId, payload.requestId, payload.result, payload.error));
   ipcMain.handle('agent-runtime/sessions/close', async (_, bindingId) => closeAgentRuntimeSession(bindingId));
+  ipcMain.handle('agent-runtime/sessions/continue-task', async (_, bindingId) => logged('session-continue-task', { bindingId: bindingId || null }, () => continueAgentRuntimeTaskSession(bindingId)));
   ipcMain.handle('agent-runtime/sessions/resume', async (_, payload = {}) => logged('session-resume', { bindingId: payload.bindingId || null }, () => resumeAgentRuntimeSession(payload.bindingId, payload)));
   ipcMain.handle('agent-runtime/test-connection', async (_, payload) => {
     try {
