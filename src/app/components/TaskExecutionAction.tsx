@@ -17,7 +17,7 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 interface RuntimeState {
   profiles?: Array<{ id: string; name: string; integrationMode: string; enabled: boolean }>;
   defaults?: { globalProfileId?: string | null; globalWorkspacePath?: string | null; projectProfileIds?: Record<string, string> };
-  observations?: Record<string, { availability?: string; authentication?: string; state?: string }>;
+  observations?: Record<string, { availability?: string; authentication?: string; state?: string; error?: string }>;
 }
 
 interface RuntimeResolution {
@@ -420,7 +420,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             </div>}
             {!binding && observation && (
               <div className="rounded-md border border-slate-200 p-3 text-xs text-slate-600">
-                Runtime observation: {observation.availability || 'unknown'} · authentication {observation.authentication || 'unknown'} · {observation.state || 'unknown'}.
+                <p>Runtime observation: {observation.availability || 'unknown'} · authentication {observation.authentication || 'unknown'} · {observation.state || 'unknown'}.</p>
+                {observation.error && <p className="mt-1 text-rose-700">Last probe: {observation.error}</p>}
               </div>
             )}
             {!binding && preflight?.model && (preflight.model.requested || preflight.model.effective) && (
