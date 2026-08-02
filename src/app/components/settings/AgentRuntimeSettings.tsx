@@ -25,6 +25,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
   const [fixedArgsText, setFixedArgsText] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [executionProfileId, setExecutionProfileId] = useState('');
+  const [globalWorkspacePath, setGlobalWorkspacePath] = useState('');
   const [workspacePath, setWorkspacePath] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState('');
   const [contextReference, setContextReference] = useState('');
@@ -35,12 +36,15 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
 
   const load = async () => {
     if (!runtimeBridge) {
-      setState({ schemaVersion: 1, profiles: [], defaults: { globalProfileId: null, projectProfileIds: {} }, observations: {} });
+      setState({ schemaVersion: 1, profiles: [], defaults: { globalProfileId: null, globalWorkspacePath: null, projectProfileIds: {} }, observations: {} });
       setFeedback('Agent runtime execution is available in the Omvra desktop app.');
       return;
     }
     const result = await runtimeBridge.getState();
-    if (result.ok && result.value) setState(result.value);
+    if (result.ok && result.value) {
+      setState(result.value);
+      setGlobalWorkspacePath(result.value.defaults.globalWorkspacePath || '');
+    }
     else setFeedback(result.error || 'Unable to load runtime profiles.');
   };
 
@@ -88,6 +92,19 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
     const result = await runtimeBridge.saveDefaults(defaults);
     if (!result.ok) return setFeedback(result.error || 'Unable to save runtime defaults.');
     setFeedback('Runtime default saved.');
+    await load();
+  };
+
+  const saveGlobalWorkspacePath = async () => {
+    if (!state || !runtimeBridge) return setFeedback('Runtime defaults can be saved in the Omvra desktop app.');
+    setBusy(true);
+    const result = await runtimeBridge.saveDefaults({
+      ...state.defaults,
+      globalWorkspacePath: globalWorkspacePath.trim() || null,
+    });
+    setBusy(false);
+    if (!result.ok) return setFeedback(result.error || 'Unable to save the global working location.');
+    setFeedback(globalWorkspacePath.trim() ? 'Global working location saved.' : 'Global working location cleared; repo-less tasks will use isolated scratch workspaces.');
     await load();
   };
 
@@ -156,9 +173,10 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
 
         <div className="grid gap-3 rounded-xl border border-[#ececf0] p-4 sm:grid-cols-2">
           <label className="space-y-1"><span className="text-xs font-semibold text-[#71717a]">Name</span><Input value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} className={FIELD_CLASS} /></label>
-          <label className="space-y-1"><span className="text-xs font-semibold text-[#71717a]">Mode</span><select value={draft.integrationMode} onChange={event => setDraft({ ...draft, integrationMode: event.target.value as AgentRuntimeProfile['integrationMode'] })} className={`${FIELD_CLASS} w-full`}><option value="codex-app-server-stdio">Codex app-server over stdio</option><option value="claude-stream-json-stdio">Claude stream-json over stdio</option><option value="acp-local-stdio">ACP agent over stdio</option><option value="external-handoff">External handoff</option></select></label>
+          <label className="space-y-1"><span className="text-xs font-semibold text-[#71717a]">Mode</span><select value={draft.integrationMode} onChange={event => { const integrationMode = event.target.value as AgentRuntimeProfile['integrationMode']; setDraft({ ...draft, integrationMode, ...(integrationMode === 'codex-app-server-stdio' ? {} : { approvalPolicy: undefined }) }); }} className={`${FIELD_CLASS} w-full`}><option value="codex-app-server-stdio">Codex app-server over stdio</option><option value="claude-stream-json-stdio">Claude stream-json over stdio</option><option value="acp-local-stdio">ACP agent over stdio</option><option value="external-handoff">External handoff</option></select></label>
           <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Exact executable path</span><Input value={draft.executablePath || ''} placeholder="/absolute/path/to/agent" onChange={event => setDraft({ ...draft, executablePath: event.target.value })} className={FIELD_CLASS} />{draft.integrationMode === 'codex-app-server-stdio' && <span className="block text-xs leading-5 text-[#7f8796]">Select the installed Codex executable. Omvra launches its native app-server protocol automatically; no ACP adapter is required.</span>}{draft.integrationMode === 'claude-stream-json-stdio' && <span className="block text-xs leading-5 text-[#7f8796]">Select the installed Claude executable. Omvra uses Claude's native stream-json protocol; no ACP adapter is required.</span>}{draft.integrationMode === 'acp-local-stdio' && <span className="block text-xs leading-5 text-[#7f8796]">Works with any native ACP executable. Add required launch arguments one per line—for OpenCode, use <code>acp</code>.</span>}</label>
           {draft.integrationMode === 'external-handoff' && <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Approved URL scheme (optional)</span><Input value={draft.externalUrlScheme || ''} placeholder="codex" onChange={event => setDraft({ ...draft, externalUrlScheme: event.target.value })} className={FIELD_CLASS} /></label>}
+          {draft.integrationMode === 'codex-app-server-stdio' && <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Approval prompts</span><select value={draft.approvalPolicy || ''} onChange={event => setDraft({ ...draft, approvalPolicy: (event.target.value || undefined) as AgentRuntimeProfile['approvalPolicy'] })} className={`${FIELD_CLASS} w-full`}><option value="">Use Codex default</option><option value="on-request">Ask when needed</option><option value="untrusted">Ask for untrusted actions</option><option value="never">Never ask</option></select><span className="block text-xs leading-5 text-[#7f8796]">Controls Codex runtime approval prompts for sessions started with this profile. Omvra lifecycle approval gates remain separate.</span>{draft.approvalPolicy === 'never' && <span className="block rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">Codex will not ask before permitted actions. Sandbox, filesystem, network, and Omvra MCP access restrictions still apply.</span>}</label>}
           <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Fixed arguments (one per line)</span><textarea value={fixedArgsText} onChange={event => setFixedArgsText(event.target.value)} className="min-h-20 w-full rounded-xl border border-[#e5e7eb] p-3 text-sm text-[#71717a]" /></label>
           <div className="flex items-center justify-between sm:col-span-2"><Label className="text-sm text-[#71717a]">Enabled</Label><Switch checked={draft.enabled} onCheckedChange={enabled => setDraft({ ...draft, enabled })} /></div>
           <button type="button" onClick={() => void saveProfile()} disabled={busy || !draft.name.trim()} className={`${PRIMARY_BUTTON_CLASS} sm:col-span-2`}><Plus className="size-4" />{draft.id ? 'Update profile' : 'Add profile'}</button>
@@ -168,6 +186,14 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
       <section className="space-y-4 border-t border-[#ececf0] pt-6" aria-labelledby="runtime-defaults-title">
         <h3 id="runtime-defaults-title" className="text-base font-medium text-[#5f6068]">Defaults and resolution</h3>
         <label className="block space-y-1"><span className="text-xs font-semibold text-[#71717a]">Global default</span><select value={state?.defaults.globalProfileId || ''} onChange={event => void saveDefault('global', event.target.value)} className={`${FIELD_CLASS} w-full`}><option value="">Not configured</option>{profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label>
+        <div className="space-y-2">
+          <Label htmlFor="global-runtime-workspace" className="text-xs font-semibold text-[#71717a]">Global working location</Label>
+          <div className="flex gap-2">
+            <Input id="global-runtime-workspace" value={globalWorkspacePath} placeholder="/absolute/path/to/shared-workspace" onChange={event => setGlobalWorkspacePath(event.target.value)} className={`${FIELD_CLASS} min-w-0 flex-1`} />
+            <button type="button" onClick={() => void saveGlobalWorkspacePath()} disabled={busy} className={BUTTON_CLASS}>Save location</button>
+          </div>
+          <p className="text-xs leading-5 text-[#7f8796]">Fallback for tasks in any project that have no task or project folder. This does not filter project lists. Leave empty to use an isolated Omvra scratch workspace per task.</p>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1"><span className="text-xs font-semibold text-[#71717a]">Project</span><select value={selectedProjectId} onChange={event => setSelectedProjectId(event.target.value)} className={`${FIELD_CLASS} w-full`}><option value="">No project</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
           <label className="space-y-1"><span className="text-xs font-semibold text-[#71717a]">Project default</span><select disabled={!selectedProjectId} value={selectedProjectId ? state?.defaults.projectProfileIds[selectedProjectId] || '' : ''} onChange={event => void saveDefault('project', event.target.value)} className={`${FIELD_CLASS} w-full`}><option value="">Use global default</option>{profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label>

@@ -106,6 +106,7 @@ test('agent runtime registrar validates writes and keeps custom schemes behind i
     store,
     shell: { openExternal: async url => { opened = url; } },
     evaluateAgentRuntimeGovernance: payload => ({ ok: true, bindingId: payload.bindingId, action: 'warn' }),
+    resolveManagedWorkspace: taskId => ({ workspacePath: `/tmp/agent-workspaces/${taskId}`, source: 'scratch-workspace' }),
   });
 
   const saved = handlers.get('agent-runtime/save-profile')(null, {
@@ -119,6 +120,7 @@ test('agent runtime registrar validates writes and keeps custom schemes behind i
   assert.equal(handoff.ok, true);
   assert.equal(new URL(opened).protocol, 'codex:');
   assert.equal(handlers.has('agent-runtime/test-connection'), true);
+  assert.deepEqual(handlers.get('agent-runtime/resolve-managed-workspace')(null, 'task-1').value, { workspacePath: '/tmp/agent-workspaces/task-1', source: 'scratch-workspace' });
   assert.deepEqual(handlers.get('agent-runtime/sessions/evaluate-governance')(null, { bindingId: 'binding-1' }), { ok: true, bindingId: 'binding-1', action: 'warn' });
 });
 

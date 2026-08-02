@@ -10,7 +10,7 @@ test('does not start a second active task session', async () => {
     scope: { kind: 'task', taskId: 'task-1' },
   };
   const runner = createAgentRuntimeSessionRunner({
-    store: {},
+    store: { get: () => [], set: () => {} },
     resolveProfile: () => { throw new Error('must not resolve a duplicate session'); },
     confirmStart: () => { confirmCalls += 1; return { canStart: true }; },
     transitionContribution: () => ({ ok: true }),
@@ -25,4 +25,118 @@ test('does not start a second active task session', async () => {
   assert.equal(result.error, 'ACP_EXECUTION_ALREADY_ACTIVE');
   assert.equal(result.bindingId, 'binding-1');
   assert.equal(confirmCalls, 0);
+});
+
+test('injects the bounded Omvra context pack into a new native session', async () => {
+  const prompts = [];
+  const updates = [];
+  const events = [];
+  const logs = [];
+  const responses = [];
+  let storedBinding = null;
+  let notify;
+  const client = {
+    initialize: async () => ({ capabilities: { prompt: true } }),
+    startSession: async () => {
+      assert.equal(typeof notify, 'function');
+      notify({ method: 'mcpServer/startupStatus/updated', params: { name: 'figma', status: 'failed', failureReason: 'reauthenticationRequired', error: 'Login required' } });
+      return { sessionId: 'native-session-1' };
+    },
+    prompt: async (_sessionId, text) => {
+      prompts.push(text);
+      notify({ method: 'turn/started', params: { turn: { status: 'inProgress' } } });
+      return { accepted: true };
+    },
+    onNotification: callback => { notify = callback; },
+    respond: (requestId, response, error) => { responses.push({ requestId, response, error }); },
+  };
+  const runner = createAgentRuntimeSessionRunner({
+    store: { get: () => [], set: () => {} },
+    resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'acp-local-stdio', executablePath: '/tmp/runtime' } }),
+    confirmStart: () => ({
+      ok: true,
+      canStart: true,
+      task: { __mcpRevision: 4 },
+      contractSnapshot: { taskId: 'task-1', taskRevision: 4, contributionId: null, contextEntryIds: ['checkpoint-1'] },
+      contractDigest: 'digest',
+    }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: () => {
+      storedBinding = { id: 'binding-1', revision: 0, runtimeProfileId: 'runtime-1', state: 'starting', scope: { kind: 'task', taskId: 'task-1' } };
+      return { ok: true, binding: storedBinding };
+    },
+    updateBinding: (_store, input) => {
+      updates.push(input);
+      storedBinding = { ...storedBinding, ...input, id: 'binding-1', revision: input.expectedRevision + 1 };
+      return { ok: true, binding: storedBinding };
+    },
+    appendEvent: (_store, event) => { events.push(event); return { ok: true }; },
+    listSessions: () => ({ bindings: storedBinding ? [storedBinding] : [], events: [] }),
+    getTaskContextEntry: (_store, { entryId }) => ({ ok: true, entry: { id: entryId, kind: 'context-checkpoint', fromRevision: 4, toRevision: 4, summary: 'Continue from accepted checkpoint', markers: [], provenance: 'human-authored', createdAt: '2026-08-02T00:00:00.000Z', sourceRefs: [{ type: 'activity', id: 'activity-1' }] } }),
+    createClient: () => client,
+    logger: { info: (message, details) => logs.push({ message, details }), debug: (message, details) => logs.push({ message, details }), warn: (message, details) => logs.push({ message, details }), error: (message, details) => logs.push({ message, details }) },
+  });
+
+  const result = await runner.start({ confirmed: true, taskId: 'task-1', workspacePath: '/tmp/workspace', idempotencyKey: 'start-1' });
+  assert.equal(result.ok, true);
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0], /Continue from accepted checkpoint/);
+  assert.equal(result.binding.state, 'active');
+  assert.equal(updates.at(-1).state, 'active');
+  const mcpEvent = events.find(event => event.nativeEventType === 'mcpServer/startupStatus/updated');
+  assert.equal(mcpEvent.toolName, 'figma');
+  assert.equal(mcpEvent.state, 'failed');
+  assert.equal(mcpEvent.outcome, 'reauthenticationRequired');
+  assert.equal(events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent'), true);
+  assert.equal(logs.some(entry => entry.message === '[agent-runtime] session.ready' && entry.details.bindingId === 'binding-1'), true);
+  assert.equal(logs.some(entry => entry.message === '[agent-runtime] notification' && entry.details.subject === 'figma'), true);
+  notify({ method: 'mcpServer/elicitation/request', id: 42, params: { serverName: 'omvra_testing_mcp', mode: 'form', message: 'Allow the task preflight?', requestedSchema: { type: 'object', properties: { confirmed: { type: 'boolean', title: 'Confirm', default: true } }, required: ['confirmed'] } } });
+  assert.equal(runner.listRequests('binding-1')[0].message, 'Allow the task preflight?');
+  assert.equal(storedBinding.state, 'needs-input');
+  assert.equal((await runner.respond('binding-1', 42, { action: 'accept', content: { confirmed: true }, _meta: null })).ok, true);
+  assert.equal(runner.listRequests('binding-1').length, 0);
+  assert.equal(responses[0].requestId, 42);
+  assert.equal(storedBinding.state, 'active');
+  notify({ method: 'error', params: { error: { message: 'Task tool failed.' }, willRetry: false } });
+  assert.equal(events.at(-1).outcome, 'Task tool failed.');
+  notify({ method: 'turn/completed', params: { turn: { status: 'interrupted' } } });
+  assert.equal(storedBinding.state, 'interrupted');
+});
+
+test('resuming interrupted task work immediately sends the current authoritative task context', async () => {
+  const prompts = [];
+  const events = [];
+  let notify;
+  let binding = { id: 'binding-resume', revision: 2, runtimeProfileId: 'runtime-1', state: 'interrupted', opaqueSessionRef: 'thread-1', scope: { kind: 'task', taskId: 'task-1', executionAttemptId: 'attempt-1', taskRevision: 4 } };
+  const runner = createAgentRuntimeSessionRunner({
+    store: {},
+    resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'codex-app-server-stdio', executablePath: '/tmp/codex' } }),
+    confirmStart: () => ({ canStart: false }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: () => ({ ok: false }),
+    updateBinding: (_store, input) => {
+      binding = { ...binding, ...input, revision: input.expectedRevision + 1 };
+      return { ok: true, binding };
+    },
+    appendEvent: (_store, event) => { events.push(event); return { ok: true }; },
+    listSessions: () => ({ bindings: [binding], events: [] }),
+    getTaskById: () => ({ id: 'task-1', title: 'Test task', notes: 'Update the task description with the agent details.', status: 'in-progress', __mcpRevision: 4 }),
+    listTaskContext: () => ({ ok: true, entries: [{ id: 'checkpoint-1' }] }),
+    getTaskContextEntry: () => ({ ok: true, entry: { id: 'checkpoint-1', kind: 'context-checkpoint', fromRevision: 4, toRevision: 4, summary: 'Use the accepted task brief.', sourceRefs: [] } }),
+    createClient: () => ({
+      initialize: async () => ({ capabilities: { prompt: true } }),
+      onNotification: callback => { notify = callback; },
+      resumeSession: async () => ({ sessionId: 'thread-1' }),
+      prompt: async (_sessionId, text) => { prompts.push(text); notify({ method: 'turn/started', params: { turn: { status: 'inProgress' } } }); return { turnId: 'turn-1' }; },
+      close: () => {},
+    }),
+  });
+
+  const result = await runner.resume('binding-resume', { workspacePath: '/tmp/workspace' });
+  assert.equal(result.ok, true);
+  assert.equal(result.binding.state, 'active');
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0], /Title: Test task/);
+  assert.match(prompts[0], /Update the task description with the agent details/);
+  assert.equal(events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent'), true);
 });

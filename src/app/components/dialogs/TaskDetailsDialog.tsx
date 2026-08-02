@@ -311,7 +311,10 @@ export function TaskDetailsDialog({
               onEdit={handleEditTask}
               onCopy={handleCopyTaskDetails}
               onExportPdf={handleExportPdf}
-              onStartWork={() => setStartWorkRequest(request => request + 1)}
+              onStartWork={() => {
+                onClose();
+                setStartWorkRequest(request => request + 1);
+              }}
             />
           )}
           footer={(
@@ -431,7 +434,14 @@ export function TaskDetailsDialog({
             />
           </AnchoredPanelSection>
         </AnchoredPanel>
-        {task && <TaskExecutionAction task={task} openRequest={startWorkRequest} trigger={null} />}
+        {task && (
+          <TaskExecutionAction
+            task={task}
+            repositoryFolder={swimlanes.find(project => project.id === task.swimlaneId || task.projectIds?.includes(project.id))?.repositoryFolder}
+            openRequest={startWorkRequest}
+            trigger={null}
+          />
+        )}
       </DialogSurface>
     </Dialog>
   );

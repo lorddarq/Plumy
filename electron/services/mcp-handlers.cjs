@@ -514,9 +514,16 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
     case 'tasks.context.append': {
       const taskId = parseTaskId(args);
       if (!taskId) return { error: invalidParams('Invalid params: "taskId" is required.') };
+      const task = getTaskById(store, taskId);
+      const currentRevision = Number.isInteger(Number(task?.__mcpRevision)) ? Number(task.__mcpRevision) : 0;
       const result = appendTaskContextEntry(store, {
         ...args,
         taskId,
+        fromRevision: args.fromRevision ?? currentRevision,
+        toRevision: args.toRevision ?? currentRevision,
+        sourceRefs: Array.isArray(args.sourceRefs) && args.sourceRefs.length > 0
+          ? args.sourceRefs
+          : [{ type: 'task-change', id: `${taskId}@${currentRevision}` }],
         provenance: 'agent-authored',
         actor: 'mcp-agent',
       });

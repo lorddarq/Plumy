@@ -119,13 +119,14 @@ Connection testing launches the exact executable and argument array without shel
 
 The runtime working directory is execution-scope metadata, not a global connection setting and not part of a runtime profile. A single manually entered workspace path would incorrectly assume that an agent works in only one project.
 
-The accepted first-release model is:
+The working-directory model is:
 
 1. **Swimlane information** may define a repository folder as the default working directory for tasks in that swimlane.
 2. A task may define an optional repository-folder override when its work belongs elsewhere.
-3. Preflight resolves the task override first, then the swimlane default. If neither is configured, start is blocked with an explicit configuration-required state; Omvra does not guess, scan the filesystem, or reuse a folder from another task.
-4. The task execution surface shows the resolved folder and whether it came from task or swimlane information before starting the runtime.
-5. One execution/session retains one primary working directory. An agent may cycle through projects by starting or resuming each task in its independently resolved directory; Omvra does not silently change the directory of a live session.
+3. A global working location may be configured as a cross-project fallback. It participates only in working-directory resolution and never filters projects or task lists.
+4. Preflight resolves the task override first, then the swimlane/project default, then the global location. If none is configured, Omvra creates an isolated app-managed scratch workspace for that task; it does not guess, scan the filesystem, or reuse a folder from another task.
+5. The task execution surface shows the resolved folder and whether it came from the task, project, global location, or scratch workspace before starting the runtime.
+6. One execution/session retains one primary working directory. An agent may cycle through projects by starting or resuming each task in its independently resolved directory; Omvra does not silently change the directory of a live session.
 
 Additional repository folders for one task are deferred until a demonstrated multi-repository workflow requires them. If added, they must be explicit allowed roots rather than an implicit search scope. The current global `workspacePath` connection input is therefore transitional and should be removed when this resolution model is implemented, not merely renamed.
 

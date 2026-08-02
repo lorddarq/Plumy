@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useDrag } from 'react-dnd';
-import { Trash2 } from 'lucide-react';
+import { Play, Trash2 } from 'lucide-react';
 import { Task } from '../types';
 import { PenWritingIcon } from './icons/PenWritingIcon';
 import { FilesCopyIcon } from './icons/FilesCopyIcon';
@@ -48,6 +48,7 @@ export function DraggableTimelineTask({
   const ref = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [startWorkRequest, setStartWorkRequest] = useState(0);
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const dragOffsetXRef = useRef(0);
 
@@ -107,7 +108,8 @@ export function DraggableTimelineTask({
   }
 
   return (
-    <ContextMenu open={contextMenuOpen} onOpenChange={setContextMenuOpen}>
+    <>
+      <ContextMenu open={contextMenuOpen} onOpenChange={setContextMenuOpen}>
       <ContextMenuTrigger asChild>
         <div
           ref={ref}
@@ -166,7 +168,10 @@ export function DraggableTimelineTask({
           <PenWritingIcon />
           Edit
         </ContextMenuItem>
-        <TaskExecutionAction task={task} repositoryFolder={repositoryFolder} />
+        <ContextMenuItem onSelect={() => setStartWorkRequest(request => request + 1)}>
+          <Play />
+          Start work
+        </ContextMenuItem>
         <ContextMenuItem variant="destructive" onSelect={() => onTaskDelete(task.id)}>
           <Trash2 />
           Delete
@@ -176,7 +181,9 @@ export function DraggableTimelineTask({
           Duplicate
         </ContextMenuItem>
       </ContextMenuContent>
-    </ContextMenu>
+      </ContextMenu>
+      <TaskExecutionAction task={task} repositoryFolder={repositoryFolder} openRequest={startWorkRequest} trigger={null} />
+    </>
   );
 }
 

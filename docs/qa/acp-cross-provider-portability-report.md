@@ -7,15 +7,15 @@ Task: `task-7a1c588f-d713-4172-b44b-5fdacf930662`
 
 The provider-neutral profile and protocol layers are present and the bounded task-context ledger is implemented. Static and contract-level checks pass for profile validation, native ACP/Codex/Claude capability negotiation, bounded context projection, immutable source-linked entries, revision protection, session-binding identity, and privacy restrictions.
 
-The requested end-to-end second-runtime handoff is not ready to accept. The current task start path records `contextEntryIds` in the preflight contract snapshot, but the session runner starts the second runtime with an empty session configuration and does not retrieve or inject the accepted checkpoint and bounded history index. No transcript replay was observed; the missing behavior is context-pack delivery, not an unsafe replay path.
+The requested end-to-end second-runtime handoff now has a product-path implementation slice. The task start path still records bounded `contextEntryIds` in the preflight contract snapshot, and the session runner now retrieves those exact entries, builds a provider-neutral context pack, and injects it through the native client's common first prompt. Live two-provider completion remains unverified because no two configured runnable profiles and fixture task were available.
 
 ## Findings
 
 | Area | Result | Evidence |
 | --- | --- | --- |
 | Same profile contract across runtimes | Pass at contract level | `agent-runtime-profile-service.test.cjs`; `agent-runtime-protocol-client.test.cjs` cover ACP, Codex app-server, and Claude stream-json profiles. |
-| Latest checkpoint and bounded history | Pass in ledger/preflight projection; blocked end-to-end | `task-context-ledger-service.test.cjs` caps the projection and preserves `hasMore`; `agent-execution-preflight-service.cjs` records only entry IDs. The session runner does not retrieve or pass those entries to a native client. |
-| Targeted older source-linked retrieval | Pass at MCP/domain boundary; not wired into handoff | `tasks.context.list/get` and ledger tests preserve source references and explicit missing sources. No runner call retrieves a selected entry. |
+| Latest checkpoint and bounded history | Pass for bounded pack construction and injection; live provider run pending | `agent-runtime-context-pack.cjs` retrieves at most 12 exact entries and `agent-runtime-session-runner.cjs` injects the pack after native session creation. |
+| Targeted older source-linked retrieval | Pass for selected entry retrieval; live provider run pending | The runner calls the exact task-context getter for preflight-selected IDs and preserves only bounded source references, not source records/bodies. |
 | Task/Goal identity and revision gates | Pass for existing contracts | Session binding tests cover task and Goal-node scope; preflight tests cover stale revision and digest rejection. |
 | Provider-private state isolation | Pass | Bindings retain one runtime profile and one opaque session reference per execution scope; raw session references are rejected from normalized task context and event payloads. |
 | Capability differences | Pass | Native clients expose exact capability snapshots and reject unsupported resume/close operations instead of emulating them. |
@@ -23,13 +23,13 @@ The requested end-to-end second-runtime handoff is not ready to accept. The curr
 | Controlled provider comparison | Blocked | No two configured, runnable provider profiles and no stable fixture task/accepted checkpoint were available for a live controlled run. Provider-reported usage remains unknown unless a native runtime emits it. |
 | Portability evidence report | Pass | This report is the durable QA artifact. |
 
-## Reproduction of the handoff gap
+## Previous handoff gap and current verification
 
 1. Prepare a task execution with a checkpoint and bounded history entries.
 2. Observe the preflight contract snapshot: it contains bounded `contextEntryIds`.
 3. Start a native session through `agent-runtime-session-runner.cjs`.
-4. Observe that the runner calls `client.startSession({})`; it does not call `tasks.context.get`, resolve source references, or create a bounded context pack from the checkpoint/index.
-5. Result: a second provider can start under the same governance and binding contract, but it cannot yet continue from the latest accepted Omvra context through the product path.
+4. The runner retrieves each bounded ID through the task-context getter, creates a pack containing summaries and source references only, and sends it through the provider-neutral `client.prompt()` seam.
+5. Result: the product path now delivers Omvra context without transcript replay. Live two-provider continuation remains a separate environment-dependent verification.
 
 ## Ready-for-test checklist
 
@@ -38,8 +38,8 @@ The requested end-to-end second-runtime handoff is not ready to accept. The curr
 - [x] Context ledger list/get/append behavior is bounded, source-linked, immutable, revision-protected, and idempotent.
 - [x] Session bindings preserve task/Goal scope and runtime identity without persisting opaque references into task context or normalized events.
 - [x] Unsupported operations, missing usage, and missing source records remain explicit.
-- [ ] A runtime-independent context-pack builder exists for the latest accepted checkpoint plus bounded history index.
-- [ ] The session runner retrieves only selected older source-linked entries and passes the bounded pack to the selected native runtime.
+- [x] A runtime-independent context-pack builder exists for the latest accepted checkpoint plus bounded history index.
+- [x] The session runner retrieves only selected older source-linked entries and passes the bounded pack to the selected native runtime.
 - [ ] Two different configured providers complete the same controlled fixture task and produce comparable evidence.
 
 ## Recommended next verification

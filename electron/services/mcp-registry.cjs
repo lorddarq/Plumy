@@ -223,7 +223,7 @@ const READ_TOOL_DEFINITIONS = [
 const WRITE_TOOL_DEFINITIONS = [
   {
     name: 'tasks.context.append',
-    description: 'Appends one immutable, agent-authored task context entry with optimistic revision and idempotency protection. It does not mutate the task or authorize execution.',
+    description: 'Appends one immutable, agent-authored task context entry with optimistic revision and idempotency protection. Omitted revision bounds default to the current task revision; omitted sourceRefs default to that task revision. It does not mutate the task or authorize execution.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -232,8 +232,8 @@ const WRITE_TOOL_DEFINITIONS = [
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
         idempotencyKey: { type: 'string' },
         kind: { type: 'string', enum: ['requirement-change', 'decision', 'implementation-attempt', 'blocker', 'review-feedback', 'handoff', 'evidence', 'status-change', 'context-checkpoint'] },
-        fromRevision: { type: 'integer', minimum: 0 },
-        toRevision: { type: 'integer', minimum: 0 },
+        fromRevision: { type: 'integer', minimum: 0, description: 'Optional lower task revision bound. Defaults to the current task revision.' },
+        toRevision: { type: 'integer', minimum: 0, description: 'Optional upper task revision bound. Defaults to the current task revision.' },
         summary: { type: 'string' },
         markers: { type: 'array', items: { type: 'string' }, maxItems: 50 },
         changedFields: { type: 'array', items: { type: 'string' }, maxItems: 50 },
@@ -241,6 +241,7 @@ const WRITE_TOOL_DEFINITIONS = [
           type: 'array',
           minItems: 1,
           maxItems: 50,
+          description: 'Optional supporting records. Defaults to the current task revision when omitted.',
           items: {
             type: 'object',
             additionalProperties: true,
@@ -252,7 +253,7 @@ const WRITE_TOOL_DEFINITIONS = [
           },
         },
       },
-      required: ['taskId', 'expectedRevision', 'idempotencyKey', 'kind', 'summary', 'markers', 'sourceRefs'],
+      required: ['taskId', 'expectedRevision', 'idempotencyKey', 'kind', 'summary', 'markers'],
     },
   },
   {

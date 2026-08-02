@@ -255,6 +255,7 @@ declare global {
         deleteProfile: (profileId: string) => Promise<{ ok: boolean; value?: boolean; error?: string }>;
         saveDefaults: (defaults: AgentRuntimeDefaults) => Promise<{ ok: boolean; value?: AgentRuntimeDefaults; error?: string }>;
         resolve: (payload: AgentRuntimeResolutionInput) => Promise<{ ok: boolean; value?: AgentRuntimeResolution; error?: string }>;
+        resolveManagedWorkspace: (taskId: string) => Promise<{ ok: boolean; value?: { workspacePath: string; source: 'scratch-workspace' }; error?: string }>;
         prepareExecution: (payload: Record<string, unknown>) => Promise<any>;
         confirmStart: (payload: Record<string, unknown>) => Promise<any>;
         testConnection: (payload: AgentRuntimeResolutionInput & { workspacePath: string }) => Promise<AgentRuntimeOperationResult>;
@@ -266,6 +267,7 @@ declare global {
         }) => Promise<AgentRuntimeOperationResult>;
         sessions: {
           list: (payload?: { bindingId?: string; limit?: number }) => Promise<any>;
+          requests: (bindingId: string) => Promise<Array<{ bindingId: string; requestId: string | number; method: string; serverName: string; mode: string; message: string; fields: Array<{ name: string; type: string; title: string; description: string; required: boolean; defaultValue?: unknown; options?: unknown[] }> }>>;
           createBinding: (payload: Record<string, unknown>) => Promise<any>;
           updateBinding: (payload: Record<string, unknown>) => Promise<any>;
           appendEvent: (payload: Record<string, unknown>) => Promise<any>;
@@ -317,6 +319,7 @@ declare global {
     integrationMode: 'acp-local-stdio' | 'claude-stream-json-stdio' | 'codex-app-server-stdio' | 'external-handoff';
     executablePath?: string;
     fixedArgs: string[];
+    approvalPolicy?: 'untrusted' | 'on-request' | 'never';
     externalUrlScheme?: string;
     enabled: boolean;
     createdAt?: string;
@@ -326,6 +329,7 @@ declare global {
   interface AgentRuntimeDefaults {
     schemaVersion?: 1;
     globalProfileId: string | null;
+    globalWorkspacePath?: string | null;
     projectProfileIds: Record<string, string>;
   }
 

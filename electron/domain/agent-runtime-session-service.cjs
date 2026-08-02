@@ -10,8 +10,8 @@ const TERMINAL_REASONS = new Set(['closed', 'cancelled', 'process-exit', 'runtim
 const STATE_TRANSITIONS = new Map([
   ['starting', new Set(['ready', 'interrupted', 'closed', 'failed'])],
   ['ready', new Set(['active', 'needs-input', 'cancelling', 'interrupted', 'closed', 'failed'])],
-  ['active', new Set(['needs-input', 'cancelling', 'interrupted', 'closed', 'failed'])],
-  ['needs-input', new Set(['active', 'cancelling', 'interrupted', 'closed', 'failed'])],
+  ['active', new Set(['ready', 'needs-input', 'cancelling', 'interrupted', 'closed', 'failed'])],
+  ['needs-input', new Set(['ready', 'active', 'cancelling', 'interrupted', 'closed', 'failed'])],
   ['cancelling', new Set(['interrupted', 'closed', 'failed'])],
   ['interrupted', new Set(['starting', 'closed', 'failed'])],
   ['closed', new Set()],
@@ -187,6 +187,10 @@ function createAgentRuntimeSessionService({
       ...(terminalReason ? { terminalReason } : {}),
       ...(terminal ? { closedAt: timestamp } : {}),
     };
+    if (ACTIVE_STATES.has(state)) {
+      delete next.terminalReason;
+      delete next.closedAt;
+    }
     if (opaqueSessionRef && !terminal) next.opaqueSessionRef = opaqueSessionRef;
     else delete next.opaqueSessionRef;
     writeBindings(store, bindings.map(item => item.id === bindingId ? next : item));
@@ -233,7 +237,7 @@ function createAgentRuntimeSessionService({
       ...(startedAt && finishedAt ? { durationMs: Date.parse(finishedAt) - Date.parse(startedAt) } : {}),
       ...(safeIdentifier(input.state, 80) ? { state: safeIdentifier(input.state, 80) } : {}),
       ...(safeIdentifier(input.outcome, 80) ? { outcome: safeIdentifier(input.outcome, 80) } : {}),
-      ...(safeIdentifier(input.requestId) ? { requestId: safeIdentifier(input.requestId) } : {}),
+      ...(safeIdentifier(input.requestId === undefined || input.requestId === null ? '' : String(input.requestId)) ? { requestId: safeIdentifier(String(input.requestId)) } : {}),
       ...(safeIdentifier(input.toolName) ? { toolName: safeIdentifier(input.toolName) } : {}),
       ...(capabilityId ? { capabilityId } : {}),
     };

@@ -97,7 +97,7 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
     if (message.method === 'turn/interrupt') respond(currentChild, message.id, {});
   });
   const client = createNativeRuntimeClient({
-    integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', fixedArgs: ['-c', 'model="gpt"'],
+    integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', fixedArgs: ['-c', 'model="gpt"'], approvalPolicy: 'never',
   }, { workspacePath: '/tmp/workspace', spawnProcess: (_command, args) => {
     assert.deepEqual(args, ['-c', 'model="gpt"', 'app-server', '--stdio']);
     return child;
@@ -115,7 +115,10 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
   await client.cancel(session.sessionId);
   assert.throws(() => client.closeSession(session.sessionId), error => error.code === 'ACP_CAPABILITY_UNSUPPORTED');
   assert.equal(requests.find(message => message.method === 'thread/start').params.cwd, '/tmp/workspace');
+  assert.equal(requests.find(message => message.method === 'thread/start').params.approvalPolicy, 'never');
   assert.equal(requests.find(message => message.method === 'thread/resume').params.threadId, 'thread-1');
+  assert.equal(requests.find(message => message.method === 'thread/resume').params.approvalPolicy, 'never');
+  assert.equal(requests.find(message => message.method === 'turn/start').params.approvalPolicy, 'never');
   assert.deepEqual(methods, ['initialize', 'initialized', 'account/read', 'model/list', 'thread/start', 'thread/resume', 'turn/start', 'turn/steer', 'turn/interrupt']);
   client.close();
 });
@@ -166,12 +169,15 @@ test('transport rejects malformed runtime messages and bounds pending requests',
 
 test('runtime process exit rejects active requests instead of leaving a falsely active client', async () => {
   const child = createChild(() => {});
+  const logs = [];
   const transport = new JsonLineTransport('/usr/bin/fixture', [], {
     workspacePath: '/tmp/workspace', spawnProcess: () => child, timeoutMs: 1_000,
+    logger: { info: (message, details) => logs.push({ message, details }), debug: () => {}, error: (message, details) => logs.push({ message, details }) },
   });
   const pending = transport.request('session/prompt').catch(error => error);
   child.emit('exit', 9);
   assert.equal((await pending).code, 'ACP_SESSION_INTERRUPTED');
+  assert.equal(logs.some(entry => entry.message === '[agent-runtime:transport] process.exited' && entry.details.code === 9), true);
 });
 
 test('bidirectional request IDs cannot resolve an unrelated client request', async () => {

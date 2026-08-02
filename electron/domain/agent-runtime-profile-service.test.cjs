@@ -33,8 +33,11 @@ test('runtime profiles validate executable paths, schemes, and credential-like a
   }), /Credentials/);
   assert.equal(store.get(PROFILE_STORE_KEY), undefined);
   assert.equal(saveProfile(store, {
-    id: 'codex', name: 'Codex', integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', enabled: true,
-  }).integrationMode, 'codex-app-server-stdio');
+    id: 'codex', name: 'Codex', integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', approvalPolicy: 'never', enabled: true,
+  }).approvalPolicy, 'never');
+  assert.throws(() => saveProfile(store, {
+    id: 'codex-invalid', name: 'Codex', integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', approvalPolicy: 'always', enabled: true,
+  }), /approvalPolicy/);
   assert.equal(saveProfile(store, {
     id: 'claude', name: 'Claude', integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude', enabled: true,
   }).integrationMode, 'claude-stream-json-stdio');
@@ -44,12 +47,15 @@ test('runtime resolution is deterministic and never silently falls back', () => 
   const store = createStore();
   saveProfile(store, { id: 'global', name: 'Global', integrationMode: 'acp-local-stdio', executablePath: '/usr/bin/global', enabled: true });
   saveProfile(store, { id: 'project', name: 'Project', integrationMode: 'external-handoff', externalUrlScheme: 'codex', enabled: true });
-  saveDefaults(store, { globalProfileId: 'global', projectProfileIds: { 'project-1': 'project' } });
+  saveDefaults(store, { globalProfileId: 'global', globalWorkspacePath: '/tmp/global-workspace', projectProfileIds: { 'project-1': 'project' } });
 
   assert.equal(resolveProfile(store, { projectId: 'project-1' }).profile.id, 'project');
   assert.equal(resolveProfile(store, { projectId: 'project-1', executionProfileId: 'global' }).source, 'execution-override');
   assert.equal(resolveProfile(store, { executionProfileId: 'missing' }).state, 'missing');
+  assert.equal(store.get(DEFAULTS_STORE_KEY).globalWorkspacePath, '/tmp/global-workspace');
+  assert.throws(() => saveDefaults(store, { globalProfileId: 'global', globalWorkspacePath: 'relative/path', projectProfileIds: {} }), /absolute/);
 
   deleteProfile(store, 'project');
   assert.deepEqual(store.get(DEFAULTS_STORE_KEY).projectProfileIds, {});
+  assert.equal(store.get(DEFAULTS_STORE_KEY).globalWorkspacePath, '/tmp/global-workspace');
 });

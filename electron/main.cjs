@@ -78,6 +78,10 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   updateBinding: (runtimeStore, payload) => updateAgentRuntimeSessionBinding(runtimeStore, payload),
   appendEvent: (runtimeStore, payload) => appendAgentRuntimeEvent(runtimeStore, payload),
   listSessions: (runtimeStore, payload) => listAgentRuntimeSessions(runtimeStore, payload),
+  getTaskById: (runtimeStore, taskId) => require('./services/workspace-service.cjs').getTaskById(runtimeStore, taskId),
+  listTaskContext: (runtimeStore, payload) => listTaskContextEntries(runtimeStore, payload),
+  getTaskContextEntry: (runtimeStore, payload) => getTaskContextEntry(runtimeStore, payload),
+  logger: console,
 });
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';
@@ -554,8 +558,18 @@ registerAgentRuntimeIpcHandlers({
   startGoalAgentRuntimeSession: (payload) => agentRuntimeSessionRunner.startGoalNode(payload),
   invokeAgentRuntimeSession: (bindingId, method, text) => agentRuntimeSessionRunner.invoke(bindingId, method, text),
   respondAgentRuntimeSession: (bindingId, requestId, result, error) => agentRuntimeSessionRunner.respond(bindingId, requestId, result, error),
+  listAgentRuntimeSessionRequests: (bindingId) => agentRuntimeSessionRunner.listRequests(bindingId),
   closeAgentRuntimeSession: (bindingId) => agentRuntimeSessionRunner.close(bindingId),
   resumeAgentRuntimeSession: (bindingId, payload) => agentRuntimeSessionRunner.resume(bindingId, payload),
+  resolveManagedWorkspace: (taskId) => {
+    if (typeof taskId !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(taskId)) {
+      throw new Error('A valid task ID is required for a managed workspace.');
+    }
+    const workspacePath = path.join(app.getPath('userData'), 'agent-workspaces', taskId);
+    fs.mkdirSync(workspacePath, { recursive: true, mode: 0o700 });
+    return { workspacePath, source: 'scratch-workspace' };
+  },
+  logger: console,
 });
 registerRuntimeIpcHandlers({
   ipcMain,

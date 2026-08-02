@@ -158,7 +158,7 @@ Requirements:
 
 - current task `expectedRevision`;
 - unique idempotency key;
-- valid kind, summary, revision range, and source references;
+- valid kind and summary; omitted revision bounds and source references default to the current task revision at the MCP adapter boundary;
 - agent writes use `agent-authored` provenance;
 - append does not mutate task fields or increment `__mcpRevision`.
 

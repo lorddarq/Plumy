@@ -1796,6 +1796,14 @@ test('task context MCP tools append, retrieve sources, and enrich bounded prefli
   assert.equal(appended.result.structuredContent.entry.provenance, 'agent-authored');
   assert.equal(appended.result.structuredContent.currentRevision, 0);
 
+  const defaulted = call('tasks_context_append', {
+    taskId: 'task-1', expectedRevision: 0, idempotencyKey: 'mcp-context-defaults', kind: 'implementation-attempt',
+    summary: 'The agent began the requested task work.', markers: ['acp'],
+  });
+  assert.equal(defaulted.result.structuredContent.entry.fromRevision, 0);
+  assert.equal(defaulted.result.structuredContent.entry.toRevision, 0);
+  assert.deepEqual(defaulted.result.structuredContent.entry.sourceRefs, [{ type: 'task-change', id: 'task-1@0' }]);
+
   const listed = call('tasks_context_list', { taskId: 'task-1', markers: ['mcp'] });
   assert.equal(listed.result.structuredContent.entries.length, 1);
   assert.equal(listed.result.structuredContent.entries[0].sourceRefs, undefined);
@@ -1807,8 +1815,9 @@ test('task context MCP tools append, retrieve sources, and enrich bounded prefli
 
   const preflight = call('agent_resolve_task_context', { taskId: 'task-1' });
   assert.deepEqual(preflight.result.structuredContent.taskContext.latestCheckpoint, null);
-  assert.equal(preflight.result.structuredContent.taskContext.entriesSinceCheckpoint.length, 1);
-  assert.equal(preflight.result.structuredContent.taskContext.entriesSinceCheckpoint[0].sourceRefs, undefined);
+  assert.equal(preflight.result.structuredContent.taskContext.entriesSinceCheckpoint.length, 2);
+  assert.equal(preflight.result.structuredContent.taskContext.entriesSinceCheckpoint[1].summary, 'The agent began the requested task work.');
+  assert.equal(preflight.result.structuredContent.taskContext.entriesSinceCheckpoint.every(entry => entry.sourceRefs === undefined), true);
   assert.equal(preflight.result.structuredContent.taskContext.hasMore, false);
 });
 

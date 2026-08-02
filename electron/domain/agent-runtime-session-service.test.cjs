@@ -44,6 +44,16 @@ test('session bindings are provider-neutral, revisioned, idempotent, and keep on
   assert.equal(state.bindings.length, 1);
 });
 
+test('a completed model turn returns an active session to ready', () => {
+  const { service } = harness();
+  const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
+  const ready = service.updateBinding(null, { bindingId: binding.id, expectedRevision: 0, state: 'ready', opaqueSessionRef: 'session-1' }).binding;
+  const active = service.updateBinding(null, { bindingId: binding.id, expectedRevision: ready.revision, state: 'active' }).binding;
+  const idle = service.updateBinding(null, { bindingId: binding.id, expectedRevision: active.revision, state: 'ready' });
+  assert.equal(idle.ok, true);
+  assert.equal(idle.binding.state, 'ready');
+});
+
 test('normalized events retain correlation and reported usage without private runtime payloads', () => {
   const { service, state } = harness();
   const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
@@ -167,6 +177,17 @@ test('crash reconciliation preserves resumability while close and archive clear 
   assert.equal(state.bindings[0].state, 'closed');
   assert.equal(state.bindings[0].opaqueSessionRef, undefined);
   assert.equal(state.bindings[0].scope.taskRevision, 4);
+});
+
+test('resuming an interrupted binding clears its stale terminal reason', () => {
+  const { service, state } = harness();
+  const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
+  service.updateBinding(null, { bindingId: binding.id, expectedRevision: 0, state: 'ready', opaqueSessionRef: 'resume-me' });
+  service.reconcileInterrupted(null);
+  assert.equal(state.bindings[0].terminalReason, 'process-exit');
+  const starting = service.updateBinding(null, { bindingId: binding.id, expectedRevision: 2, state: 'starting' });
+  assert.equal(starting.ok, true);
+  assert.equal(starting.binding.terminalReason, undefined);
 });
 
 test('binding and event reads are bounded and unknown stored fields survive updates', () => {

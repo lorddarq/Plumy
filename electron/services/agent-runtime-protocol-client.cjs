@@ -63,7 +63,9 @@ class JsonLineTransport {
     this.stderr = '';
     this.closed = false;
     this.jsonRpc = options.jsonRpc === true;
+    this.logger = options.logger || null;
     const spawnProcess = options.spawnProcess || spawn;
+    this.logger?.info?.('[agent-runtime:transport] process.starting', { executable: path.basename(command), workspacePath: options.workspacePath });
     this.child = spawnProcess(command, args, {
       cwd: validateWorkspacePath(options.workspacePath),
       shell: false,
@@ -72,13 +74,14 @@ class JsonLineTransport {
     });
     this.child.stdout?.on('data', chunk => this.#receive(chunk));
     this.child.stderr?.on('data', chunk => { this.stderr = `${this.stderr}${chunk}`.slice(-2048); });
-    this.child.once('error', error => this.#fail(runtimeError(
-      error.code === 'ENOENT' ? 'ACP_RUNTIME_MISSING' : 'ACP_RUNTIME_UNAVAILABLE',
-      error.message,
-    )));
+    this.child.once('error', error => {
+      this.logger?.error?.('[agent-runtime:transport] process.error', { code: error.code || null, message: error.message || String(error) });
+      this.#fail(runtimeError(error.code === 'ENOENT' ? 'ACP_RUNTIME_MISSING' : 'ACP_RUNTIME_UNAVAILABLE', error.message));
+    });
     this.child.once('exit', code => {
       if (!this.closed) {
         const detail = this.stderr.trim();
+        this.logger?.error?.('[agent-runtime:transport] process.exited', { code: code ?? null, stderr: detail || null });
         this.#fail(runtimeError('ACP_SESSION_INTERRUPTED', `Runtime exited unexpectedly (${code ?? 'unknown'}).${detail ? ` ${detail}` : ''}`));
       }
     });
@@ -95,12 +98,14 @@ class JsonLineTransport {
       return Promise.reject(runtimeError('ACP_QUEUE_FULL', 'Runtime request queue is full.'));
     }
     const id = this.nextId++;
+    this.logger?.debug?.('[agent-runtime:transport] request.started', { id, method, timeoutMs });
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
+        this.logger?.error?.('[agent-runtime:transport] request.timed-out', { id, method, timeoutMs });
         reject(runtimeError('ACP_RUNTIME_UNAVAILABLE', `${method} timed out after ${timeoutMs} ms.`));
       }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { method, resolve, reject, timer });
       try {
         this.#write({ id, method, params });
       } catch (error) {
@@ -162,8 +167,13 @@ class JsonLineTransport {
         const pending = this.pending.get(message.id);
         this.pending.delete(message.id);
         clearTimeout(pending.timer);
-        if (message.error) pending.reject(runtimeError('ACP_PROTOCOL_INCOMPATIBLE', message.error.message || 'Runtime request failed.'));
-        else pending.resolve(message.result);
+        if (message.error) {
+          this.logger?.error?.('[agent-runtime:transport] request.failed', { id: message.id, method: pending.method, message: message.error.message || 'Runtime request failed.' });
+          pending.reject(runtimeError('ACP_PROTOCOL_INCOMPATIBLE', message.error.message || 'Runtime request failed.'));
+        } else {
+          this.logger?.debug?.('[agent-runtime:transport] request.completed', { id: message.id, method: pending.method });
+          pending.resolve(message.result);
+        }
       }
     }
   }
@@ -275,6 +285,7 @@ class CodexAppServerClient {
   constructor(profile, options) {
     this.transport = new JsonLineTransport(profile.executablePath, [...(profile.fixedArgs || []), 'app-server', '--stdio'], options);
     this.workspacePath = validateWorkspacePath(options.workspacePath);
+    this.approvalPolicy = profile.approvalPolicy;
     this.activeTurns = new Map();
     this.transport.onNotification(message => {
       if (message.method === 'turn/completed' && message.params?.threadId) this.activeTurns.delete(message.params.threadId);
@@ -301,19 +312,19 @@ class CodexAppServerClient {
   }
 
   async startSession(configuration = {}) {
-    const result = await this.transport.request('thread/start', { ...configuration, cwd: this.workspacePath });
+    const result = await this.transport.request('thread/start', { ...configuration, ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), cwd: this.workspacePath });
     return { sessionId: validateSessionRef(result?.thread?.id), configuration: result };
   }
 
   async resumeSession(sessionId, configuration = {}) {
     const id = validateSessionRef(sessionId);
-    const result = await this.transport.request('thread/resume', { ...configuration, threadId: id });
+    const result = await this.transport.request('thread/resume', { ...configuration, ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), threadId: id });
     return { sessionId: validateSessionRef(result?.thread?.id || id), configuration: result };
   }
 
   async prompt(sessionId, text) {
     const threadId = validateSessionRef(sessionId);
-    const result = await this.transport.request('turn/start', { threadId, input: [{ type: 'text', text: validateInputText(text) }] });
+    const result = await this.transport.request('turn/start', { threadId, input: [{ type: 'text', text: validateInputText(text) }], ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}) });
     const turnId = validateSessionRef(result?.turn?.id);
     this.activeTurns.set(threadId, turnId);
     return { turnId, result };

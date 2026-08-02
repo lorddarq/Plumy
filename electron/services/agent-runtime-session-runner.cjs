@@ -1,5 +1,6 @@
 const { randomUUID } = require('node:crypto');
 const { createNativeRuntimeClient } = require('./agent-runtime-protocol-client.cjs');
+const { createAgentRuntimeContextPack } = require('../domain/agent-runtime-context-pack.cjs');
 
 const ACTIVE_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
 
@@ -12,15 +13,86 @@ function createAgentRuntimeSessionRunner({
   updateBinding,
   appendEvent,
   listSessions,
+  getTaskById = null,
+  listTaskContext = null,
+  getTaskContextEntry = null,
+  createClient = createNativeRuntimeClient,
   now = () => new Date().toISOString(),
+  logger = null,
 }) {
   const clients = new Map();
+  const pendingRequests = new Map();
+  const buildContextPack = typeof getTaskContextEntry === 'function'
+    ? createAgentRuntimeContextPack({ getEntry: getTaskContextEntry }).build
+    : null;
 
   const failure = (error, message, details = {}) => ({ ok: false, error, message, ...details });
+  const log = (level, event, details = {}) => logger?.[level]?.(`[agent-runtime] ${event}`, details);
+  const requestKey = (bindingId, requestId) => `${bindingId}:${typeof requestId}:${String(requestId)}`;
+
+  function sanitizedElicitation(bindingId, message) {
+    if (message?.method !== 'mcpServer/elicitation/request' || message.id === undefined || message.id === null) return null;
+    const params = message.params || {};
+    const schema = params.requestedSchema && typeof params.requestedSchema === 'object' ? params.requestedSchema : {};
+    const required = new Set(Array.isArray(schema.required) ? schema.required.filter(name => typeof name === 'string') : []);
+    const fields = Object.entries(schema.properties || {}).slice(0, 20).map(([name, definition]) => {
+      const field = definition && typeof definition === 'object' ? definition : {};
+      const options = Array.isArray(field.enum) ? field.enum.filter(value => ['string', 'number', 'boolean'].includes(typeof value)).slice(0, 50) : [];
+      return {
+        name: String(name).slice(0, 128),
+        type: ['string', 'number', 'integer', 'boolean'].includes(field.type) ? field.type : 'string',
+        title: typeof field.title === 'string' ? field.title.slice(0, 200) : String(name).slice(0, 128),
+        description: typeof field.description === 'string' ? field.description.slice(0, 500) : '',
+        required: required.has(name),
+        ...(field.default !== undefined ? { defaultValue: field.default } : {}),
+        ...(options.length ? { options } : {}),
+      };
+    });
+    return {
+      bindingId,
+      requestId: message.id,
+      method: message.method,
+      serverName: typeof params.serverName === 'string' ? params.serverName.slice(0, 160) : '',
+      mode: ['form', 'openai/form', 'url'].includes(params.mode) ? params.mode : 'form',
+      message: typeof params.message === 'string' ? params.message.slice(0, 2_000) : 'Codex needs input before it can continue.',
+      fields,
+    };
+  }
+
+  function listRequests(bindingId) {
+    return [...pendingRequests.values()].filter(request => request.bindingId === bindingId).map(request => JSON.parse(JSON.stringify(request)));
+  }
+
+  function buildCurrentTaskContext(binding) {
+    if (!buildContextPack || typeof getTaskById !== 'function' || binding.scope?.kind !== 'task') return { ok: true, pack: null, text: '' };
+    const task = getTaskById(store, binding.scope.taskId);
+    if (!task) return failure('TASK_NOT_FOUND', `Task "${binding.scope.taskId}" not found.`);
+    const context = typeof listTaskContext === 'function'
+      ? listTaskContext(store, { taskId: task.id, limit: 12 })
+      : null;
+    return buildContextPack(store, {
+      taskId: task.id,
+      taskRevision: Number(task.__mcpRevision || 0),
+      taskTitle: task.title,
+      taskDescription: task.notes,
+      taskStatus: task.status,
+      contributionId: binding.scope.contributionId,
+      contextEntryIds: context?.ok ? (context.entries || []).map(entry => entry.id) : [],
+    });
+  }
 
   function bindingFor(id) {
     const result = listSessions(store, { bindingId: id, limit: 1 });
     return result?.bindings?.[0] || null;
+  }
+
+  function syncBindingState(bindingId, state) {
+    const current = bindingFor(bindingId);
+    if (!current || current.state === state) return current;
+    const result = updateBinding(store, { bindingId, expectedRevision: current.revision, state });
+    if (!result.ok) log('warn', 'binding.state-sync-failed', { bindingId, from: current.state, to: state, error: result.error });
+    else log('info', 'binding.state-changed', { bindingId, from: current.state, to: state });
+    return result.binding || current;
   }
 
   function recordNotification(binding, message) {
@@ -34,15 +106,31 @@ function createAgentRuntimeSessionRunner({
               : lower.includes('turn') || lower.includes('prompt') ? 'turn'
                 : 'session';
     const params = message?.params || {};
-    return appendEvent(store, {
+    const errorMessage = typeof params.error === 'string' ? params.error
+      : typeof params.error?.message === 'string' ? params.error.message
+        : typeof params.turn?.error?.message === 'string' ? params.turn.error.message
+          : null;
+    const subject = params.toolName || params.tool?.name || params.serverName || params.server?.name || params.name || params.item?.type || null;
+    const summary = {
+      bindingId: binding.id,
+      method,
+      state: params.state || params.status || params.turn?.status || params.thread?.status || null,
+      subject,
+      failureReason: params.failureReason || null,
+      error: errorMessage ? errorMessage.slice(0, 500) : null,
+    };
+    log(summary.state === 'failed' ? 'warn' : 'debug', 'notification', summary);
+    const elicitation = sanitizedElicitation(binding.id, message);
+    if (elicitation) pendingRequests.set(requestKey(binding.id, elicitation.requestId), elicitation);
+    const appended = appendEvent(store, {
       bindingId: binding.id,
       runtimeProfileId: binding.runtimeProfileId,
       kind,
       nativeEventType: method,
-      state: params.state || params.status,
-      outcome: params.outcome,
-      requestId: message?.id || params.requestId,
-      toolName: params.toolName || params.tool?.name,
+      state: params.state || params.status || params.turn?.status || params.thread?.status,
+      outcome: params.outcome || params.failureReason || (errorMessage ? errorMessage.slice(0, 500) : undefined),
+      requestId: message?.id ?? params.requestId,
+      toolName: subject,
       capabilityId: params.capabilityId,
       permissionState: params.permissionState || params.state,
       usageAggregation: params.usage?.aggregation,
@@ -54,23 +142,49 @@ function createAgentRuntimeSessionRunner({
       currency: params.usage?.currency,
       idempotencyKey: `runtime:${binding.id}:${randomUUID()}`,
     });
+    if (method === 'turn/started') syncBindingState(binding.id, 'active');
+    else if (method === 'turn/completed') {
+      for (const key of pendingRequests.keys()) if (key.startsWith(`${binding.id}:`)) pendingRequests.delete(key);
+      const turnState = params.turn?.status || params.status || params.state;
+      syncBindingState(binding.id, turnState === 'failed' ? 'failed' : turnState === 'interrupted' ? 'interrupted' : 'ready');
+    }
+    else if (kind === 'input') syncBindingState(binding.id, 'needs-input');
+    return appended;
   }
 
   async function start(payload = {}) {
-    if (payload.confirmed !== true) return failure('ACP_START_CONFIRMATION_REQUIRED', 'Explicit confirmation is required before starting work.');
-    if (typeof payload.workspacePath !== 'string' || !payload.workspacePath.trim()) return failure('ACP_REPOSITORY_FOLDER_REQUIRED', 'A repository folder is required before starting work.');
+    log('info', 'start.requested', { taskId: payload.taskId || null, hasWorkspace: Boolean(payload.workspacePath), executionProfileId: payload.executionProfileId || null });
+    if (payload.confirmed !== true) {
+      log('warn', 'start.rejected', { taskId: payload.taskId || null, error: 'ACP_START_CONFIRMATION_REQUIRED' });
+      return failure('ACP_START_CONFIRMATION_REQUIRED', 'Explicit confirmation is required before starting work.');
+    }
+    if (typeof payload.workspacePath !== 'string' || !payload.workspacePath.trim()) {
+      log('warn', 'start.rejected', { taskId: payload.taskId || null, error: 'ACP_REPOSITORY_FOLDER_REQUIRED' });
+      return failure('ACP_REPOSITORY_FOLDER_REQUIRED', 'A repository folder is required before starting work.');
+    }
 
     const existingSessions = listSessions(store, { limit: 100 });
     const activeExisting = (existingSessions?.bindings || []).find(binding => binding.scope?.kind === 'task' && binding.scope.taskId === payload.taskId && ACTIVE_STATES.has(binding.state));
-    if (activeExisting) return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'This task already has an active runtime session.', { bindingId: activeExisting.id, binding: activeExisting });
+    if (activeExisting) {
+      log('warn', 'start.rejected', { taskId: payload.taskId, bindingId: activeExisting.id, error: 'ACP_EXECUTION_ALREADY_ACTIVE' });
+      return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'This task already has an active runtime session.', { bindingId: activeExisting.id, binding: activeExisting });
+    }
 
     const confirmed = confirmStart(store, payload);
-    if (!confirmed?.canStart) return confirmed;
+    if (!confirmed?.canStart) {
+      log('warn', 'start.preflight-blocked', { taskId: payload.taskId, error: confirmed?.error || null, blockers: confirmed?.blockers?.map(blocker => blocker.code || blocker) || [] });
+      return confirmed;
+    }
     let attempt = confirmed.attempt;
 
     const profileResolution = resolveProfile(store, payload);
     if (!profileResolution.ok || !profileResolution.profile) return failure('ACP_RUNTIME_NOT_CONFIGURED', 'The selected runtime profile could not be resolved.', { preflight: confirmed });
     const profile = profileResolution.profile;
+    log('info', 'start.preflight-ready', { taskId: payload.taskId, runtimeProfileId: profile.id, integrationMode: profile.integrationMode });
+    const contextPack = buildContextPack
+      ? buildContextPack(store, confirmed.contractSnapshot)
+      : { ok: true, pack: null, text: '' };
+    if (!contextPack.ok) return failure(contextPack.error, contextPack.message, { preflight: confirmed });
     const actorPersonId = payload.actorPersonId || confirmed.task?.assigneeId || confirmed.context?.assignee?.id;
     const latestRevision = Number(confirmed.task?.__mcpRevision || confirmed.contractSnapshot.taskRevision);
     const transitionBase = {
@@ -108,19 +222,23 @@ function createAgentRuntimeSessionRunner({
         taskId: confirmed.contractSnapshot.taskId,
         contributionId: confirmed.contractSnapshot.contributionId,
         executionAttemptId: attempt.id,
-        taskRevision: Number(started.task?.__mcpRevision || acknowledged.task.__mcpRevision || latestRevision),
+        taskRevision: Number(started.task?.__mcpRevision || latestRevision),
       },
       capabilities: [],
     });
     if (!bindingResult.ok) return failure(bindingResult.error, bindingResult.message || 'The runtime session binding could not be created.', { preflight: confirmed });
 
     const binding = bindingResult.binding;
+    log('info', 'binding.created', { taskId: payload.taskId, bindingId: binding.id, runtimeProfileId: profile.id });
     let client;
     try {
-      client = createNativeRuntimeClient(profile, { workspacePath: payload.workspacePath });
+      client = createClient(profile, { workspacePath: payload.workspacePath, logger });
+      log('info', 'runtime.initializing', { bindingId: binding.id, runtimeProfileId: profile.id });
       const negotiated = await client.initialize();
-      const session = await client.startSession({});
+      log('info', 'runtime.initialized', { bindingId: binding.id, authentication: negotiated.authentication || 'unknown', capabilities: Object.keys(negotiated.capabilities || {}).filter(key => negotiated.capabilities[key] === true) });
       client.onNotification?.(message => recordNotification(binding, message));
+      const session = await client.startSession({});
+      log('info', 'session.created', { bindingId: binding.id });
       const ready = updateBinding(store, {
         bindingId: binding.id,
         expectedRevision: binding.revision,
@@ -130,10 +248,20 @@ function createAgentRuntimeSessionRunner({
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The runtime session could not be marked ready.'), { code: ready.error });
       clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profile.id });
-      return { ok: true, state: 'ready', binding: ready.binding, attempt, task: started.task, preflight: confirmed };
+      if (contextPack.text) {
+        log('info', 'context.prompting', { bindingId: binding.id, contextEntryCount: confirmed.contractSnapshot.contextEntryIds?.length || 0 });
+        appendEvent(store, { bindingId: binding.id, runtimeProfileId: profile.id, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${binding.id}:task-instructions` });
+        await client.prompt(session.sessionId, contextPack.text);
+        log('info', 'context.accepted', { bindingId: binding.id });
+      }
+      log('info', 'session.ready', { taskId: payload.taskId, bindingId: binding.id, runtimeProfileId: profile.id });
+      const current = bindingFor(binding.id) || ready.binding;
+      return { ok: true, state: current.state, binding: current, attempt, task: started.task, preflight: confirmed };
     } catch (error) {
       client?.close?.();
-      updateBinding(store, { bindingId: binding.id, expectedRevision: binding.revision, state: 'failed', terminalReason: 'protocol-error' });
+      const current = bindingFor(binding.id) || binding;
+      updateBinding(store, { bindingId: binding.id, expectedRevision: current.revision, state: 'failed', terminalReason: 'protocol-error' });
+      log('error', 'start.failed', { taskId: payload.taskId, bindingId: binding.id, code: error.code || 'ACP_RUNTIME_UNAVAILABLE', message: error.message || String(error), stack: error.stack || null });
       return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The runtime session could not be started.', { preflight: confirmed, binding });
     }
   }
@@ -163,10 +291,10 @@ function createAgentRuntimeSessionRunner({
     const binding = bindingResult.binding;
     let client;
     try {
-      client = createNativeRuntimeClient(profileResolution.profile, { workspacePath: payload.workspacePath });
+      client = createClient(profileResolution.profile, { workspacePath: payload.workspacePath, logger });
       const negotiated = await client.initialize();
-      const session = await client.startSession({});
       client.onNotification?.(message => recordNotification(binding, message));
+      const session = await client.startSession({});
       const ready = updateBinding(store, {
         bindingId: binding.id,
         expectedRevision: binding.revision,
@@ -208,6 +336,8 @@ function createAgentRuntimeSessionRunner({
     if (requestId === undefined || requestId === null) return failure('ACP_PROTOCOL_INCOMPATIBLE', 'A runtime request ID is required.');
     try {
       session.client.respond(requestId, result, error);
+      pendingRequests.delete(requestKey(bindingId, requestId));
+      if (current.state === 'needs-input') syncBindingState(bindingId, 'active');
       return { ok: true };
     } catch (caught) {
       return failure(caught.code || 'ACP_PROTOCOL_INCOMPATIBLE', caught.message || 'The runtime request could not be answered.');
@@ -228,10 +358,10 @@ function createAgentRuntimeSessionRunner({
     if (!starting.ok) return starting;
     let client;
     try {
-      client = createNativeRuntimeClient(profileResolution.profile, { workspacePath });
+      client = createClient(profileResolution.profile, { workspacePath, logger });
       const negotiated = await client.initialize();
-      await client.resumeSession(current.opaqueSessionRef, {});
       client.onNotification?.(message => recordNotification(starting.binding, message));
+      await client.resumeSession(current.opaqueSessionRef, {});
       const ready = updateBinding(store, {
         bindingId,
         expectedRevision: starting.binding.revision,
@@ -241,10 +371,17 @@ function createAgentRuntimeSessionRunner({
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The session could not be resumed.'), { code: ready.error });
       clients.set(bindingId, { client, workspacePath, profileId: current.runtimeProfileId });
-      return ready;
+      const contextPack = buildCurrentTaskContext(ready.binding);
+      if (!contextPack.ok) throw Object.assign(new Error(contextPack.message), { code: contextPack.error });
+      if (contextPack.text) {
+        appendEvent(store, { bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${ready.binding.revision}` });
+        await client.prompt(current.opaqueSessionRef, contextPack.text);
+      }
+      return { ...ready, binding: bindingFor(bindingId) || ready.binding };
     } catch (error) {
       client?.close?.();
-      updateBinding(store, { bindingId, expectedRevision: starting.binding.revision, state: 'failed', terminalReason: 'protocol-error' });
+      const latest = bindingFor(bindingId) || starting.binding;
+      updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'failed', terminalReason: 'protocol-error' });
       return failure(error.code || 'ACP_SESSION_RESUME_UNSUPPORTED', error.message || 'The runtime session could not be resumed.');
     }
   }
@@ -264,7 +401,7 @@ function createAgentRuntimeSessionRunner({
     }
   }
 
-  return { close, invoke, respond, resume, start, startGoalNode };
+  return { close, invoke, listRequests, respond, resume, start, startGoalNode };
 }
 
 module.exports = { createAgentRuntimeSessionRunner };

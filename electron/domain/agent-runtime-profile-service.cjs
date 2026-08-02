@@ -6,6 +6,7 @@ const OBSERVATIONS_STORE_KEY = 'omvra.agentRuntimeObservations.v1';
 const HANDOFFS_STORE_KEY = 'omvra.externalAgentHandoffs.v1';
 const PROFILE_SCHEMA_VERSION = 1;
 const ALLOWED_EXTERNAL_SCHEMES = new Set(['codex', 'cursor', 'vscode', 'vscode-insiders', 'zed']);
+const CODEX_APPROVAL_POLICIES = new Set(['untrusted', 'on-request', 'never']);
 const SENSITIVE_ARGUMENT = /(?:^|[-_])(api[-_]?key|access[-_]?token|auth[-_]?token|token|password|secret)(?:$|[=_-])/i;
 
 function cleanString(value, field, maxLength = 512) {
@@ -48,6 +49,10 @@ function validateProfile(input, now = new Date().toISOString()) {
   if (externalUrlScheme && !ALLOWED_EXTERNAL_SCHEMES.has(externalUrlScheme)) {
     throw new Error(`Unsupported external URL scheme: ${externalUrlScheme}.`);
   }
+  const approvalPolicy = input.approvalPolicy;
+  if (approvalPolicy !== undefined && (integrationMode !== 'codex-app-server-stdio' || !CODEX_APPROVAL_POLICIES.has(approvalPolicy))) {
+    throw new Error('approvalPolicy must be untrusted, on-request, or never for Codex app-server profiles.');
+  }
 
   return {
     schemaVersion: PROFILE_SCHEMA_VERSION,
@@ -56,6 +61,7 @@ function validateProfile(input, now = new Date().toISOString()) {
     integrationMode,
     ...(executablePath ? { executablePath } : {}),
     fixedArgs: validateFixedArgs(input.fixedArgs),
+    ...(approvalPolicy ? { approvalPolicy } : {}),
     ...(externalUrlScheme ? { externalUrlScheme } : {}),
     enabled: input.enabled !== false,
     createdAt: typeof input.createdAt === 'string' ? input.createdAt : now,
@@ -77,6 +83,9 @@ function readDefaults(store) {
   return {
     schemaVersion: PROFILE_SCHEMA_VERSION,
     globalProfileId: typeof value?.globalProfileId === 'string' ? value.globalProfileId : null,
+    globalWorkspacePath: typeof value?.globalWorkspacePath === 'string' && path.isAbsolute(value.globalWorkspacePath)
+      ? value.globalWorkspacePath
+      : null,
     projectProfileIds: value?.projectProfileIds && typeof value.projectProfileIds === 'object' && !Array.isArray(value.projectProfileIds)
       ? value.projectProfileIds
       : {},
@@ -87,7 +96,11 @@ function saveDefaults(store, input) {
   const profiles = readProfiles(store);
   const profileIds = new Set(profiles.map(profile => profile.id));
   const globalProfileId = input?.globalProfileId || null;
+  const globalWorkspacePath = input?.globalWorkspacePath
+    ? cleanString(input.globalWorkspacePath, 'globalWorkspacePath', 2048)
+    : null;
   if (globalProfileId && !profileIds.has(globalProfileId)) throw new Error('Global default profile does not exist.');
+  if (globalWorkspacePath && !path.isAbsolute(globalWorkspacePath)) throw new Error('globalWorkspacePath must be absolute.');
   const projectProfileIds = {};
   for (const [projectId, profileId] of Object.entries(input?.projectProfileIds || {})) {
     const cleanProjectId = cleanString(projectId, 'projectId', 128);
@@ -95,7 +108,7 @@ function saveDefaults(store, input) {
     if (!profileIds.has(profileId)) throw new Error(`Project default profile does not exist: ${profileId}.`);
     projectProfileIds[cleanProjectId] = profileId;
   }
-  const defaults = { schemaVersion: PROFILE_SCHEMA_VERSION, globalProfileId, projectProfileIds };
+  const defaults = { schemaVersion: PROFILE_SCHEMA_VERSION, globalProfileId, globalWorkspacePath, projectProfileIds };
   store.set(DEFAULTS_STORE_KEY, defaults);
   return defaults;
 }
@@ -116,6 +129,7 @@ function deleteProfile(store, profileId) {
   const defaults = readDefaults(store);
   saveDefaults(store, {
     globalProfileId: defaults.globalProfileId === id ? null : defaults.globalProfileId,
+    globalWorkspacePath: defaults.globalWorkspacePath,
     projectProfileIds: Object.fromEntries(Object.entries(defaults.projectProfileIds).filter(([, value]) => value !== id)),
   });
   return true;

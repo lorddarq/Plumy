@@ -80,7 +80,7 @@ Local launch behavior must:
 - use an exact resolved executable and argument array without shell interpolation;
 - validate the workspace directory and pass only the intended task context;
 - allowlist supported external URL schemes;
-- keep agent permission prompts enabled;
+- keep agent permission prompts enabled by default; a supported runtime profile may explicitly disable prompts with a visible warning, without bypassing sandbox, MCP-access, lifecycle, or human-acceptance boundaries;
 - avoid background retries, automatic relaunch, or automatic provider failover.
 
 ### External handoff fallback

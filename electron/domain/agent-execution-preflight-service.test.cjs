@@ -7,7 +7,7 @@ function harness(overrides = {}) {
     tasks: [
       { id: 'dependency', status: 'done', __mcpRevision: 2 },
       {
-        id: 'task-1', status: 'open', assigneeId: 'arc', projectIds: ['project-1'], dependencyIds: ['dependency'], __mcpRevision: 4,
+        id: 'task-1', title: 'Implement supervision', notes: 'Show visible execution progress.', status: 'open', assigneeId: 'arc', projectIds: ['project-1'], dependencyIds: ['dependency'], __mcpRevision: 4,
         collaboration: { orchestratorId: 'arc', contributions: [{ id: 'contribution-1', personId: 'edgar', role: 'subagent', scope: 'Implement the runtime gate.', state: 'pending' }] },
       },
     ],
@@ -47,6 +47,8 @@ test('composed preflight resolves task, contribution, dependencies, runtime, mod
   assert.equal(result.runtime.profileId, 'local');
   assert.deepEqual(result.model, { requested: 'gpt-5', effective: 'gpt-5' });
   assert.deepEqual(result.contractSnapshot.contextEntryIds, ['checkpoint-1', 'decision-1']);
+  assert.equal(result.contractSnapshot.taskTitle, 'Implement supervision');
+  assert.equal(result.contractSnapshot.taskDescription, 'Show visible execution progress.');
   assert.equal(Object.hasOwn(result.contractSnapshot, 'agentInstructions'), false);
   assert.equal(getTransitionCalls(), 0);
 });
@@ -106,6 +108,38 @@ test('direct task execution stays backward compatible and does not fabricate col
   assert.equal(result.directExecution, true);
   assert.equal(result.attempt, null);
   assert.equal(getTransitionCalls(), 0);
+});
+
+test('confirmation preserves an explicitly resolved runtime contract', () => {
+  const { service, state } = harness();
+  delete state.tasks[1].collaboration;
+  const input = { taskId: 'task-1', executionProfileId: 'local' };
+  const prepared = service.prepare(null, input);
+  const result = service.confirmStart(null, {
+    ...input,
+    expectedRevision: 4,
+    expectedContractDigest: prepared.contractDigest,
+    confirmed: true,
+  });
+  assert.equal(prepared.contractSnapshot.runtimeResolutionSource, 'execution-override');
+  assert.equal(result.ok, true);
+});
+
+test('contribution scope must be present during both preparation and confirmation', () => {
+  const { service } = harness();
+  const incomplete = service.prepare(null, { taskId: 'task-1', executionProfileId: 'local' });
+  const stale = service.confirmStart(null, {
+    taskId: 'task-1', contributionId: 'contribution-1', executionProfileId: 'local', expectedRevision: 4,
+    expectedContractDigest: incomplete.contractDigest, confirmed: true,
+  });
+  assert.equal(stale.blockers[0].code, 'ACP_PREFLIGHT_STALE');
+
+  const input = { taskId: 'task-1', contributionId: 'contribution-1', executionProfileId: 'local' };
+  const prepared = service.prepare(null, input);
+  const started = service.confirmStart(null, {
+    ...input, expectedRevision: 4, expectedContractDigest: prepared.contractDigest, confirmed: true,
+  });
+  assert.equal(started.ok, true);
 });
 
 test('persona model preference applies only when the selected runtime advertises it', () => {
