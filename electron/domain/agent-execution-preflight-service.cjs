@@ -78,13 +78,17 @@ function createAgentExecutionPreflightService({
     }
     const observation = profile ? readObservations(store)[profile.id] || null : null;
     if (profile && !observation && input.deferConnection !== true) blockers.push(issue('ACP_RUNTIME_UNVERIFIED', 'Test the selected runtime connection before starting work.'));
-    if (observation && observation.availability !== 'available') blockers.push(issue('ACP_RUNTIME_UNAVAILABLE', 'The selected runtime is not currently available.'));
-    if (observation?.authentication === 'required') blockers.push(issue('ACP_AUTHENTICATION_REQUIRED', 'The selected runtime requires provider-managed sign-in.'));
+    if (input.deferConnection !== true && observation && observation.availability !== 'available') {
+      blockers.push(issue('ACP_RUNTIME_UNAVAILABLE', 'The selected runtime is not currently available.'));
+    }
+    if (input.deferConnection !== true && observation?.authentication === 'required') {
+      blockers.push(issue('ACP_AUTHENTICATION_REQUIRED', 'The selected runtime requires provider-managed sign-in.'));
+    }
 
     const requiredCapabilities = Array.from(new Set((Array.isArray(input.requiredCapabilities) ? input.requiredCapabilities : [])
       .map(normalizeString).filter(Boolean))).slice(0, MAX_REQUIRED_CAPABILITIES);
     for (const capability of requiredCapabilities) {
-      if (observation?.agentCapabilities?.[capability] !== true) {
+      if (input.deferConnection !== true && observation?.agentCapabilities?.[capability] !== true) {
         blockers.push(issue('ACP_CAPABILITY_UNSUPPORTED', `Required capability "${capability}" is not supported.`, { capability }));
       }
     }
@@ -100,7 +104,7 @@ function createAgentExecutionPreflightService({
     let effectiveModel = observation?.modelOrMode || null;
     if (requestedModel) {
       const supported = advertisedModels.some(model => [model?.id, model?.model].includes(requestedModel));
-      if (advertisedModels.length && !supported) blockers.push(issue('ACP_MODEL_UNSUPPORTED', `Requested model "${requestedModel}" is not advertised by the selected runtime.`));
+      if (input.deferConnection !== true && advertisedModels.length && !supported) blockers.push(issue('ACP_MODEL_UNSUPPORTED', `Requested model "${requestedModel}" is not advertised by the selected runtime.`));
       else if (!advertisedModels.length) warnings.push(issue('ACP_MODEL_UNVERIFIED', 'The runtime did not advertise a model list; the requested model will be verified at session configuration.'));
       effectiveModel = requestedModel;
     } else if (personaModel) {

@@ -73,6 +73,20 @@ test('preflight fails closed for unfinished dependencies, active attempts, auth,
   ]));
 });
 
+test('deferred connection preflight refreshes stale unavailable observations before blocking execution', () => {
+  const { service } = harness({
+    observations: { local: { availability: 'unavailable', authentication: 'required', agentCapabilities: {} } },
+  });
+  const deferred = service.prepare(null, { taskId: 'task-1', contributionId: 'contribution-1', deferConnection: true, requiredCapabilities: ['resume'], requestedModel: 'gpt-5' });
+  assert.equal(deferred.blockers.some(item => item.code === 'ACP_RUNTIME_UNAVAILABLE'), false);
+  assert.equal(deferred.blockers.some(item => item.code === 'ACP_AUTHENTICATION_REQUIRED'), false);
+  assert.equal(deferred.blockers.some(item => item.code === 'ACP_CAPABILITY_UNSUPPORTED'), false);
+  assert.equal(deferred.blockers.some(item => item.code === 'ACP_MODEL_UNSUPPORTED'), false);
+
+  const normal = service.prepare(null, { taskId: 'task-1', contributionId: 'contribution-1', requiredCapabilities: ['resume'] });
+  assert.equal(normal.blockers.some(item => item.code === 'ACP_RUNTIME_UNAVAILABLE'), true);
+});
+
 test('final start gate requires explicit confirmation and revalidates revision and digest before one attempt write', () => {
   const { service, state, getTransitionCalls } = harness();
   const prepared = service.prepare(null, { taskId: 'task-1', contributionId: 'contribution-1' });
