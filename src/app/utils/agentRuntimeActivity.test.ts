@@ -14,16 +14,26 @@ test('runtime activity collapses noisy MCP updates and preserves Codex turn mile
   assert.equal(activity.find(item => item.label === 'MCP connection starting')?.count, 2);
   assert.equal(activity.some(item => item.label === 'Task instructions accepted'), true);
   assert.equal(activity.some(item => item.label === 'Codex finished the latest turn'), true);
-  assert.equal(describeAgentRuntimeSession('ready', events).label, 'Latest work finished');
+  assert.equal(describeAgentRuntimeSession('ready', events).label, 'Agent is idle');
   assert.equal(describeAgentRuntimeSession('ready', events).isTurnActive, false);
 });
 
-test('runtime session summary distinguishes active work from a connected idle session', () => {
-  const working = describeAgentRuntimeSession('ready', [
-    { id: '1', type: 'turn-state', nativeEventType: 'turn/started', observedAt: '2026-08-02T12:00:00.000Z' },
+test('runtime session summary trusts active binding state when the bounded event window is stale', () => {
+  const working = describeAgentRuntimeSession('active', [
+    { id: '1', type: 'turn-state', nativeEventType: 'turn/completed', observedAt: '2026-08-02T12:00:00.000Z' },
   ]);
-  assert.equal(working.label, 'Working now');
+  assert.equal(working.label, 'Agent is working');
   assert.equal(working.isTurnActive, true);
+});
+
+test('runtime session summary distinguishes connected idle and stopping states', () => {
+  const idle = describeAgentRuntimeSession('ready', []);
+  assert.equal(idle.label, 'Agent is idle');
+  assert.match(idle.detail, /no run is active/i);
+
+  const stopping = describeAgentRuntimeSession('cancelling', []);
+  assert.equal(stopping.label, 'Agent is stopping');
+  assert.equal(stopping.isTurnActive, false);
 });
 
 test('runtime activity identifies MCP connections when the provider reports their names', () => {

@@ -82,11 +82,13 @@ export function summarizeAgentRuntimeActivity(events: AgentRuntimeActivityEvent[
 
 export function describeAgentRuntimeSession(bindingState: string, events: AgentRuntimeActivityEvent[]) {
   if (bindingState === 'failed') return { label: 'Work stopped unexpectedly', detail: 'The runtime process or protocol session failed.', tone: 'danger' as const, isTurnActive: false };
-  if (bindingState === 'needs-input') return { label: 'Waiting for your input', detail: 'Codex cannot continue until you respond.', tone: 'warning' as const, isTurnActive: false };
+  if (bindingState === 'needs-input') return { label: 'Agent is waiting for you', detail: 'Codex cannot continue until you respond.', tone: 'warning' as const, isTurnActive: false };
   if (bindingState === 'interrupted') return { label: 'Work was interrupted', detail: 'Resume the session to continue this task.', tone: 'warning' as const, isTurnActive: false };
+  if (bindingState === 'active') return { label: 'Agent is working', detail: 'Codex is actively working on the task.', tone: 'positive' as const, isTurnActive: true };
+  if (bindingState === 'cancelling') return { label: 'Agent is stopping', detail: 'Codex is stopping the current run.', tone: 'warning' as const, isTurnActive: false };
+  if (bindingState === 'starting') return { label: 'Agent is starting', detail: 'Omvra is connecting to Codex.', tone: 'neutral' as const, isTurnActive: false };
+  if (bindingState === 'closed') return { label: 'Work session closed', detail: 'Codex is not working on this task.', tone: 'neutral' as const, isTurnActive: false };
   const latestTurn = [...events].reverse().find(event => event.nativeEventType === 'turn/started' || event.nativeEventType === 'turn/completed');
-  if (latestTurn?.nativeEventType === 'turn/started') return { label: 'Working now', detail: 'Codex is actively working on the task.', tone: 'positive' as const, isTurnActive: true };
-  if (latestTurn?.nativeEventType === 'turn/completed') return { label: 'Latest work finished', detail: 'Codex is not working now. Finishing a run does not mark the task complete.', tone: 'positive' as const, isTurnActive: false };
-  if (bindingState === 'starting') return { label: 'Starting work', detail: 'Omvra is connecting to Codex.', tone: 'neutral' as const, isTurnActive: false };
-  return { label: 'No active run', detail: 'Start work to continue this task. Follow-up guidance is optional.', tone: 'neutral' as const, isTurnActive: false };
+  if (latestTurn?.nativeEventType === 'turn/completed') return { label: 'Agent is idle', detail: 'The latest run ended. This does not mean the task is complete.', tone: 'neutral' as const, isTurnActive: false };
+  return { label: 'Agent is idle', detail: 'The work session is connected, but no run is active.', tone: 'neutral' as const, isTurnActive: false };
 }
