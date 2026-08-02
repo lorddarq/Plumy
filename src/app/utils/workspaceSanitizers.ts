@@ -316,6 +316,7 @@ export function sanitizeTimelineSwimlanes(
         description: normalizeOptionalText(item.description) ?? normalizeOptionalText(item.subtitle),
         subtitle: normalizeOptionalText(item.subtitle),
         color: typeof item.color === 'string' ? item.color : '#3b82f6',
+        repositoryFolder: normalizeOptionalText(item.repositoryFolder),
       };
     })
     .filter(item => item !== null) as TimelineSwimlane[];

@@ -146,12 +146,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         setRuntimeState(state);
         const mcpCapabilities = await window.electron.mcp.getCapabilities();
         if (!cancelled) setMcpReadOnly(mcpCapabilities.ok ? Boolean(mcpCapabilities.data?.readOnly) : null);
-        const resolvedWorkspace = await resolveAgentRuntimeWorkspace(
-          task.id,
+        const resolvedWorkspace = resolveAgentRuntimeWorkspace(
           task.repositoryFolder,
           repositoryFolder,
           state.defaults?.globalWorkspacePath,
-          taskId => window.electron.agentRuntime.resolveManagedWorkspace(taskId),
         );
         if (!cancelled) setWorkspace(resolvedWorkspace);
         const projectId = task.projectIds?.[0] || task.swimlaneId;

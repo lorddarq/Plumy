@@ -324,6 +324,7 @@ export function sanitizeTimelineSwimlanes(
         description: normalizeOptionalText(candidate.description) ?? normalizeOptionalText(candidate.subtitle),
         subtitle: normalizeOptionalText(candidate.subtitle),
         color: typeof candidate.color === 'string' ? candidate.color : '#3b82f6',
+        repositoryFolder: normalizeOptionalText(candidate.repositoryFolder),
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);

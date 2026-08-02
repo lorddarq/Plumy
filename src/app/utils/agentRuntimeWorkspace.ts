@@ -5,12 +5,6 @@ export interface AgentRuntimeWorkspaceResolution {
   source: AgentRuntimeWorkspaceSource;
 }
 
-interface ManagedWorkspaceResult {
-  ok: boolean;
-  value?: AgentRuntimeWorkspaceResolution;
-  error?: string;
-}
-
 export function resolveConfiguredAgentWorkspace(
   taskWorkspacePath?: string,
   projectWorkspacePath?: string,
@@ -26,27 +20,14 @@ export function resolveConfiguredAgentWorkspace(
   return globalPath ? { workspacePath: globalPath, source: 'global-default' } : null;
 }
 
-export async function resolveAgentRuntimeWorkspace(
-  taskId: string,
+export function resolveAgentRuntimeWorkspace(
   taskWorkspacePath: string | undefined,
   projectWorkspacePath: string | undefined,
   globalWorkspacePath: string | null | undefined,
-  resolveManagedWorkspace: (taskId: string) => Promise<ManagedWorkspaceResult>,
-): Promise<AgentRuntimeWorkspaceResolution> {
+): AgentRuntimeWorkspaceResolution {
   const configured = resolveConfiguredAgentWorkspace(taskWorkspacePath, projectWorkspacePath, globalWorkspacePath);
   if (configured) return configured;
-
-  try {
-    const managed = await resolveManagedWorkspace(taskId);
-    if (!managed.ok || !managed.value) throw new Error(managed.error || 'A scratch workspace could not be prepared.');
-    return managed.value;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("No handler registered for 'agent-runtime/resolve-managed-workspace'")) {
-      throw new Error('Restart Omvra to load the managed workspace service, then try Start work again.');
-    }
-    throw error;
-  }
+  throw new Error('Configure a repository folder on the task or project before starting work.');
 }
 
 export function agentRuntimeWorkspaceSourceLabel(source?: AgentRuntimeWorkspaceSource): string {

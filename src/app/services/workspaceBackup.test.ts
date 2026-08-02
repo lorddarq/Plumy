@@ -52,6 +52,24 @@ test('full workspace backups keep Goal policy separate from general preferences'
   assert.notEqual(payload.preferences, payload.goalPolicy);
 });
 
+test('workspace backup restore preserves a project repository folder', () => {
+  const repaired = repairWorkspaceBackupPayload({
+    version: 2,
+    tasks: [],
+    milestones: [],
+    projects: [{ id: 'project-1', name: 'Omvra', repositoryFolder: '  /Users/example/omvra  ' }],
+    people: [],
+    statusColumns: fallbackStatusColumns,
+    preferences: {},
+  }, {
+    fallbackStatusColumns,
+    fallbackPreferences: createDefaultWorkspacePreferences(fallbackStatusColumns),
+  });
+
+  assert.equal(repaired.ok, true);
+  assert.equal(repaired.projects[0].repositoryFolder, '/Users/example/omvra');
+});
+
 test('workspace backup preserves versioned Goal agent configuration through electron-store round trips', () => {
   const goal = {
     id: 'goal-agent-backup',

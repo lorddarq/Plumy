@@ -15,11 +15,9 @@ test('working-directory resolution keeps project filtering independent', () => {
   assert.equal(resolveConfiguredAgentWorkspace(undefined, undefined, undefined), null);
 });
 
-test('managed workspace resolution explains a stale Electron main process', async () => {
-  await assert.rejects(
-    resolveAgentRuntimeWorkspace('task-1', undefined, undefined, undefined, async () => {
-      throw new Error("Error invoking remote method 'agent-runtime/resolve-managed-workspace': Error: No handler registered for 'agent-runtime/resolve-managed-workspace'");
-    }),
-    /Restart Omvra to load the managed workspace service/,
+test('task execution blocks instead of creating an empty scratch workspace', () => {
+  assert.throws(
+    () => resolveAgentRuntimeWorkspace(undefined, undefined, undefined),
+    /Configure a repository folder on the task or project/,
   );
 });

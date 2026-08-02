@@ -145,3 +145,15 @@ test('sanitizeTimelineSwimlanes promotes legacy subtitle to description', () => 
   assert.equal(swimlane.description, 'Marketing and website delivery work.');
   assert.equal(swimlane.subtitle, 'Marketing and website delivery work.');
 });
+
+test('sanitizeTimelineSwimlanes preserves a trimmed repository folder', () => {
+  const [swimlane] = sanitizeTimelineSwimlanes([
+    {
+      id: 'project-1',
+      name: 'Omvra',
+      repositoryFolder: '  /Users/example/omvra  ',
+    },
+  ], []);
+
+  assert.equal(swimlane.repositoryFolder, '/Users/example/omvra');
+});
