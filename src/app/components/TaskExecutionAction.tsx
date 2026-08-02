@@ -64,6 +64,7 @@ interface TaskExecutionActionProps {
   repositoryFolder?: string;
   trigger?: ReactNode;
   openRequest?: number;
+  onOpenRequestHandled?: () => void;
   startOnTrigger?: boolean;
   onOpen?: () => void;
 }
@@ -83,7 +84,7 @@ function taskStatusLabel(status: Task['status']) {
   return 'Open';
 }
 
-export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, startOnTrigger = false, onOpen }: TaskExecutionActionProps) {
+export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, startOnTrigger = false, onOpen }: TaskExecutionActionProps) {
   const [open, setOpen] = useState(false);
   const [startRequested, setStartRequested] = useState(false);
   const [sessionLoaded, setSessionLoaded] = useState(false);
@@ -123,8 +124,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     if (openRequest) {
       setStartRequested(true);
       setOpen(true);
+      onOpenRequestHandled?.();
     }
-  }, [openRequest]);
+  }, [onOpenRequestHandled, openRequest]);
 
   useEffect(() => {
     if (!open || !window.electron?.agentRuntime) return;

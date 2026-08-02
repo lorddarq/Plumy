@@ -439,6 +439,7 @@ export function TaskDetailsDialog({
             task={task}
             repositoryFolder={swimlanes.find(project => project.id === task.swimlaneId || task.projectIds?.includes(project.id))?.repositoryFolder}
             openRequest={startWorkRequest}
+            onOpenRequestHandled={() => setStartWorkRequest(0)}
             trigger={null}
           />
         )}

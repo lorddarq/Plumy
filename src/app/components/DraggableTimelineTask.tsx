@@ -182,7 +182,7 @@ export function DraggableTimelineTask({
         </ContextMenuItem>
       </ContextMenuContent>
       </ContextMenu>
-      <TaskExecutionAction task={task} repositoryFolder={repositoryFolder} openRequest={startWorkRequest} trigger={null} />
+      <TaskExecutionAction task={task} repositoryFolder={repositoryFolder} openRequest={startWorkRequest} onOpenRequestHandled={() => setStartWorkRequest(0)} trigger={null} />
     </>
   );
 }
