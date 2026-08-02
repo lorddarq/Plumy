@@ -3,6 +3,7 @@ const { randomUUID } = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
+const { buildRuntimeEnvironment } = require('./agent-runtime-environment.cjs');
 
 const ACP_PROTOCOL_VERSION = 1;
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -49,6 +50,14 @@ function validateProfileLaunch(profile) {
   if (typeof profile.executablePath !== 'string' || !path.isAbsolute(profile.executablePath) || profile.executablePath.includes('\0')) {
     throw runtimeError('ACP_RUNTIME_MISSING', 'Runtime executablePath must be absolute.');
   }
+  try {
+    if (fs.statSync(profile.executablePath).isDirectory()) {
+      throw runtimeError('ACP_RUNTIME_UNAVAILABLE', 'Runtime executablePath must point to an executable file, not a directory. For the ChatGPT app, select /Applications/ChatGPT.app/Contents/Resources/codex.');
+    }
+  } catch (error) {
+    if (error?.code === 'ACP_RUNTIME_UNAVAILABLE') throw error;
+    if (error?.code !== 'ENOENT') throw runtimeError('ACP_RUNTIME_UNAVAILABLE', `Runtime executablePath could not be inspected: ${error.message}`);
+  }
   if (profile.fixedArgs !== undefined && (!Array.isArray(profile.fixedArgs) || profile.fixedArgs.length > 64
     || profile.fixedArgs.some(argument => typeof argument !== 'string' || argument.length > 1024 || argument.includes('\0')))) {
     throw runtimeError('ACP_RUNTIME_UNAVAILABLE', 'Runtime fixedArgs are invalid.');
@@ -70,6 +79,7 @@ class JsonLineTransport {
     this.logger?.info?.('[agent-runtime:transport] process.starting', { executable: path.basename(command), workspacePath: options.workspacePath });
     this.child = spawnProcess(command, args, {
       cwd: validateWorkspacePath(options.workspacePath),
+      env: buildRuntimeEnvironment(options.env),
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,

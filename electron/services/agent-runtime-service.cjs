@@ -8,6 +8,7 @@ const {
   resolveProfile,
 } = require('../domain/agent-runtime-profile-service.cjs');
 const { createNativeRuntimeClient } = require('./agent-runtime-protocol-client.cjs');
+const { buildRuntimeEnvironment } = require('./agent-runtime-environment.cjs');
 
 const ACP_PROTOCOL_VERSION = 1;
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -66,7 +67,7 @@ function runBoundedCliProbe(spawnProcess, command, args, { workspacePath, timeou
     };
     const timer = setTimeout(() => finish(Object.assign(new Error(`${runtimeName} probe timed out after ${timeoutMs} ms.`), { state: 'unavailable' })), timeoutMs);
     try {
-      child = spawnProcess(command, args, { cwd: workspacePath, shell: false, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+      child = spawnProcess(command, args, { cwd: workspacePath, env: buildRuntimeEnvironment(), shell: false, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     } catch (error) {
       finish(error);
       return;
@@ -175,7 +176,7 @@ async function openExternalHandoff(store, payload, options = {}) {
         '--task', taskId,
         '--context', contextReference,
         '--prompt', prompt,
-      ], { cwd: workspacePath, detached: true, shell: false, stdio: 'ignore', windowsHide: true });
+      ], { cwd: workspacePath, env: buildRuntimeEnvironment(), detached: true, shell: false, stdio: 'ignore', windowsHide: true });
       child.once('error', reject);
       child.once('spawn', () => {
         child.unref();

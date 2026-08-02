@@ -51,6 +51,7 @@ test('generic ACP client negotiates exact capabilities and completes a bounded s
     assert.equal(command, '/usr/bin/fixture');
     assert.deepEqual(args, ['acp']);
     assert.equal(options.shell, false);
+    assert.equal(typeof options.env.PATH, 'string');
     return child;
   }, timeoutMs: 100 });
 
@@ -79,6 +80,16 @@ test('generic ACP refuses unadvertised resume and close rather than emulating th
   await assert.rejects(() => client.resumeSession('session-1'), error => error.code === 'ACP_SESSION_RESUME_UNSUPPORTED');
   await assert.rejects(() => client.closeSession('session-1'), error => error.code === 'ACP_CAPABILITY_UNSUPPORTED');
   client.close();
+});
+
+test('runtime profiles reject directory paths before spawning', () => {
+  assert.throws(() => createNativeRuntimeClient({
+    integrationMode: 'codex-app-server-stdio', executablePath: '/tmp',
+  }, { workspacePath: '/tmp/workspace', spawnProcess: () => { throw new Error('must not spawn'); } }), error => {
+    assert.equal(error.code, 'ACP_RUNTIME_UNAVAILABLE');
+    assert.match(error.message, /must point to an executable file/);
+    return true;
+  });
 });
 
 test('Codex client uses native thread and turn methods for start, resume, steer, and cancellation', async () => {
