@@ -38,6 +38,7 @@ test('generic ACP client negotiates exact capabilities and completes a bounded s
       agentCapabilities: {
         loadSession: false,
         mcpCapabilities: { http: true },
+        models: [{ id: 'acp-model', isDefault: true }],
         sessionCapabilities: { resume: {}, close: {} },
       },
     });
@@ -60,12 +61,25 @@ test('generic ACP client negotiates exact capabilities and completes a bounded s
   assert.equal(observation.capabilities.resume, true);
   assert.equal(observation.capabilities.load, false);
   assert.equal(observation.capabilities.mcpHttp, true);
-  const session = await client.startSession({ mcpServers: [{ name: 'omvra', url: 'http://127.0.0.1:3456/mcp' }] });
+  const session = await client.startSession({ model: 'acp-model', mcpServers: [{ name: 'omvra', url: 'http://127.0.0.1:3456/mcp' }] });
   assert.equal(session.sessionId, 'session-1');
+  assert.equal(messages.find(message => message.method === 'session/new').params.model, 'acp-model');
   assert.deepEqual(await client.prompt(session.sessionId, 'Do bounded work'), { stopReason: 'end_turn' });
   assert.deepEqual(client.cancel(session.sessionId), { acknowledged: false });
   await client.closeSession(session.sessionId);
   assert.deepEqual(messages.map(message => message.method), ['initialize', 'session/new', 'session/prompt', 'session/cancel', 'session/close']);
+  client.close();
+});
+
+test('native ACP blocks a saved preference that is no longer advertised', async () => {
+  const child = createChild((message, currentChild) => {
+    if (message.method === 'initialize') respond(currentChild, message.id, { protocolVersion: 1, agentCapabilities: { models: [{ id: 'available' }] } });
+  });
+  const client = createNativeRuntimeClient({ integrationMode: 'acp-local-stdio', executablePath: '/usr/bin/fixture', modelPreference: 'missing' }, {
+    workspacePath: '/tmp/workspace', spawnProcess: () => child, timeoutMs: 100,
+  });
+  await client.initialize();
+  await assert.rejects(() => client.startSession(), error => error.code === 'ACP_MODEL_UNAVAILABLE');
   client.close();
 });
 
@@ -127,6 +141,7 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
   assert.throws(() => client.closeSession(session.sessionId), error => error.code === 'ACP_CAPABILITY_UNSUPPORTED');
   assert.equal(requests.find(message => message.method === 'thread/start').params.cwd, '/tmp/workspace');
   assert.equal(requests.find(message => message.method === 'thread/start').params.approvalPolicy, 'never');
+  assert.equal(requests.find(message => message.method === 'thread/start').params.model, 'gpt');
   assert.equal(requests.find(message => message.method === 'thread/resume').params.threadId, 'thread-1');
   assert.equal(requests.find(message => message.method === 'thread/resume').params.approvalPolicy, 'never');
   assert.equal(requests.find(message => message.method === 'turn/start').params.approvalPolicy, 'never');
@@ -157,6 +172,21 @@ test('Claude client launches the exact native stream-json contract and writes ra
   ]);
   assert.deepEqual(messages[0], { type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Continue' }] } });
   await client.closeSession();
+});
+
+test('Claude passes a per-profile model preference through native stream-json startup', async () => {
+  const launches = [];
+  const client = createNativeRuntimeClient({ integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude', modelPreference: 'claude-sonnet' }, {
+    workspacePath: '/tmp/workspace', spawnProcess: (command, args, options) => {
+      launches.push({ command, args, options });
+      return createChild(() => {});
+    },
+  });
+  await client.initialize();
+  await client.startSession({ sessionId: '00000000-0000-4000-8000-000000000001' });
+  assert.equal(launches[0].args.at(-2), '--model');
+  assert.equal(launches[0].args.at(-1), 'claude-sonnet');
+  client.close();
 });
 
 test('transport rejects malformed runtime messages and bounds pending requests', async () => {

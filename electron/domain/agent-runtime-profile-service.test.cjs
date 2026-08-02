@@ -4,6 +4,7 @@ const {
   DEFAULTS_STORE_KEY,
   PROFILE_STORE_KEY,
   deleteProfile,
+  readDefaults,
   resolveProfile,
   saveDefaults,
   saveProfile,
@@ -58,4 +59,32 @@ test('runtime resolution is deterministic and never silently falls back', () => 
   deleteProfile(store, 'project');
   assert.deepEqual(store.get(DEFAULTS_STORE_KEY).projectProfileIds, {});
   assert.equal(store.get(DEFAULTS_STORE_KEY).globalWorkspacePath, '/tmp/global-workspace');
+});
+
+test('legacy defaults enable ACP runtime access and the policy preserves profiles', () => {
+  const store = createStore();
+  saveProfile(store, { id: 'local', name: 'Local', integrationMode: 'acp-local-stdio', executablePath: '/usr/bin/local', enabled: true });
+
+  assert.equal(readDefaults(store).acpRuntimeAccessEnabled, true);
+  saveDefaults(store, { globalProfileId: 'local', projectProfileIds: {} });
+  assert.equal(resolveProfile(store, {}).ok, true);
+
+  const disabled = saveDefaults(store, { acpRuntimeAccessEnabled: false, globalProfileId: 'local', projectProfileIds: {} });
+  assert.equal(disabled.acpRuntimeAccessEnabled, false);
+  assert.equal(resolveProfile(store, {}).state, 'disabled');
+  assert.equal(store.get(PROFILE_STORE_KEY).profiles[0].id, 'local');
+
+  saveDefaults(store, { acpRuntimeAccessEnabled: true, globalProfileId: 'local', projectProfileIds: {} });
+  assert.equal(resolveProfile(store, {}).profile.id, 'local');
+});
+
+test('model preference is optional profile configuration and does not persist credentials', () => {
+  const store = createStore();
+  const profile = saveProfile(store, {
+    id: 'codex', name: 'Codex', integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex',
+    modelPreference: 'gpt-5', enabled: true,
+  });
+  assert.equal(profile.modelPreference, 'gpt-5');
+  assert.equal(store.get(PROFILE_STORE_KEY).profiles[0].modelPreference, 'gpt-5');
+  assert.throws(() => saveProfile(store, { ...profile, modelPreference: 'token=secret' }), /modelPreference is invalid|Credentials/);
 });

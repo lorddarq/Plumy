@@ -53,6 +53,10 @@ function validateProfile(input, now = new Date().toISOString()) {
   if (approvalPolicy !== undefined && (integrationMode !== 'codex-app-server-stdio' || !CODEX_APPROVAL_POLICIES.has(approvalPolicy))) {
     throw new Error('approvalPolicy must be untrusted, on-request, or never for Codex app-server profiles.');
   }
+  const modelPreference = input.modelPreference === undefined || input.modelPreference === null || input.modelPreference === ''
+    ? undefined
+    : cleanString(input.modelPreference, 'modelPreference', 256);
+  if (modelPreference && SENSITIVE_ARGUMENT.test(modelPreference)) throw new Error('Credentials must not be stored as a model preference.');
 
   return {
     schemaVersion: PROFILE_SCHEMA_VERSION,
@@ -62,6 +66,7 @@ function validateProfile(input, now = new Date().toISOString()) {
     ...(executablePath ? { executablePath } : {}),
     fixedArgs: validateFixedArgs(input.fixedArgs),
     ...(approvalPolicy ? { approvalPolicy } : {}),
+    ...(modelPreference ? { modelPreference } : {}),
     ...(externalUrlScheme ? { externalUrlScheme } : {}),
     enabled: input.enabled !== false,
     createdAt: typeof input.createdAt === 'string' ? input.createdAt : now,
@@ -82,6 +87,7 @@ function readDefaults(store) {
   const value = store.get(DEFAULTS_STORE_KEY);
   return {
     schemaVersion: PROFILE_SCHEMA_VERSION,
+    acpRuntimeAccessEnabled: value?.acpRuntimeAccessEnabled !== false,
     globalProfileId: typeof value?.globalProfileId === 'string' ? value.globalProfileId : null,
     globalWorkspacePath: typeof value?.globalWorkspacePath === 'string' && path.isAbsolute(value.globalWorkspacePath)
       ? value.globalWorkspacePath
@@ -95,6 +101,10 @@ function readDefaults(store) {
 function saveDefaults(store, input) {
   const profiles = readProfiles(store);
   const profileIds = new Set(profiles.map(profile => profile.id));
+  const currentDefaults = readDefaults(store);
+  const acpRuntimeAccessEnabled = input?.acpRuntimeAccessEnabled === undefined
+    ? currentDefaults.acpRuntimeAccessEnabled
+    : input.acpRuntimeAccessEnabled !== false;
   const globalProfileId = input?.globalProfileId || null;
   const globalWorkspacePath = input?.globalWorkspacePath
     ? cleanString(input.globalWorkspacePath, 'globalWorkspacePath', 2048)
@@ -108,7 +118,7 @@ function saveDefaults(store, input) {
     if (!profileIds.has(profileId)) throw new Error(`Project default profile does not exist: ${profileId}.`);
     projectProfileIds[cleanProjectId] = profileId;
   }
-  const defaults = { schemaVersion: PROFILE_SCHEMA_VERSION, globalProfileId, globalWorkspacePath, projectProfileIds };
+  const defaults = { schemaVersion: PROFILE_SCHEMA_VERSION, acpRuntimeAccessEnabled, globalProfileId, globalWorkspacePath, projectProfileIds };
   store.set(DEFAULTS_STORE_KEY, defaults);
   return defaults;
 }
@@ -140,6 +150,14 @@ function resolveProfile(store, { executionProfileId, projectId } = {}) {
   const defaults = readDefaults(store);
   const selectedId = executionProfileId || (projectId ? defaults.projectProfileIds[projectId] : null) || defaults.globalProfileId;
   const source = executionProfileId ? 'execution-override' : projectId && defaults.projectProfileIds[projectId] ? 'project-default' : 'global-default';
+  if (!defaults.acpRuntimeAccessEnabled) {
+    return {
+      ok: false,
+      state: 'disabled',
+      source,
+      error: 'ACP runtime access is disabled. Enable it to use runtime profiles, connections, and handoffs.',
+    };
+  }
   if (!selectedId) return { ok: false, state: 'missing', source, error: 'No runtime profile is configured for this execution.' };
   const profile = profiles.find(item => item.id === selectedId);
   if (!profile) return { ok: false, state: 'missing', source, profileId: selectedId, error: 'The selected runtime profile is missing.' };

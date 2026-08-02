@@ -216,12 +216,34 @@ function normalizeAcpCapabilities(value = {}) {
     close: sessions.close != null,
     mcpHttp: value.mcpCapabilities?.http === true,
     mcpSse: value.mcpCapabilities?.sse === true,
+    modelSelection: Array.isArray(value.models) || Array.isArray(value.modelCapabilities?.models),
     raw: value,
   };
 }
 
+function normalizeModels(value) {
+  const models = Array.isArray(value) ? value : [];
+  return models.map(model => ({
+    id: model?.id || model?.model || model?.name,
+    isDefault: model?.isDefault === true,
+  })).filter(model => typeof model.id === 'string' && model.id.trim()).slice(0, 100);
+}
+
+function requestedModel(profile, requested) {
+  const model = requested || profile.modelPreference;
+  return typeof model === 'string' && model.trim() ? model.trim() : undefined;
+}
+
+function assertAdvertisedModel(model, models) {
+  if (!model) return;
+  if (!models.some(candidate => candidate.id === model)) {
+    throw runtimeError('ACP_MODEL_UNAVAILABLE', `Preferred model "${model}" is not advertised by the selected runtime.`);
+  }
+}
+
 class AcpStdioClient {
   constructor(profile, options) {
+    this.profile = profile;
     this.transport = new JsonLineTransport(profile.executablePath, profile.fixedArgs || [], { ...options, jsonRpc: true });
     this.workspacePath = validateWorkspacePath(options.workspacePath);
     this.capabilities = null;
@@ -240,17 +262,21 @@ class AcpStdioClient {
       throw runtimeError('ACP_PROTOCOL_INCOMPATIBLE', `Unsupported ACP protocol version: ${result?.protocolVersion ?? 'missing'}.`);
     }
     this.capabilities = normalizeAcpCapabilities(result.agentCapabilities);
+    this.models = normalizeModels(result.agentCapabilities?.models || result.agentCapabilities?.modelCapabilities?.models);
     return {
       implementationName: result.agentInfo?.title || result.agentInfo?.name || null,
       adapterVersion: result.agentInfo?.version || null,
       authentication: Array.isArray(result.authMethods) && result.authMethods.length ? 'required' : 'unknown',
       authMethods: Array.isArray(result.authMethods) ? result.authMethods : [],
       capabilities: this.capabilities,
+      models: this.models,
     };
   }
 
-  async startSession({ mcpServers = [] } = {}) {
-    const result = await this.transport.request('session/new', { cwd: this.workspacePath, mcpServers: validateMcpServers(mcpServers) });
+  async startSession({ mcpServers = [], model } = {}) {
+    const selectedModel = requestedModel(this.profile, model);
+    assertAdvertisedModel(selectedModel, this.models || []);
+    const result = await this.transport.request('session/new', { cwd: this.workspacePath, mcpServers: validateMcpServers(mcpServers), ...(selectedModel ? { model: selectedModel } : {}) });
     return { sessionId: validateSessionRef(result?.sessionId), configuration: result };
   }
 
@@ -295,6 +321,7 @@ class AcpStdioClient {
 
 class CodexAppServerClient {
   constructor(profile, options) {
+    this.profile = profile;
     this.transport = new JsonLineTransport(profile.executablePath, [...(profile.fixedArgs || []), 'app-server', '--stdio'], options);
     this.workspacePath = validateWorkspacePath(options.workspacePath);
     this.approvalPolicy = profile.approvalPolicy;
@@ -312,19 +339,22 @@ class CodexAppServerClient {
     this.transport.notify('initialized', {});
     const account = await this.transport.request('account/read', { refreshToken: false });
     const modelResult = await this.transport.request('model/list', { limit: 100, includeHidden: false });
+    this.models = normalizeModels(modelResult?.data);
     const signedOut = account?.requiresOpenaiAuth === true && !account.account;
     return {
       implementationName: 'Codex app-server',
       adapterVersion: result?.userAgent || null,
       authentication: signedOut ? 'required' : account?.account ? 'authenticated' : 'not-required',
       accountType: account?.account?.type || null,
-      models: Array.isArray(modelResult?.data) ? modelResult.data : [],
-      capabilities: { threadStart: true, threadResume: true, prompt: true, steer: true, cancel: true, close: false, models: true },
+      models: this.models,
+      capabilities: { threadStart: true, threadResume: true, prompt: true, steer: true, cancel: true, close: false, models: true, modelSelection: true },
     };
   }
 
   async startSession(configuration = {}) {
-    const result = await this.transport.request('thread/start', { ...configuration, ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), cwd: this.workspacePath });
+    const selectedModel = requestedModel(this.profile, configuration.model);
+    assertAdvertisedModel(selectedModel, this.models || []);
+    const result = await this.transport.request('thread/start', { ...configuration, ...(selectedModel ? { model: selectedModel } : {}), ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), cwd: this.workspacePath });
     return { sessionId: validateSessionRef(result?.thread?.id), configuration: result };
   }
 
@@ -376,7 +406,7 @@ class ClaudeStreamJsonClient {
   initialize() {
     return Promise.resolve({
       implementationName: 'Claude Code', adapterVersion: null, authentication: 'unknown',
-      capabilities: { prompt: true, resume: true, steer: true, cancel: true, close: true, mcpConfigPath: true },
+      capabilities: { prompt: true, resume: true, steer: true, cancel: true, close: true, mcpConfigPath: true, modelSelection: true },
     });
   }
 
@@ -389,12 +419,13 @@ class ClaudeStreamJsonClient {
     return configPath;
   }
 
-  startSession({ sessionId = randomUUID(), mcpConfigPath, mcpServers } = {}) {
+  startSession({ sessionId = randomUUID(), mcpConfigPath, mcpServers, model } = {}) {
     this.sessionId = validateSessionRef(sessionId);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(this.sessionId)) {
       throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session ID must be a UUID.');
     }
-    const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId];
+    const selectedModel = requestedModel(this.profile, model);
+    const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId, ...(selectedModel ? ['--model', selectedModel] : [])];
     const configPath = mcpConfigPath || this.createMcpConfigPath(mcpServers);
     if (configPath) args.push('--mcp-config', validateWorkspacePath(configPath));
     this.transport = new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath });

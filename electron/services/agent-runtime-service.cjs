@@ -104,7 +104,7 @@ async function testConnection(store, payload, options = {}) {
       const observation = {
         availability: 'available', authentication: 'unknown', capabilities: 'supported', implementationName: 'Claude Code',
         adapterVersion: versionOutput.trim().slice(0, 128) || null, providerName: 'anthropic', modelOrMode: null,
-        agentCapabilities: { streamJson: true, sessionResume: true }, authMethodCount: 0, observedAt, state: 'ready',
+        agentCapabilities: { streamJson: true, sessionResume: true, modelSelection: true }, modelSelection: 'supported', models: [], authMethodCount: 0, observedAt, state: 'ready',
       };
       persistObservation(store, profile.id, observation);
       return { ok: true, state: 'ready', profile, source: resolution.source, observation };
@@ -131,6 +131,7 @@ async function testConnection(store, payload, options = {}) {
         id: model?.id || model?.model,
         isDefault: model?.isDefault === true,
       })).filter(model => typeof model.id === 'string' && model.id) : [],
+      modelSelection: negotiated.capabilities?.modelSelection === true ? 'supported' : 'unsupported',
       authMethodCount: negotiated.authMethods?.length || (signedOut ? 1 : 0), observedAt,
       state: signedOut ? 'signed-out' : 'ready',
     };

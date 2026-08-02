@@ -36,7 +36,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
 
   const load = async () => {
     if (!runtimeBridge) {
-      setState({ schemaVersion: 1, profiles: [], defaults: { globalProfileId: null, globalWorkspacePath: null, projectProfileIds: {} }, observations: {} });
+      setState({ schemaVersion: 1, profiles: [], defaults: { acpRuntimeAccessEnabled: true, globalProfileId: null, globalWorkspacePath: null, projectProfileIds: {} }, observations: {} });
       setFeedback('Agent runtime execution is available in the Omvra desktop app.');
       return;
     }
@@ -51,6 +51,8 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
   useEffect(() => { void load(); }, []);
 
   const profiles = state?.profiles || [];
+  const acpRuntimeAccessEnabled = state?.defaults.acpRuntimeAccessEnabled !== false;
+  const draftObservation = draft.id ? state?.observations[draft.id] : undefined;
   const selectedTask = tasks.find(task => task.id === selectedTaskId);
   const resolved = (() => {
     if (!state) return null;
@@ -70,6 +72,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
       fixedArgs: fixedArgsText.split('\n').map(value => value.trim()).filter(Boolean),
       executablePath: draft.executablePath?.trim() || undefined,
       externalUrlScheme: draft.externalUrlScheme?.trim() || undefined,
+      modelPreference: draft.modelPreference?.trim() || undefined,
     });
     setBusy(false);
     if (!result.ok) return setFeedback(result.error || 'Unable to save runtime profile.');
@@ -108,6 +111,16 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
     await load();
   };
 
+  const toggleAcpRuntimeAccess = async (enabled: boolean) => {
+    if (!state || !runtimeBridge) return setFeedback('ACP runtime access can be changed in the Omvra desktop app.');
+    setBusy(true);
+    const result = await runtimeBridge.saveDefaults({ ...state.defaults, acpRuntimeAccessEnabled: enabled });
+    setBusy(false);
+    if (!result.ok) return setFeedback(result.error || 'Unable to change ACP runtime access.');
+    setFeedback(enabled ? 'ACP runtime access enabled.' : 'ACP runtime access disabled; MCP remains available.');
+    await load();
+  };
+
   const testResolvedConnection = async () => {
     if (!runtimeBridge) return setFeedback('Connection testing requires the Omvra desktop app.');
     setBusy(true);
@@ -142,6 +155,17 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
         Profiles contain configuration only—never credentials. Omvra uses the exact resolved profile and does not silently fall back to another runtime.
       </p>
 
+      <section className="space-y-2 rounded-xl border border-[#ececf0] p-4" aria-labelledby="acp-runtime-access-title">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <h3 id="acp-runtime-access-title" className="text-base font-medium text-[#5f6068]">Allow ACP runtime access</h3>
+            <p className="text-xs leading-5 text-[#7f8796]">When off, runtime profiles, connections, sessions, and external handoffs are hidden or blocked. MCP access and ordinary task/Goal behavior remain available.</p>
+          </div>
+          <Switch checked={acpRuntimeAccessEnabled} disabled={busy} aria-label="Toggle ACP runtime access" onCheckedChange={toggleAcpRuntimeAccess} />
+        </div>
+      </section>
+
+      {acpRuntimeAccessEnabled && <>
       <section className="space-y-4" aria-labelledby="runtime-profiles-title">
         <h3 id="runtime-profiles-title" className="text-base font-medium text-[#5f6068]">Runtime profiles</h3>
         {profiles.map(profile => {
@@ -177,6 +201,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
           <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Exact executable path</span><Input value={draft.executablePath || ''} placeholder="/absolute/path/to/agent" onChange={event => setDraft({ ...draft, executablePath: event.target.value })} className={FIELD_CLASS} />{draft.integrationMode === 'codex-app-server-stdio' && <span className="block text-xs leading-5 text-[#7f8796]">Select the installed Codex executable. Omvra launches its native app-server protocol automatically; no ACP adapter is required.</span>}{draft.integrationMode === 'claude-stream-json-stdio' && <span className="block text-xs leading-5 text-[#7f8796]">Select the installed Claude executable. Omvra uses Claude's native stream-json protocol; no ACP adapter is required.</span>}{draft.integrationMode === 'acp-local-stdio' && <span className="block text-xs leading-5 text-[#7f8796]">Works with any native ACP executable. Add required launch arguments one per line—for OpenCode, use <code>acp</code>.</span>}</label>
           {draft.integrationMode === 'external-handoff' && <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Approved URL scheme (optional)</span><Input value={draft.externalUrlScheme || ''} placeholder="codex" onChange={event => setDraft({ ...draft, externalUrlScheme: event.target.value })} className={FIELD_CLASS} /></label>}
           {draft.integrationMode === 'codex-app-server-stdio' && <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Approval prompts</span><select value={draft.approvalPolicy || ''} onChange={event => setDraft({ ...draft, approvalPolicy: (event.target.value || undefined) as AgentRuntimeProfile['approvalPolicy'] })} className={`${FIELD_CLASS} w-full`}><option value="">Use Codex default</option><option value="on-request">Ask when needed</option><option value="untrusted">Ask for untrusted actions</option><option value="never">Never ask</option></select><span className="block text-xs leading-5 text-[#7f8796]">Controls Codex runtime approval prompts for sessions started with this profile. Omvra lifecycle approval gates remain separate.</span>{draft.approvalPolicy === 'never' && <span className="block rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">Codex will not ask before permitted actions. Sandbox, filesystem, network, and Omvra MCP access restrictions still apply.</span>}</label>}
+          {draft.integrationMode !== 'external-handoff' && <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Preferred model (optional)</span>{draftObservation?.models?.length ? <select value={draft.modelPreference || ''} onChange={event => setDraft({ ...draft, modelPreference: event.target.value || undefined })} className={`${FIELD_CLASS} w-full`}><option value="">Use runtime default</option>{draftObservation.models.map(model => <option key={model.id} value={model.id}>{model.id}{model.isDefault ? ' (default)' : ''}</option>)}</select> : <Input value={draft.modelPreference || ''} placeholder="Test connection to load advertised models" disabled={draft.id !== '' && draft.integrationMode !== 'claude-stream-json-stdio' && draftObservation?.modelSelection !== 'supported'} onChange={event => setDraft({ ...draft, modelPreference: event.target.value })} className={FIELD_CLASS} />}<span className="block text-xs leading-5 text-[#7f8796]">{draftObservation?.modelSelection === 'unsupported' ? 'This runtime does not advertise model selection.' : draftObservation?.models?.length ? 'Choose one of the models advertised by this runtime.' : 'Test the connection to load advertised models. Claude uses its native --model option when configured.'} A missing model blocks the session instead of silently switching models.</span></label>}
           <label className="space-y-1 sm:col-span-2"><span className="text-xs font-semibold text-[#71717a]">Fixed arguments (one per line)</span><textarea value={fixedArgsText} onChange={event => setFixedArgsText(event.target.value)} className="min-h-20 w-full rounded-xl border border-[#e5e7eb] p-3 text-sm text-[#71717a]" /></label>
           <div className="flex items-center justify-between sm:col-span-2"><Label className="text-sm text-[#71717a]">Enabled</Label><Switch checked={draft.enabled} onCheckedChange={enabled => setDraft({ ...draft, enabled })} /></div>
           <button type="button" onClick={() => void saveProfile()} disabled={busy || !draft.name.trim()} className={`${PRIMARY_BUTTON_CLASS} sm:col-span-2`}><Plus className="size-4" />{draft.id ? 'Update profile' : 'Add profile'}</button>
@@ -224,6 +249,8 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
         )}
         {feedback && <p role="status" className="flex items-start gap-2 rounded-xl bg-[#f8f8fa] p-3 text-xs leading-5 text-[#5f6068]"><CheckCircle2 className="mt-0.5 size-4 shrink-0" />{feedback}</p>}
       </section>
+      </>}
+      {!acpRuntimeAccessEnabled && feedback && <p role="status" className="flex items-start gap-2 rounded-xl bg-[#f8f8fa] p-3 text-xs leading-5 text-[#5f6068]"><CheckCircle2 className="mt-0.5 size-4 shrink-0" />{feedback}</p>}
     </div>
   );
 }

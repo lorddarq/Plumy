@@ -27,6 +27,26 @@ test('does not start a second active task session', async () => {
   assert.equal(confirmCalls, 0);
 });
 
+test('does not create a session when ACP runtime access is disabled', async () => {
+  let bindingsCreated = false;
+  const runner = createAgentRuntimeSessionRunner({
+    store: {},
+    resolveProfile: () => ({ ok: false, state: 'disabled', error: 'ACP runtime access is disabled.' }),
+    confirmStart: () => ({ canStart: true, contractSnapshot: { taskId: 'task-1', taskRevision: 0 }, task: {} }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: () => { bindingsCreated = true; return { ok: true, binding: {} }; },
+    updateBinding: () => ({ ok: true }),
+    appendEvent: () => ({ ok: true }),
+    listSessions: () => ({ bindings: [], events: [] }),
+  });
+
+  const result = await runner.start({ confirmed: true, taskId: 'task-1', workspacePath: '/tmp/workspace' });
+  assert.equal(result.ok, false);
+  assert.equal(result.state, 'disabled');
+  assert.equal(result.error, 'ACP_RUNTIME_ACCESS_DISABLED');
+  assert.equal(bindingsCreated, false);
+});
+
 test('injects the bounded Omvra context pack into a new native session', async () => {
   const prompts = [];
   const bindingInputs = [];

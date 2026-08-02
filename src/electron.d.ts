@@ -321,6 +321,7 @@ declare global {
     executablePath?: string;
     fixedArgs: string[];
     approvalPolicy?: 'untrusted' | 'on-request' | 'never';
+    modelPreference?: string;
     externalUrlScheme?: string;
     enabled: boolean;
     createdAt?: string;
@@ -329,6 +330,7 @@ declare global {
 
   interface AgentRuntimeDefaults {
     schemaVersion?: 1;
+    acpRuntimeAccessEnabled: boolean;
     globalProfileId: string | null;
     globalWorkspacePath?: string | null;
     projectProfileIds: Record<string, string>;
@@ -345,6 +347,8 @@ declare global {
     providerName?: string | null;
     modelOrMode?: string | null;
     agentCapabilities?: Record<string, unknown>;
+    models?: Array<{ id: string; isDefault?: boolean }>;
+    modelSelection?: 'supported' | 'unsupported' | 'unknown';
     authMethodCount?: number;
     error?: string;
   }

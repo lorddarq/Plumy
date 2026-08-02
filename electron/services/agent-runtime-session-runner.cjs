@@ -191,7 +191,10 @@ function createAgentRuntimeSessionRunner({
     let attempt = confirmed.attempt;
 
     const profileResolution = resolveProfile(store, payload);
-    if (!profileResolution.ok || !profileResolution.profile) return failure('ACP_RUNTIME_NOT_CONFIGURED', 'The selected runtime profile could not be resolved.', { preflight: confirmed });
+    if (!profileResolution.ok || !profileResolution.profile) {
+      if (profileResolution.state === 'disabled') return failure('ACP_RUNTIME_ACCESS_DISABLED', profileResolution.error, { state: 'disabled', preflight: confirmed });
+      return failure('ACP_RUNTIME_NOT_CONFIGURED', 'The selected runtime profile could not be resolved.', { preflight: confirmed });
+    }
     const profile = profileResolution.profile;
     log('info', 'start.preflight-ready', { taskId: payload.taskId, runtimeProfileId: profile.id, integrationMode: profile.integrationMode });
     const contextPack = buildContextPack
@@ -302,7 +305,10 @@ function createAgentRuntimeSessionRunner({
       && ACTIVE_STATES.has(binding.state));
     if (activeExisting) return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'This Goal agent-node already has an active runtime session.', { bindingId: activeExisting.id, binding: activeExisting });
     const profileResolution = resolveProfile(store, payload);
-    if (!profileResolution.ok || !profileResolution.profile) return failure('ACP_RUNTIME_NOT_CONFIGURED', 'The selected runtime profile could not be resolved.');
+    if (!profileResolution.ok || !profileResolution.profile) {
+      if (profileResolution.state === 'disabled') return failure('ACP_RUNTIME_ACCESS_DISABLED', profileResolution.error, { state: 'disabled' });
+      return failure('ACP_RUNTIME_NOT_CONFIGURED', 'The selected runtime profile could not be resolved.');
+    }
     const mcp = prepareMcp(profileResolution.profile, {
       kind: 'goal-node', goalId: payload.goalId, goalElementId: payload.goalElementId, goalExecutionId: payload.goalExecutionId,
     });
@@ -395,7 +401,10 @@ function createAgentRuntimeSessionRunner({
     if (!current || !current.opaqueSessionRef) return failure('ACP_SESSION_RESUME_UNSUPPORTED', 'This session has no resumable runtime reference.');
     if (!['interrupted', 'starting'].includes(current.state)) return failure('ACP_SESSION_NOT_RESUMABLE', `Session is ${current.state}.`);
     const profileResolution = resolveProfile(store, { executionProfileId: current.runtimeProfileId });
-    if (!profileResolution.ok) return failure('ACP_RUNTIME_NOT_CONFIGURED', 'The runtime profile could not be resolved.');
+    if (!profileResolution.ok) {
+      if (profileResolution.state === 'disabled') return failure('ACP_RUNTIME_ACCESS_DISABLED', profileResolution.error, { state: 'disabled' });
+      return failure('ACP_RUNTIME_NOT_CONFIGURED', 'The runtime profile could not be resolved.');
+    }
     const workspacePath = typeof payload.workspacePath === 'string' ? payload.workspacePath.trim() : '';
     if (!workspacePath) return failure('ACP_REPOSITORY_FOLDER_REQUIRED', 'A repository folder is required before resuming work.');
     const starting = current.state === 'interrupted'

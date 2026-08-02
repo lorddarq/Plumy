@@ -50,6 +50,7 @@ test('connection test sends initialize only and records observations separately'
   assert.equal(JSON.parse(written).method, 'initialize');
   assert.equal(written.includes('session/'), false);
   assert.equal(result.observation.implementationName, 'test-agent');
+  assert.equal(result.observation.modelSelection, 'unsupported');
   assert.equal(child.killed, true);
 });
 
@@ -194,4 +195,25 @@ test('external executable handoff reports launch failures instead of leaving an 
     workspacePath: '/tmp/workspace', taskId: 'task-1', contextReference: 'omvra://task/task-1', prompt: 'Continue task',
   }, { spawnProcess: () => child }), /not found/);
   assert.equal(store.get(HANDOFFS_STORE_KEY), undefined);
+});
+
+test('disabled ACP runtime access blocks connection tests and external handoffs before launch', async () => {
+  const store = createStore();
+  saveProfile(store, { id: 'local', name: 'Local', integrationMode: 'acp-local-stdio', executablePath: '/usr/bin/agent', enabled: true });
+  saveProfile(store, { id: 'external', name: 'External', integrationMode: 'external-handoff', externalUrlScheme: 'codex', enabled: true });
+  saveDefaults(store, { acpRuntimeAccessEnabled: false, globalProfileId: 'local', projectProfileIds: {} });
+  let spawned = false;
+  let opened = false;
+
+  const connection = await testConnection(store, { workspacePath: '/tmp/workspace' }, {
+    spawnProcess: () => { spawned = true; throw new Error('must not launch'); },
+  });
+  const handoff = await openExternalHandoff(store, {
+    workspacePath: '/tmp/workspace', taskId: 'task-1', contextReference: 'omvra://task/task-1', prompt: 'Continue task',
+  }, { shell: { openExternal: async () => { opened = true; } } });
+
+  assert.equal(connection.state, 'disabled');
+  assert.equal(handoff.state, 'disabled');
+  assert.equal(spawned, false);
+  assert.equal(opened, false);
 });
