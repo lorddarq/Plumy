@@ -111,7 +111,7 @@ export function TaskContextHistorySection({ taskId, expectedRevision = 0 }: Task
                 {showDate && <p className="text-xs leading-4 text-[#71717a]">{dateLabel}</p>}
                 <div className="overflow-hidden rounded-xl border border-black/[0.05] bg-[#fcfbf7] shadow-[0_1px_2px_rgba(0,0,0,0.10)]">
                   <button type="button" onClick={() => void history.selectEntry(entry.id)} aria-expanded={expanded} aria-controls={detailId} className="block w-full px-4 py-4 text-left hover:bg-black/[0.015] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1a60cb]/30">
-                    <span className="block whitespace-pre-wrap break-words text-sm font-semibold leading-5 text-[#71717a] [overflow-wrap:anywhere]">{entry.summary}</span>
+                    <span className="block whitespace-pre-wrap break-words text-xs font-normal leading-4 text-[#71717a] [overflow-wrap:anywhere]">{entry.summary}</span>
                     <span className="mt-2 block text-xs leading-4 text-[#71717a]">{provenanceLabels[entry.provenance]} · revision {entry.fromRevision === entry.toRevision ? entry.toRevision : `${entry.fromRevision}–${entry.toRevision}`}</span>
                   </button>
                   {expanded && (

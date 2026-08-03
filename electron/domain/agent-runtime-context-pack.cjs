@@ -57,6 +57,11 @@ function createAgentRuntimeContextPack({ getEntry, maxEntries = MAX_CONTEXT_ENTR
       `Description: ${pack.taskDescription || '(no description provided)'}`,
       `Current status: ${pack.taskStatus || 'unknown'}`,
       ...(pack.contributionScope ? [`Assigned scope: ${pack.contributionScope}`] : []),
+      'Progress tracking responsibilities:',
+      '- Re-read the latest task with tasks.get before changing its notes and again before ending each work run.',
+      '- As todo items are completed and verified, check their existing Markdown boxes with tasks.update_description using the latest expected revision, while preserving every other part of the task description.',
+      '- Leave incomplete, blocked, or unverified todos unchecked. If task writes are unavailable or fail, report that clearly instead of claiming the checklist was updated.',
+      '- Checklist progress and task completion are separate: do not mark the task complete solely because the current agent run ended.',
       'Context history:',
       ...entries.map(entry => entry.status === 'missing'
         ? `- [missing] ${entry.id}`

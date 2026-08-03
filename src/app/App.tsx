@@ -8,6 +8,7 @@ import { useAppShell } from './hooks/useAppShell.ts';
 import { UiLayoutStoreProvider } from './store/uiLayoutStore.tsx';
 import { WorkspaceStoreProvider, useWorkspaceStore } from './store/workspaceStore.tsx';
 import { Toaster } from './components/ui/sonner';
+import { AgentRuntimeNotifications } from './components/AgentRuntimeNotifications.tsx';
 
 function AppContent() {
   const appShell = useAppShell();
@@ -96,6 +97,7 @@ function AppStoreShell() {
       tasks={tasks}
       milestones={milestones}
     >
+      <AgentRuntimeNotifications tasks={tasks} />
       <AppContent />
     </UiLayoutStoreProvider>
   );

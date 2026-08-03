@@ -16,6 +16,10 @@ test('builds a bounded provider-neutral pack without source bodies or transcript
   assert.match(result.text, /Title: Implement supervision/);
   assert.match(result.text, /Description: Show visible execution progress\./);
   assert.match(result.text, /Assigned scope: Update the task execution panel\./);
+  assert.match(result.text, /before ending each work run/i);
+  assert.match(result.text, /tasks\.update_description/);
+  assert.match(result.text, /Leave incomplete, blocked, or unverified todos unchecked/);
+  assert.match(result.text, /Checklist progress and task completion are separate/);
   assert.match(result.text, /\[missing\] older-1/);
   assert.doesNotMatch(result.text, /must not leak/i);
 });
