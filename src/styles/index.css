@@ -4,6 +4,7 @@
 @import './reserved-slots.css';
 @import './timeline.css';
 @import './components.css';
+@import './onboarding.css';
 
 /* Compact success toast style aligned with the agent workflow notification pattern. */
 [data-sonner-toast][data-type='success'] {

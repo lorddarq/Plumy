@@ -92,7 +92,7 @@ interface AboutSettingsSectionProps {
   onExportWorkspaceBackup: () => Promise<boolean>;
 }
 
-export function HelpSettingsSection() {
+export function HelpSettingsSection({ onReplayOnboarding }: { onReplayOnboarding: () => void }) {
   return (
     <AnchoredPanelSection
       id="help"
@@ -112,8 +112,8 @@ export function HelpSettingsSection() {
           </div>
           <button
             type="button"
-            disabled
-            className="inline-flex h-8 cursor-not-allowed items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#a5a5ac] opacity-70 outline-none"
+            className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#71717a] outline-none hover:bg-[#fafafa] focus-visible:ring-2 focus-visible:ring-[#76879d]"
+            onClick={onReplayOnboarding}
           >
             <RotateCcw className="size-4" />
             Restart Onboarding

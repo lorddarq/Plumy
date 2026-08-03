@@ -9,9 +9,29 @@ import { UiLayoutStoreProvider } from './store/uiLayoutStore.tsx';
 import { WorkspaceStoreProvider, useWorkspaceStore } from './store/workspaceStore.tsx';
 import { Toaster } from './components/ui/sonner';
 import { AgentRuntimeNotifications } from './components/AgentRuntimeNotifications.tsx';
+import { OnboardingDialog } from './components/OnboardingDialog.tsx';
+import { hasCompletedOnboarding } from './utils/onboarding.ts';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 function AppContent() {
   const appShell = useAppShell();
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const onboardingHandledRef = useRef(false);
+  const closeOnboarding = useCallback(() => { onboardingHandledRef.current = true; setOnboardingOpen(false); }, []);
+
+  useEffect(() => {
+    if (!appShell.isHydrated || onboardingHandledRef.current) return;
+    let cancelled = false;
+    void hasCompletedOnboarding().then(completed => { if (!cancelled && !completed) setOnboardingOpen(true); else onboardingHandledRef.current = true; });
+    return () => { cancelled = true; };
+  }, [appShell.isHydrated, appShell.panelsProps.adminActions]);
+
+  useEffect(() => {
+    if (!appShell.isHydrated) return;
+    const replay = () => { appShell.panelsProps.adminActions.onClosePreferences(); setOnboardingOpen(true); };
+    window.addEventListener('omvra:replay-onboarding', replay);
+    return () => window.removeEventListener('omvra:replay-onboarding', replay);
+  }, [appShell.isHydrated, appShell.panelsProps.adminActions]);
 
   if (!appShell.isHydrated) {
     return (
@@ -76,6 +96,7 @@ function AppContent() {
       </div>
 
       <DeleteConfirmDialog {...appShell.deleteConfirmProps} />
+      <OnboardingDialog open={onboardingOpen} onClose={closeOnboarding} />
     </>
   );
 }

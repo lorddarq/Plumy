@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Folder, Play, Send, Server, Square, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Folder, Play, Server } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
 import { describeAgentRuntimeSession, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent } from '../utils/agentRuntimeActivity';
@@ -11,7 +11,8 @@ import {
 import {
   ContextMenuItem,
 } from './ui/context-menu';
-import { MarkdownContent } from './MarkdownContent';
+import { TaskSessionComposer } from './TaskSessionComposer';
+import { StateBadge } from './statuses/AppStatusBar';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from './ui/sheet';
 
 interface RuntimeState {
@@ -104,8 +105,6 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const [operationBusy, setOperationBusy] = useState(false);
   const [requestBusy, setRequestBusy] = useState(false);
   const [steerText, setSteerText] = useState('');
-  const [outcomeKind, setOutcomeKind] = useState<'decision' | 'blocker' | 'evidence' | 'context-checkpoint'>('context-checkpoint');
-  const [outcomeSummary, setOutcomeSummary] = useState('');
 
   const activeContribution = task.collaboration?.contributions?.find(contribution => contribution.state === 'working');
   const startableContribution = task.collaboration?.contributions?.find(contribution =>
@@ -205,12 +204,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       ? [{ id: `${binding.id}-failed`, label: 'Work stopped unexpectedly', detail: 'The runtime session failed before completing the task.', count: 1, tone: 'danger' as const }]
       : [];
   const isTurnActive = sessionSummary?.isTurnActive === true;
-  const agentStatusSurface = sessionSummary?.tone === 'positive' ? 'bg-emerald-50'
-    : sessionSummary?.tone === 'warning' ? 'bg-amber-50'
-      : sessionSummary?.tone === 'danger' ? 'bg-red-50' : 'bg-slate-50';
-  const agentStatusDot = sessionSummary?.tone === 'positive' ? 'bg-emerald-500'
-    : sessionSummary?.tone === 'warning' ? 'bg-amber-500'
-      : sessionSummary?.tone === 'danger' ? 'bg-red-500' : 'bg-slate-400';
+  const agentStatusTone = sessionSummary?.tone === 'positive' ? 'success'
+    : sessionSummary?.tone === 'warning' ? 'warning'
+      : sessionSummary?.tone === 'danger' ? 'danger' : 'muted';
   const instructionsSent = latestTurnStartIndex >= 0 || events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent');
   const latestTurnCompleted = latestRunEvents.some(event => event.nativeEventType === 'turn/completed');
 
@@ -291,28 +287,6 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       await refreshSession();
     } catch (caught) {
       reportRuntimeError(`session-${operation}`, caught, 'The session operation failed.');
-    } finally {
-      setOperationBusy(false);
-    }
-  };
-
-  const saveOutcome = async () => {
-    if (!binding || !outcomeSummary.trim() || operationBusy) return;
-    setOperationBusy(true);
-    setError(null);
-    try {
-      const result = await window.electron?.agentRuntime?.sessions?.appendOutcome?.({
-        bindingId: binding.id,
-        kind: outcomeKind,
-        summary: outcomeSummary.trim(),
-        expectedRevision: task.__mcpRevision ?? 0,
-        idempotencyKey: `renderer-outcome-${binding.id}-${Date.now()}`,
-        actor: task.assigneeId || 'renderer',
-      });
-      if (!result?.ok) throw new Error(result?.message || result?.error || 'The outcome could not be recorded.');
-      setOutcomeSummary('');
-    } catch (caught) {
-      reportRuntimeError('outcome-record', caught, 'The outcome could not be recorded.');
     } finally {
       setOperationBusy(false);
     }
@@ -431,12 +405,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             <SheetDescription>{binding ? 'Follow the agent’s task progress, blockers, and outcome. Guidance is optional.' : 'Omvra is resolving the task context and starting the assigned work.'}</SheetDescription>
           </SheetHeader>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5 text-sm">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="flex items-start justify-between gap-3"><div className="font-semibold text-slate-900">{task.title}</div><span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-medium text-slate-600 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)]">{taskStatusLabel(task.status)}</span></div>
-              <div className="mt-3 text-xs font-semibold text-slate-500">Task brief</div>
-              <div className="mt-1 text-xs leading-5 text-slate-700">{task.notes?.trim() ? <MarkdownContent content={task.notes} /> : 'No task description provided.'}</div>
-            </div>
+          <div className={`min-h-0 flex-1 overflow-y-auto px-6 py-5 text-sm ${binding ? 'flex flex-col' : 'space-y-3'}`}>
             {mcpReadOnly && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><div className="font-semibold">Omvra task updates are disabled</div><div className="mt-1">MCP access is set to Read Only. Codex can inspect this task but cannot change its description or status. Select Task Write under Settings → MCP Access and restart the listener to allow task updates.</div></div>}
             {!binding && <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-md border border-slate-200 p-3">
@@ -468,10 +437,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
               </div>
             )}
             {binding && (
-              <div className="rounded-md border border-slate-200 p-3">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className={`rounded-lg p-3 ${agentStatusSurface}`}><div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><span className={`size-2 rounded-full ${agentStatusDot}`} />Agent status</div><div className="mt-2 font-semibold text-slate-900">{sessionSummary?.label}</div><div className="mt-1 text-xs leading-5 text-slate-600">{sessionSummary?.detail}</div></div>
-                  <div className="rounded-lg bg-slate-50 p-3"><div className="text-xs font-semibold text-slate-500">Task status</div><div className="mt-2 font-semibold text-slate-900">{taskStatusLabel(task.status)}</div><div className="mt-1 text-xs leading-5 text-slate-600">{task.status === 'done' ? 'The task is marked complete in Omvra.' : 'The task has not been marked complete in Omvra.'}</div></div>
+              <div className="flex min-h-0 flex-1 flex-col rounded-md border border-slate-200 p-3">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Agent status <StateBadge label={sessionSummary?.label || 'Unavailable'} value="" tone={agentStatusTone} title={sessionSummary?.detail} /></div>
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Task status <StateBadge label={taskStatusLabel(task.status)} value="" tone={task.status === 'done' ? 'success' : task.status === 'under-review' ? 'warning' : task.status === 'in-progress' ? 'success' : 'muted'} /></div>
                 </div>
                 {pendingRequests.map(request => {
                   const missingRequired = request.fields.some(field => field.required && (requestValues[field.name] ?? field.defaultValue ?? '') === '');
@@ -501,23 +470,25 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between"><div className="text-xs font-semibold text-slate-700">Agent activity</div><div className="text-[11px] text-slate-400">Task progress only</div></div>
-                <div className="mt-2 max-h-64 space-y-1 overflow-auto rounded border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600" aria-live="polite">
+                <div className="mt-2 min-h-24 flex-1 space-y-1 overflow-auto rounded border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600" aria-live="polite">
                   {visibleActivity.length ? visibleActivity.map(item => <div key={item.id} className="flex items-start gap-2 rounded px-1.5 py-1.5">
                     <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${item.tone === 'danger' ? 'bg-red-500' : item.tone === 'warning' ? 'bg-amber-500' : item.tone === 'positive' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                     <div className="min-w-0 flex-1"><div className="font-medium text-slate-700">{item.label}{item.count > 1 ? ` × ${item.count}` : ''}</div>{item.detail && <div className="mt-0.5 text-[11px] text-slate-500">{item.detail}</div>}</div>
                     {'observedAt' in item && item.observedAt && <time className="shrink-0 text-[10px] text-slate-400" dateTime={item.observedAt}>{new Date(item.observedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>}
                   </div>) : <div className="px-1.5 py-1">No Codex work has started for this session.</div>}
                 </div>
-                <div className="mt-3 flex gap-2">
-                  <input value={steerText} onChange={event => setSteerText(event.target.value)} placeholder={isTurnActive ? 'Add optional guidance' : 'Start an optional follow-up'} className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1.5 text-xs" aria-label={isTurnActive ? 'Add optional guidance to current work' : 'Start an optional follow-up instruction'} />
-                  <button type="button" onClick={() => void runSessionOperation(isTurnActive && hasCapability('steer') ? 'steer' : 'prompt')} disabled={operationBusy || !steerText.trim() || (isTurnActive ? !hasCapability('steer') : !hasCapability('prompt'))} className="rounded border border-slate-200 px-2 py-1.5 text-xs font-semibold disabled:opacity-40" title={isTurnActive ? 'Add guidance' : 'Start a new run'}><Send className="size-3.5" /></button>
-                  <button type="button" onClick={() => void runSessionOperation('cancel')} disabled={operationBusy || !isTurnActive || !hasCapability('cancel')} className="rounded border border-amber-200 px-2 py-1.5 text-xs font-semibold text-amber-700 disabled:opacity-40" title={isTurnActive ? 'Stop current work' : 'No work is running'}><Square className="size-3.5" /></button>
-                  <button type="button" onClick={() => void runSessionOperation('close')} disabled={operationBusy || !hasCapability('close')} className="rounded border border-red-200 px-2 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-40" title="Close session"><X className="size-3.5" /></button>
-                </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
-                  <select value={outcomeKind} onChange={event => setOutcomeKind(event.target.value as typeof outcomeKind)} className="rounded border border-slate-200 px-2 py-1.5 text-xs" aria-label="Outcome type"><option value="context-checkpoint">Checkpoint</option><option value="decision">Decision</option><option value="blocker">Blocker</option><option value="evidence">Evidence</option></select>
-                  <input value={outcomeSummary} onChange={event => setOutcomeSummary(event.target.value)} placeholder="Record a bounded outcome" className="min-w-0 rounded border border-slate-200 px-2 py-1.5 text-xs" aria-label="Outcome summary" />
-                  <button type="button" onClick={() => void saveOutcome()} disabled={operationBusy || !outcomeSummary.trim()} className="rounded border border-slate-200 px-2 py-1.5 text-xs font-semibold disabled:opacity-40">Record</button>
+                <div className="mt-3">
+                  <TaskSessionComposer
+                    value={steerText}
+                    running={isTurnActive}
+                    busy={operationBusy}
+                    canSubmit={Boolean(steerText.trim()) && (isTurnActive ? hasCapability('steer') : hasCapability('prompt'))}
+                    canStop={hasCapability('cancel')}
+                    placeholder={isTurnActive ? 'Add optional guidance' : 'Start an optional follow-up'}
+                    onChange={setSteerText}
+                    onSubmit={() => void runSessionOperation(isTurnActive && hasCapability('steer') ? 'steer' : 'prompt')}
+                    onStop={() => void runSessionOperation('cancel')}
+                  />
                 </div>
               </div>
             )}

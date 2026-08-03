@@ -186,7 +186,7 @@ interface StateBadgeProps {
   title?: string;
 }
 
-function StateBadge({ label, value, tone, title }: StateBadgeProps) {
+export function StateBadge({ label, value, tone, title }: StateBadgeProps) {
   return (
     <span
       className="flex min-h-[17px] shrink-0 items-center justify-center gap-1 rounded-full border border-black/10 px-1.5 py-0.5"

@@ -480,7 +480,7 @@ export function PreferencesPanel({
         onUpdateChannelChange={onUpdateChannelChange}
         onExportWorkspaceBackup={onExportWorkspaceBackup}
       />
-      <HelpSettingsSection />
+      <HelpSettingsSection onReplayOnboarding={() => { window.dispatchEvent(new CustomEvent('omvra:replay-onboarding')); }} />
     </SettingsPanel>
   );
 }
