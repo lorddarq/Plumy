@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { Input } from '../ui/input';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 
 type DeleteGoalDialogProps = { open: boolean; onCancel: () => void; onConfirm: () => void };
 export function DeleteGoalDialog({ open, onCancel, onConfirm }: DeleteGoalDialogProps) {
@@ -11,6 +12,22 @@ export function DeleteGoalDialog({ open, onCancel, onConfirm }: DeleteGoalDialog
       <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onCancel} className="min-h-10 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button><button type="button" onClick={onConfirm} className="min-h-10 rounded-md bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700">Delete Goal</button></div>
     </div>
   </div>;
+}
+
+type ResetGoalExecutionDialogProps = { open: boolean; onCancel: () => void; onConfirm: () => void };
+export function ResetGoalExecutionDialog({ open, onCancel, onConfirm }: ResetGoalExecutionDialogProps) {
+  return <Dialog open={open} onOpenChange={nextOpen => { if (!nextOpen) onCancel(); }}>
+    <DialogContent showClose={false}>
+      <DialogHeader>
+        <DialogTitle>Reset this Goal execution?</DialogTitle>
+        <DialogDescription>The current attempt will be preserved in history and the Goal will return to its initial not-started state.</DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <DialogClose asChild><button type="button" className="min-h-10 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button></DialogClose>
+        <button type="button" onClick={onConfirm} className="min-h-10 rounded-md bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700">Reset execution</button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>;
 }
 
 type NewGoalDialogProps = { open: boolean; title: string; body: string; auditDirectory: string; existingGoalCount: number; onTitleChange: (value: string) => void; onBodyChange: (value: string) => void; onPickDirectory: () => Promise<void>; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void };

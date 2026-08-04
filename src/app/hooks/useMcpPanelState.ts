@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { generateMcpAccessToken, getMcpSettingsSignature } from '../utils/mcpPreferences.ts';
 import type { McpPreferencesShape } from '../utils/mcpPreferences.ts';
 
@@ -129,7 +130,11 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
       if (window.electron?.mcp?.restartServer) {
         const result = await window.electron.mcp.restartServer();
         if (!result?.success) {
-          window.alert(`Could not restart MCP server: ${result?.error || 'Unknown error'}`);
+          toast.error('Could not restart MCP server', {
+            description: result?.error || 'Check the server settings and try again.',
+            duration: 10_000,
+            closeButton: true,
+          });
           return;
         }
         if (result.listenerStatus) {
@@ -141,8 +146,12 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
         setAppliedMcpSettingsSignature(getMcpSettingsSignature(preferences));
         await Promise.resolve(runHealthCheck());
       }
-    } catch {
-      window.alert('Could not restart MCP server.');
+    } catch (error) {
+      toast.error('Could not restart MCP server', {
+        description: error instanceof Error ? error.message : 'Check the server settings and try again.',
+        duration: 10_000,
+        closeButton: true,
+      });
     }
   }, [preferences, refreshMcpAuditLog, refreshMcpListenerStatus, runHealthCheck]);
 

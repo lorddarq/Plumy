@@ -8,12 +8,12 @@ const slides: Slide[] = [
   { title: 'Welcome to Omvra', body: 'Plan work, delegate it, and supervise execution with less noise.', description: 'The Omvra workflow: plan work, delegate it, and supervise execution.', kind: 'welcome' },
   { title: 'Plan the work', body: 'Projects provide workspace context. Tasks hold the work request, dates, and the outcome you want.', description: 'A project called Product launch contains a task called Prepare launch brief.', kind: 'plan' },
   { title: 'Delegate with intent', body: 'Create an agent with persona and operational instructions, then assign the task to connect the work to that agent.', description: 'An agent profile shows persona behavior instructions and operational work-method instructions, with a task assignment.', kind: 'delegate' },
-  { title: 'Start work with confidence', body: 'Start work checks the agent, workspace, ACP/runtime configuration, model, and task context before execution.', description: 'The Start work preflight lists agent, workspace, runtime, model, and task context checks.', kind: 'start' },
+  { title: 'Start work with confidence', body: 'Start work checks the assigned agent, working folder, model, and task instructions before work begins.', description: 'The Start work panel confirms the agent, working folder, model, and task instructions.', kind: 'start' },
 ];
 
 function IllustratedPanel({ kind }: { kind: Slide['kind'] }) {
   if (kind === 'welcome') return <div className="omvra-onboarding-welcome-mark" aria-hidden="true"><img src={logo} alt="" /><span>Plan · Delegate · Supervise</span></div>;
-  const labels = kind === 'plan' ? ['Product launch', 'Prepare launch brief', 'Workspace context'] : kind === 'delegate' ? ['Atlas · Agent', 'Persona & behavior', 'Operational work method', 'Assigned task'] : ['Start work preflight', 'Agent verified', 'Workspace ready', 'Runtime configured', 'Model · Task context'];
+  const labels = kind === 'plan' ? ['Product launch', 'Prepare launch brief', 'Workspace context'] : kind === 'delegate' ? ['Atlas · Agent', 'Persona & behavior', 'Operational work method', 'Assigned task'] : ['Start work', 'Agent assigned', 'Working folder ready', 'Connection ready', 'Model · Task instructions'];
   return <div className={`omvra-onboarding-illustration is-${kind}`} aria-hidden="true">{labels.map((label, index) => <div key={label} className={index === 0 ? 'omvra-onboarding-illustration-title' : 'omvra-onboarding-illustration-row'}><span>{index === 0 ? '◆' : '✓'}</span>{label}</div>)}</div>;
 }
 

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as React from 'react';
 import TestRenderer from 'react-test-renderer';
+import { toast } from 'sonner';
 import type { Task, Person } from '../types.ts';
 import { usePeopleActions } from './usePeopleActions.ts';
 import { useStatusColumnActions } from './useStatusColumnActions.ts';
@@ -661,6 +662,43 @@ test('useMcpPanelState refreshes listener status while MCP is starting', async (
     await harness.unmount();
   } finally {
     (globalThis as any).window = originalWindow;
+  }
+});
+
+test('useMcpPanelState keeps restart errors visible in an actionable toast', async t => {
+  const restoreWindow = setWindowMock({
+    electron: {
+      mcp: {
+        restartServer: async () => ({ success: false, error: 'Port 3456 is already in use.' }),
+      },
+    },
+  });
+  const errorToast = t.mock.method(toast, 'error');
+
+  try {
+    const preferences: McpPreferencesShape = {
+      mcpAgentAccessEnabled: true,
+      mcpCapabilityProfile: 'task_write',
+      mcpBindHost: '127.0.0.1',
+      mcpPort: 3456,
+      mcpServerAddress: 'http://127.0.0.1:3456/mcp',
+      mcpAccessToken: '',
+      mcpAccessTokenTtlMinutes: 60,
+    };
+    const harness = await renderHook(
+      () => useMcpPanelState({ preferences, setPreferences: () => {}, runHealthCheck: () => {} }),
+      undefined
+    );
+
+    await harness.result().handleRestartMcpServer();
+
+    assert.deepEqual(errorToast.mock.calls[0].arguments, [
+      'Could not restart MCP server',
+      { description: 'Port 3456 is already in use.', duration: 10_000, closeButton: true },
+    ]);
+    await harness.unmount();
+  } finally {
+    restoreWindow();
   }
 });
 

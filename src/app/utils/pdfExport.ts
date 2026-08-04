@@ -1,3 +1,5 @@
+import { toast } from 'sonner';
+
 export interface PdfField {
   label: string;
   value?: string | number | null;
@@ -313,16 +315,22 @@ export async function exportPdfDocument({
     });
 
     if (!result.success && !result.canceled) {
-      window.alert(result.error || `Could not export this ${entityLabel} as a PDF.`);
+      toast.error('PDF export failed', {
+        description: result.error || `Could not export this ${entityLabel} as a PDF.`,
+        duration: 10_000,
+        closeButton: true,
+      });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     const missingHandler = message.includes("No handler registered for 'tasks/export-pdf'");
-    window.alert(
-      missingHandler
+    toast.error('PDF export failed', {
+      description: missingHandler
         ? 'PDF export is available, but Omvra needs to restart once to load the new Electron export handler.'
-        : message || `Could not export this ${entityLabel} as a PDF.`
-    );
+        : message || `Could not export this ${entityLabel} as a PDF.`,
+      duration: 10_000,
+      closeButton: true,
+    });
   }
 }
 

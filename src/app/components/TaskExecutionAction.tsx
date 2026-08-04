@@ -141,7 +141,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       try {
         const stateResult = await window.electron.agentRuntime.getState();
         if (cancelled) return;
-        if (!stateResult.ok || !stateResult.value) throw new Error(stateResult.error || 'Runtime profiles could not be loaded.');
+        if (!stateResult.ok || !stateResult.value) throw new Error(stateResult.error || 'Agent connections could not be loaded.');
         const state = stateResult.value as RuntimeState;
         setRuntimeState(state);
         const mcpCapabilities = await window.electron.mcp.getCapabilities();
@@ -154,7 +154,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         if (!cancelled) setWorkspace(resolvedWorkspace);
         const projectId = task.projectIds?.[0] || task.swimlaneId;
         const resolutionResult = await window.electron.agentRuntime.resolve({ projectId });
-        if (!resolutionResult.ok || !resolutionResult.value) throw new Error(resolutionResult.error || 'The selected runtime is unavailable.');
+        if (!resolutionResult.ok || !resolutionResult.value) throw new Error(resolutionResult.error || 'The selected agent connection is unavailable.');
         const resolved = resolutionResult.value as RuntimeResolution;
         if (!cancelled) setResolution(resolved);
         const prepared = await window.electron.agentRuntime.prepareExecution({
@@ -167,7 +167,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         });
         if (!cancelled) setPreflight(prepared as ExecutionPreflight);
       } catch (caught) {
-        if (!cancelled) reportRuntimeError('preflight', caught, 'Runtime preflight failed.');
+        if (!cancelled) reportRuntimeError('preflight', caught, 'Checks before starting failed.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -185,9 +185,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const observation = resolution?.profile ? runtimeState?.observations?.[resolution.profile.id] : undefined;
   const blockers = [
     ...(!resolvedRepositoryFolder && !loading ? ['A working directory could not be resolved.'] : []),
-    ...(resolution?.profile?.integrationMode === 'external-handoff' ? ['The selected profile supports external handoff, not a managed session.'] : []),
-    ...(resolution && !resolution.ok ? [resolution.error || 'The selected runtime is unavailable.'] : []),
-    ...(preflight?.connection?.ok === false ? [preflight.connection.error || `Runtime connection is ${preflight.connection.state || 'unavailable'}.`] : []),
+    ...(resolution?.profile?.integrationMode === 'external-handoff' ? ['The selected connection opens work externally and cannot be supervised in Omvra.'] : []),
+    ...(resolution && !resolution.ok ? [resolution.error || 'The selected agent connection is unavailable.'] : []),
+    ...(preflight?.connection?.ok === false ? [preflight.connection.error || `Agent connection is ${preflight.connection.state || 'unavailable'}.`] : []),
     ...(preflight?.blockers || []).map(blocker => blocker.message),
   ];
   const warnings = preflight?.warnings || [];
@@ -201,7 +201,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const visibleActivity = activity.length > 0 ? activity : binding?.state === 'interrupted'
     ? [{ id: `${binding.id}-interrupted`, label: 'Work was interrupted', detail: 'Start work again to reconnect and continue with the task instructions.', count: 1, tone: 'warning' as const }]
     : binding?.state === 'failed'
-      ? [{ id: `${binding.id}-failed`, label: 'Work stopped unexpectedly', detail: 'The runtime session failed before completing the task.', count: 1, tone: 'danger' as const }]
+      ? [{ id: `${binding.id}-failed`, label: 'Work stopped unexpectedly', detail: 'The agent connection ended before the work finished.', count: 1, tone: 'danger' as const }]
       : [];
   const isTurnActive = sessionSummary?.isTurnActive === true;
   const agentStatusTone = sessionSummary?.tone === 'positive' ? 'success'
@@ -243,7 +243,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     try {
       if (replaceBinding && binding) {
         const closed = await window.electron?.agentRuntime?.sessions?.close?.(binding.id);
-        if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The stale runtime session could not be replaced.');
+        if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The previous work session could not be replaced.');
       }
       const result = await window.electron?.agentRuntime?.sessions?.start?.({
         confirmed: true,
@@ -257,13 +257,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         expectedContractDigest: preflight?.contractDigest,
         idempotencyKey: `renderer-start-${task.id}-${Date.now()}`,
       });
-      if (!result?.ok) throw new Error(result?.message || result?.blockers?.[0]?.message || result?.error || 'The runtime session could not be started.');
+      if (!result?.ok) throw new Error(result?.message || result?.blockers?.[0]?.message || result?.error || 'The work session could not be started.');
       setBinding(result.binding as SessionBinding);
       await refreshSession();
-      toast.success('Codex started working', { description: task.title });
+      toast.success('Agent started working', { description: task.title });
       console.info('[agent-runtime:ui] session-start.completed', { taskId: task.id, bindingId: result.binding?.id || null });
     } catch (caught) {
-      reportRuntimeError('session-start', caught, 'The runtime session could not be started.');
+      reportRuntimeError('session-start', caught, 'The work session could not be started.');
     } finally {
       setOperationBusy(false);
     }
@@ -281,12 +281,12 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         const text = operation === 'cancel' ? undefined : steerText.trim();
         if (operation !== 'cancel' && !text) return;
         const result = await window.electron?.agentRuntime?.sessions?.[operation]?.({ bindingId: binding.id, ...(text ? { text } : {}) });
-        if (!result?.ok) throw new Error(result?.message || result?.error || 'The session operation failed.');
+        if (!result?.ok) throw new Error(result?.message || result?.error || 'The requested action failed.');
         setSteerText('');
       }
       await refreshSession();
     } catch (caught) {
-      reportRuntimeError(`session-${operation}`, caught, 'The session operation failed.');
+      reportRuntimeError(`session-${operation}`, caught, 'The requested action failed.');
     } finally {
       setOperationBusy(false);
     }
@@ -305,11 +305,11 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         requestId: request.requestId,
         result: { action, content, _meta: null },
       });
-      if (!result?.ok) throw new Error(result?.message || result?.error || 'The runtime input could not be submitted.');
+      if (!result?.ok) throw new Error(result?.message || result?.error || 'Your response could not be submitted.');
       setRequestValues({});
       await refreshSession();
     } catch (caught) {
-      reportRuntimeError('request-response', caught, 'The runtime input could not be submitted.');
+      reportRuntimeError('request-response', caught, 'Your response could not be submitted.');
     } finally {
       setRequestBusy(false);
     }
@@ -321,11 +321,11 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setError(null);
     try {
       const result = await window.electron?.agentRuntime?.sessions?.resume?.({ bindingId: binding.id, workspacePath: resolvedRepositoryFolder });
-      if (!result?.ok) throw new Error(result?.message || result?.error || 'The runtime session could not be resumed.');
+      if (!result?.ok) throw new Error(result?.message || result?.error || 'Work could not be resumed.');
       await refreshSession();
-      toast.success('Codex resumed work', { description: task.title });
+      toast.success('Agent resumed work', { description: task.title });
     } catch (caught) {
-      reportRuntimeError('session-resume', caught, 'The runtime session could not be resumed.');
+      reportRuntimeError('session-resume', caught, 'Work could not be resumed.');
     } finally {
       setOperationBusy(false);
     }
@@ -337,11 +337,11 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setError(null);
     try {
       const result = await window.electron?.agentRuntime?.sessions?.continueTask?.(binding.id);
-      if (!result?.ok) throw new Error(result?.message || result?.error || 'The runtime session could not be continued.');
+      if (!result?.ok) throw new Error(result?.message || result?.error || 'Work could not be continued.');
       await refreshSession();
-      toast.success('Codex continued work', { description: task.title });
+      toast.success('Agent continued work', { description: task.title });
     } catch (caught) {
-      reportRuntimeError('session-continue-task', caught, 'The runtime session could not be continued.');
+      reportRuntimeError('session-continue-task', caught, 'Work could not be continued.');
     } finally {
       setOperationBusy(false);
     }
@@ -383,7 +383,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     if (!preflight || !resolution?.profile || !workspace) return;
     setStartRequested(false);
     if (blockers.length > 0) {
-      toast.error('Codex could not start work', { description: blockers[0] });
+      toast.error('Agent could not start work', { description: blockers[0] });
       return;
     }
     void startWork();
@@ -406,12 +406,12 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
           </SheetHeader>
 
           <div className={`min-h-0 flex-1 overflow-y-auto px-6 py-5 text-sm ${binding ? 'flex flex-col' : 'space-y-3'}`}>
-            {mcpReadOnly && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><div className="font-semibold">Omvra task updates are disabled</div><div className="mt-1">MCP access is set to Read Only. Codex can inspect this task but cannot change its description or status. Select Task Write under Settings → MCP Access and restart the listener to allow task updates.</div></div>}
+            {mcpReadOnly && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><div className="font-semibold">Task access is read-only</div><div className="mt-1">The agent can inspect this task but cannot change its description or status. To allow updates, select Task Write under Settings → MCP Access and restart the listener.</div></div>}
             {!binding && <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-md border border-slate-200 p-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Server className="size-3.5" />Runtime</div>
-                <div className="mt-1 font-medium text-slate-900">{loading ? 'Resolving…' : runtimeLabel(resolution?.profile?.integrationMode)}</div>
-                {resolution?.profile && <div className="text-xs text-slate-500">{resolution.profile.name} · {resolution.source}</div>}
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Server className="size-3.5" />Agent connection</div>
+                <div className="mt-1 font-medium text-slate-900">{loading ? 'Checking…' : resolution?.profile?.name || 'Not configured'}</div>
+                {resolution?.profile && <div className="text-xs text-slate-500">{runtimeLabel(resolution.profile.integrationMode)} · {resolution.source}</div>}
               </div>
               <div className="rounded-md border border-slate-200 p-3">
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Folder className="size-3.5" />Working directory</div>
@@ -421,18 +421,18 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             </div>}
             {!binding && observation && (
               <div className="rounded-md border border-slate-200 p-3 text-xs text-slate-600">
-                <p>Runtime observation: {observation.availability || 'unknown'} · authentication {observation.authentication || 'unknown'} · {observation.state || 'unknown'}.</p>
-                {observation.error && <p className="mt-1 text-rose-700">Last probe: {observation.error}</p>}
+                <p>Connection details: {observation.availability || 'unknown'} · sign-in {observation.authentication || 'unknown'} · {observation.state || 'unknown'}.</p>
+                {observation.error && <p className="mt-1 text-rose-700">Last connection check: {observation.error}</p>}
               </div>
             )}
             {!binding && preflight?.model && (preflight.model.requested || preflight.model.effective) && (
               <div className="rounded-md border border-slate-200 p-3 text-xs text-slate-600">
-                Model: requested {preflight.model.requested || 'runtime default'} · effective {preflight.model.effective || 'runtime default'}.
+                Model: {preflight.model.effective || preflight.model.requested || 'agent default'}{preflight.model.requested && preflight.model.effective && preflight.model.requested !== preflight.model.effective ? ` · requested ${preflight.model.requested}` : ''}.
               </div>
             )}
             {!binding && warnings.length > 0 && (
               <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
-                <div className="font-semibold">Preflight warnings</div>
+                <div className="font-semibold">Check before starting</div>
                 <ul className="mt-1 space-y-1">{warnings.map(warning => <li key={`${warning.code || 'warning'}-${warning.message}`}>• {warning.message}</li>)}</ul>
               </div>
             )}
@@ -445,7 +445,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                 {pendingRequests.map(request => {
                   const missingRequired = request.fields.some(field => field.required && (requestValues[field.name] ?? field.defaultValue ?? '') === '');
                   return <div key={`${request.method}-${request.requestId}`} className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <div className="text-xs font-semibold text-amber-900">Codex needs your input</div>
+                    <div className="text-xs font-semibold text-amber-900">The agent needs your input</div>
                     <div className="mt-1 text-xs leading-5 text-amber-800">{request.message}</div>
                     {request.serverName && <div className="mt-1 text-[11px] text-amber-700">Requested by {request.serverName}</div>}
                     {request.fields.length > 0 && <div className="mt-3 space-y-2">{request.fields.map(field => {
@@ -462,9 +462,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   </div>;
                 })}
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">
-                  <div className="text-xs font-semibold text-slate-700">Execution stages</div>
+                  <div className="text-xs font-semibold text-slate-700">Work stages</div>
                   <div className="mt-3 grid gap-2 text-xs">
-                    <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${binding.state === 'starting' ? 'bg-blue-500' : 'bg-emerald-500'}`} /><span className="font-medium text-slate-700">Codex runtime</span><span className="ml-auto text-slate-500">{binding.state === 'starting' ? 'Booting' : 'Started'}</span></div>
+                    <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${binding.state === 'starting' ? 'bg-blue-500' : 'bg-emerald-500'}`} /><span className="font-medium text-slate-700">Agent connection</span><span className="ml-auto text-slate-500">{binding.state === 'starting' ? 'Connecting' : 'Connected'}</span></div>
                     <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${instructionsSent ? 'bg-emerald-500' : 'bg-slate-300'}`} /><span className="font-medium text-slate-700">Task instructions</span><span className="ml-auto text-slate-500">{instructionsSent ? 'Sent and accepted' : 'Not sent yet'}</span></div>
                     <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${isTurnActive ? 'bg-emerald-500' : latestTurnCompleted ? 'bg-slate-400' : 'bg-slate-300'}`} /><span className="font-medium text-slate-700">Agent work</span><span className="ml-auto text-slate-500">{isTurnActive ? 'In progress' : latestTurnCompleted ? 'Run finished' : 'Not started'}</span></div>
                   </div>
@@ -475,7 +475,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                     <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${item.tone === 'danger' ? 'bg-red-500' : item.tone === 'warning' ? 'bg-amber-500' : item.tone === 'positive' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                     <div className="min-w-0 flex-1"><div className="font-medium text-slate-700">{item.label}{item.count > 1 ? ` × ${item.count}` : ''}</div>{item.detail && <div className="mt-0.5 text-[11px] text-slate-500">{item.detail}</div>}</div>
                     {'observedAt' in item && item.observedAt && <time className="shrink-0 text-[10px] text-slate-400" dateTime={item.observedAt}>{new Date(item.observedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>}
-                  </div>) : <div className="px-1.5 py-1">No Codex work has started for this session.</div>}
+                  </div>) : <div className="px-1.5 py-1">The agent has not started work yet.</div>}
                 </div>
                 <div className="mt-3">
                   <TaskSessionComposer
@@ -495,7 +495,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</div>}
             {!error && blockers.length > 0 && (
               <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-3.5" />Blocked before confirmation</div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-3.5" />Needs attention before work can start</div>
                 <ul className="mt-2 space-y-1 text-xs text-amber-800">{blockers.map(blocker => <li key={blocker}>• {blocker}</li>)}</ul>
               </div>
             )}
@@ -507,13 +507,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
               {binding
                 ? sessionSummary?.detail
                 : activeAttempt
-                  ? 'An execution attempt is already active for this task.'
-                  : 'No process, task attempt, or model turn is started by opening this preflight.'}
+                  ? 'Work is already active for this task.'
+                  : 'Omvra checks the agent, working directory, model, and task instructions before work starts.'}
             </div>
             <div className="flex shrink-0 justify-end gap-2">
               <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={() => setOpen(false)}>Close</button>
               {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40">Open externally</button>}
-              {(binding?.state === 'interrupted' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' ? resumeSession() : startWork())} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' ? 'Resume work' : activeAttempt ? 'Execution active' : operationBusy ? 'Starting…' : 'Start work'}</button>}
+              {(binding?.state === 'interrupted' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' ? resumeSession() : startWork())} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' ? 'Resume work' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
             </div>
           </SheetFooter>
         </SheetContent>
