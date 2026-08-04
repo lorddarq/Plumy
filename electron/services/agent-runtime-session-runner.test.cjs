@@ -153,6 +153,12 @@ test('injects the bounded Omvra context pack into a new native session', async (
   assert.equal(runner.listRequests('binding-1').length, 0);
   assert.equal(responses[0].requestId, 42);
   assert.equal(storedBinding.state, 'active');
+  notify({ method: 'item/commandExecution/requestApproval', id: 'approval-1', params: { reason: 'Write the requested implementation.' } });
+  assert.equal(runner.listRequests('binding-1')[0].responseKind, 'codex-approval');
+  assert.equal(storedBinding.state, 'needs-input');
+  assert.equal((await runner.respond('binding-1', 'approval-1', { decision: 'accept' })).ok, true);
+  assert.deepEqual(responses.at(-1), { requestId: 'approval-1', response: { decision: 'accept' }, error: undefined });
+  assert.equal(storedBinding.state, 'active');
   notify({ method: 'error', params: { error: { message: 'Task tool failed.' }, willRetry: false } });
   assert.equal(events.at(-1).outcome, 'Task tool failed.');
   lifecycle({ kind: 'exit', code: 'ACP_SESSION_INTERRUPTED' });

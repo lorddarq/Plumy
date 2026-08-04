@@ -55,6 +55,7 @@ interface PendingRuntimeRequest {
   bindingId: string;
   requestId: string | number;
   method: string;
+  responseKind?: 'elicitation' | 'codex-approval';
   serverName: string;
   mode: string;
   message: string;
@@ -301,10 +302,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       const content = action === 'accept'
         ? Object.fromEntries(request.fields.map(field => [field.name, requestValues[field.name] ?? field.defaultValue ?? (field.type === 'boolean' ? false : '')]))
         : null;
+      const response = request.responseKind === 'codex-approval'
+        ? { decision: action === 'accept' ? 'accept' : 'decline' }
+        : { action, content, _meta: null };
       const result = await window.electron?.agentRuntime?.sessions?.respond?.({
         bindingId: binding.id,
         requestId: request.requestId,
-        result: { action, content, _meta: null },
+        result: response,
       });
       if (!result?.ok) throw new Error(result?.message || result?.error || 'Your response could not be submitted.');
       setRequestValues({});
@@ -459,7 +463,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                             : <input type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'} value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [field.name]: field.type === 'number' || field.type === 'integer' ? Number(event.target.value) : event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5" />}
                       </label>;
                     })}</div>}
-                    <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => void respondToRequest(request, 'decline')} disabled={requestBusy} className="rounded border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40">Decline</button><button type="button" onClick={() => void respondToRequest(request, 'accept')} disabled={requestBusy || missingRequired} className="rounded bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Continue</button></div>
+                    <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => void respondToRequest(request, 'decline')} disabled={requestBusy} className="rounded border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40">Decline</button><button type="button" onClick={() => void respondToRequest(request, 'accept')} disabled={requestBusy || missingRequired} className="rounded bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40">{request.responseKind === 'codex-approval' ? 'Allow' : 'Continue'}</button></div>
                   </div>;
                 })}
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">

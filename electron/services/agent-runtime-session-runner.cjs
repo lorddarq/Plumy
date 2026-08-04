@@ -49,7 +49,31 @@ function createAgentRuntimeSessionRunner({
   }
 
   function sanitizedElicitation(bindingId, message) {
-    if (message?.method !== 'mcpServer/elicitation/request' || message.id === undefined || message.id === null) return null;
+    if (message?.id === undefined || message?.id === null) return null;
+    const approvalMethod = typeof message.method === 'string' && [
+      'item/commandExecution/requestApproval',
+      'item/fileChange/requestApproval',
+      'item/mcpToolCall/requestApproval',
+    ].includes(message.method);
+    if (approvalMethod) {
+      const params = message.params || {};
+      const subject = message.method === 'item/commandExecution/requestApproval'
+        ? 'run a command'
+        : message.method === 'item/fileChange/requestApproval'
+          ? 'apply a file change'
+          : 'call an MCP tool';
+      return {
+        bindingId,
+        requestId: message.id,
+        method: message.method,
+        responseKind: 'codex-approval',
+        serverName: typeof params.serverName === 'string' ? params.serverName.slice(0, 160) : '',
+        mode: 'approval',
+        message: `The agent requests permission to ${subject}.${typeof params.reason === 'string' && params.reason.trim() ? ` Reason: ${params.reason.trim().slice(0, 500)}` : ''}`,
+        fields: [],
+      };
+    }
+    if (message.method !== 'mcpServer/elicitation/request') return null;
     const params = message.params || {};
     const schema = params.requestedSchema && typeof params.requestedSchema === 'object' ? params.requestedSchema : {};
     const required = new Set(Array.isArray(schema.required) ? schema.required.filter(name => typeof name === 'string') : []);
@@ -70,6 +94,7 @@ function createAgentRuntimeSessionRunner({
       bindingId,
       requestId: message.id,
       method: message.method,
+      responseKind: 'elicitation',
       serverName: typeof params.serverName === 'string' ? params.serverName.slice(0, 160) : '',
       mode: ['form', 'openai/form', 'url'].includes(params.mode) ? params.mode : 'form',
       message: typeof params.message === 'string' ? params.message.slice(0, 2_000) : 'Codex needs input before it can continue.',
@@ -148,7 +173,7 @@ function createAgentRuntimeSessionRunner({
   function recordNotification(binding, message) {
     const method = typeof message?.method === 'string' ? message.method : 'runtime/notification';
     const lower = method.toLowerCase();
-    const kind = lower.includes('permission') ? 'permission'
+    const kind = lower.includes('permission') || lower.includes('approval') ? 'permission'
       : lower.includes('input') || lower.includes('elicitation') ? 'input'
         : lower.includes('usage') || lower.includes('cost') ? 'usage'
           : lower.includes('tool') ? 'tool'
@@ -198,7 +223,7 @@ function createAgentRuntimeSessionRunner({
       const turnState = params.turn?.status || params.status || params.state;
       syncBindingState(binding.id, turnState === 'failed' ? 'failed' : turnState === 'interrupted' ? 'interrupted' : 'ready');
     }
-    else if (kind === 'input') syncBindingState(binding.id, 'needs-input');
+    else if (kind === 'input' || kind === 'permission') syncBindingState(binding.id, 'needs-input');
     return appended;
   }
 
