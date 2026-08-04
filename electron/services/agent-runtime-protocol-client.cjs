@@ -118,16 +118,18 @@ class JsonLineTransport {
     const id = this.nextId++;
     this.logger?.debug?.('[agent-runtime:transport] request.started', { id, method, timeoutMs });
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        this.logger?.error?.('[agent-runtime:transport] request.timed-out', { id, method, timeoutMs });
-        reject(runtimeError('ACP_RUNTIME_UNAVAILABLE', `${method} timed out after ${timeoutMs} ms.`));
-      }, timeoutMs);
+      const timer = Number.isFinite(timeoutMs) && timeoutMs > 0
+        ? setTimeout(() => {
+          this.pending.delete(id);
+          this.logger?.error?.('[agent-runtime:transport] request.timed-out', { id, method, timeoutMs });
+          reject(runtimeError('ACP_RUNTIME_UNAVAILABLE', `${method} timed out after ${timeoutMs} ms.`));
+        }, timeoutMs)
+        : null;
       this.pending.set(id, { method, resolve, reject, timer });
       try {
         this.#write({ id, method, params });
       } catch (error) {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         this.pending.delete(id);
         reject(runtimeError('ACP_SESSION_INTERRUPTED', error.message));
       }
@@ -307,7 +309,7 @@ class AcpStdioClient {
     return this.transport.request('session/prompt', {
       sessionId: validateSessionRef(sessionId),
       prompt: [{ type: 'text', text: validateInputText(text) }],
-    });
+    }, 0);
   }
 
   steer() {
@@ -377,7 +379,7 @@ class CodexAppServerClient {
 
   async prompt(sessionId, text) {
     const threadId = validateSessionRef(sessionId);
-    const result = await this.transport.request('turn/start', { threadId, input: [{ type: 'text', text: validateInputText(text) }], ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}) });
+    const result = await this.transport.request('turn/start', { threadId, input: [{ type: 'text', text: validateInputText(text) }], ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}) }, 0);
     const turnId = validateSessionRef(result?.turn?.id);
     this.activeTurns.set(threadId, turnId);
     return { turnId, result };
@@ -387,7 +389,7 @@ class CodexAppServerClient {
     const threadId = validateSessionRef(sessionId);
     const turnId = this.activeTurns.get(threadId);
     if (!turnId) throw runtimeError('ACP_CAPABILITY_UNSUPPORTED', 'Codex has no active turn to steer.');
-    return this.transport.request('turn/steer', { threadId, expectedTurnId: turnId, input: [{ type: 'text', text: validateInputText(text) }] });
+    return this.transport.request('turn/steer', { threadId, expectedTurnId: turnId, input: [{ type: 'text', text: validateInputText(text) }] }, 0);
   }
 
   async cancel(sessionId) {
