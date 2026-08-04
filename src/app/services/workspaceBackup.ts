@@ -49,6 +49,7 @@ export interface WorkspacePreferences {
   pipelineLoadStatusId?: TaskStatus;
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
+  skillRoots?: Array<{ root: string; source?: string }>;
   condensedUI?: boolean;
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
@@ -488,6 +489,11 @@ export function sanitizePreferences(
     pipelineLoadStatusIds,
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),
+    skillRoots: Array.isArray(preferences.skillRoots)
+      ? preferences.skillRoots
+          .filter(item => item && typeof item.root === 'string' && item.root.trim())
+          .map(item => ({ root: item.root.trim(), source: typeof item.source === 'string' ? item.source : 'omvra-configured' }))
+      : (fallback.skillRoots || []),
     condensedUI: preferences.condensedUI === true,
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
@@ -884,6 +890,11 @@ export function createDefaultWorkspacePreferences(
     pipelineLoadStatusIds,
     updateChannel: overrides.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(overrides.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
+    skillRoots: Array.isArray(overrides.skillRoots)
+      ? overrides.skillRoots
+          .filter(item => item && typeof item.root === 'string' && item.root.trim())
+          .map(item => ({ root: item.root.trim(), source: typeof item.source === 'string' ? item.source : 'omvra-configured' }))
+      : [],
     condensedUI: overrides.condensedUI === true,
     mcpAgentAccessEnabled: Boolean(overrides.mcpAgentAccessEnabled),
     mcpCapabilityProfile:

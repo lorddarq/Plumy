@@ -701,7 +701,7 @@ export function useAppShell(): AppShellState {
         showCompletedTimelineTasks: timelineLayoutState.showCompleted,
         cleanupGoalArtifacts: preferences.cleanupGoalArtifacts,
         goalAuditArchiveDirectory: preferences.goalAuditArchiveDirectory,
-        externalSkillsDirectory: preferences.skillRoots[0]?.root || '',
+        externalSkillsDirectory: preferences.skillRoots?.[0]?.root || '',
         customScrollbarsEnabled: preferences.customScrollbarsEnabled,
         condensedUI: preferences.condensedUI,
         goalPolicy,

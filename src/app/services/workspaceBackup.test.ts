@@ -68,6 +68,7 @@ test('workspace backup restore preserves a project repository folder', () => {
 
   assert.equal(repaired.ok, true);
   assert.equal(repaired.projects[0].repositoryFolder, '/Users/example/omvra');
+  assert.deepEqual(repaired.preferences.skillRoots, []);
 });
 
 test('workspace backup preserves versioned Goal agent configuration through electron-store round trips', () => {
