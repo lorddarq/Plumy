@@ -245,9 +245,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setEvents([]);
     setPendingRequests([]);
     const replacement = await refreshSession();
-    if (!replacement || !['starting', 'ready', 'active', 'needs-input', 'cancelling'].includes(replacement.state)) {
-      setStartRequested(true);
-    }
+    // Re-enter the normal launch effect: it continues a recovered `ready`
+    // session, leaves active/input sessions alone, and starts a new session
+    // only when no usable replacement exists.
+    setStartRequested(!replacement || ['ready', 'active', 'needs-input', 'starting', 'cancelling'].includes(replacement.state));
     toast.info('Runtime session recovered', { description: 'The previous provider session was replaced while preserving your task context.' });
   };
 
