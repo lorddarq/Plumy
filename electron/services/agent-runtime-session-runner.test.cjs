@@ -47,6 +47,25 @@ test('does not create a session when ACP runtime access is disabled', async () =
   assert.equal(bindingsCreated, false);
 });
 
+test('explains that a persisted session needs a new app-process session when its client is gone', async () => {
+  const runner = createAgentRuntimeSessionRunner({
+    store: {},
+    resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'codex-app-server-stdio' } }),
+    confirmStart: () => ({ canStart: false }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: () => ({ ok: false }),
+    updateBinding: () => ({ ok: true }),
+    appendEvent: () => ({ ok: true }),
+    listSessions: () => ({ bindings: [{ id: 'binding-1', state: 'ready', scope: { kind: 'task', taskId: 'task-1' } }], events: [] }),
+  });
+
+  const result = await runner.continueTask('binding-1');
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'ACP_SESSION_NOT_FOUND');
+  assert.match(result.message, /Start a new session/);
+  assert.match(result.message, /current task context/);
+});
+
 test('injects the bounded Omvra context pack into a new native session', async () => {
   const prompts = [];
   const bindingInputs = [];

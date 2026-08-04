@@ -81,9 +81,9 @@ export function summarizeAgentRuntimeActivity(events: AgentRuntimeActivityEvent[
 }
 
 export function describeAgentRuntimeSession(bindingState: string, events: AgentRuntimeActivityEvent[]) {
-  if (bindingState === 'failed') return { label: 'Work stopped unexpectedly', detail: 'The agent connection ended before the work finished.', tone: 'danger' as const, isTurnActive: false };
+  if (bindingState === 'failed') return { label: 'Previous runtime unavailable', detail: 'This provider session is no longer connected to Omvra. Start a new session; the current task context is preserved.', tone: 'danger' as const, isTurnActive: false };
   if (bindingState === 'needs-input') return { label: 'Agent is waiting for you', detail: 'The agent cannot continue until you respond.', tone: 'warning' as const, isTurnActive: false };
-  if (bindingState === 'interrupted') return { label: 'Work was interrupted', detail: 'Resume the session to continue this task.', tone: 'warning' as const, isTurnActive: false };
+  if (bindingState === 'interrupted') return { label: 'Work was interrupted', detail: 'The previous runtime may belong to another app process. Resume if available, or start a new session; task context is preserved.', tone: 'warning' as const, isTurnActive: false };
   if (bindingState === 'active') return { label: 'Agent is working', detail: 'The agent is actively working on the task.', tone: 'positive' as const, isTurnActive: true };
   if (bindingState === 'cancelling') return { label: 'Agent is stopping', detail: 'The agent is stopping the current run.', tone: 'warning' as const, isTurnActive: false };
   if (bindingState === 'starting') return { label: 'Agent is starting', detail: 'Omvra is connecting to the assigned agent.', tone: 'neutral' as const, isTurnActive: false };

@@ -29,6 +29,10 @@ function createAgentRuntimeSessionRunner({
     : null;
 
   const failure = (error, message, details = {}) => ({ ok: false, error, message, ...details });
+  const inactiveSession = () => failure(
+    'ACP_SESSION_NOT_FOUND',
+    'This runtime session is not active in the current Omvra app process. It may belong to an earlier app process or provider history state. Start a new session; Omvra will keep the current task context.',
+  );
   const log = (level, event, details = {}) => logger?.[level]?.(`[agent-runtime] ${event}`, details);
   const requestKey = (bindingId, requestId) => `${bindingId}:${typeof requestId}:${String(requestId)}`;
 
@@ -349,7 +353,7 @@ function createAgentRuntimeSessionRunner({
   async function invoke(bindingId, method, text) {
     const current = bindingFor(bindingId);
     const session = clients.get(bindingId);
-    if (!current || !session) return failure('ACP_SESSION_NOT_FOUND', 'The runtime session is not active in this app process.');
+    if (!current || !session) return inactiveSession();
     const ref = current.opaqueSessionRef;
     try {
       const result = method === 'prompt' ? await session.client.prompt(ref, text) : method === 'steer' ? await session.client.steer(ref, text) : await session.client.cancel(ref);
@@ -366,7 +370,7 @@ function createAgentRuntimeSessionRunner({
   async function continueTask(bindingId) {
     const current = bindingFor(bindingId);
     const session = clients.get(bindingId);
-    if (!current || !session) return failure('ACP_SESSION_NOT_FOUND', 'The runtime session is not active in this app process.');
+    if (!current || !session) return inactiveSession();
     if (current.scope?.kind !== 'task') return failure('ACP_CAPABILITY_UNSUPPORTED', 'Only task sessions can be continued from Start work.');
     if (current.state !== 'ready') return failure('ACP_SESSION_BUSY', `Session is ${current.state}.`);
     const contextPack = buildCurrentTaskContext(current);
@@ -384,7 +388,7 @@ function createAgentRuntimeSessionRunner({
   async function respond(bindingId, requestId, result, error) {
     const current = bindingFor(bindingId);
     const session = clients.get(bindingId);
-    if (!current || !session) return failure('ACP_SESSION_NOT_FOUND', 'The runtime session is not active in this app process.');
+    if (!current || !session) return inactiveSession();
     if (requestId === undefined || requestId === null) return failure('ACP_PROTOCOL_INCOMPATIBLE', 'A runtime request ID is required.');
     try {
       session.client.respond(requestId, result, error);

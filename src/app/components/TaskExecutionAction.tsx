@@ -201,7 +201,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const visibleActivity = activity.length > 0 ? activity : binding?.state === 'interrupted'
     ? [{ id: `${binding.id}-interrupted`, label: 'Work was interrupted', detail: 'Start work again to reconnect and continue with the task instructions.', count: 1, tone: 'warning' as const }]
     : binding?.state === 'failed'
-      ? [{ id: `${binding.id}-failed`, label: 'Work stopped unexpectedly', detail: 'The agent connection ended before the work finished.', count: 1, tone: 'danger' as const }]
+      ? [{ id: `${binding.id}-failed`, label: 'Previous runtime unavailable', detail: 'Start a new session to reconnect; the current task context is preserved.', count: 1, tone: 'danger' as const }]
       : [];
   const isTurnActive = sessionSummary?.isTurnActive === true;
   const agentStatusTone = sessionSummary?.tone === 'positive' ? 'success'
@@ -513,7 +513,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             <div className="flex shrink-0 justify-end gap-2">
               <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={() => setOpen(false)}>Close</button>
               {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40">Open externally</button>}
-              {(binding?.state === 'interrupted' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' ? resumeSession() : startWork())} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' ? 'Resume work' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
+              {(binding?.state === 'interrupted' || binding?.state === 'failed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' ? resumeSession() : startWork())} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' ? 'Resume work' : binding?.state === 'failed' ? 'Start new session' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
             </div>
           </SheetFooter>
         </SheetContent>
