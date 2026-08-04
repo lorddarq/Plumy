@@ -310,7 +310,20 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         requestId: request.requestId,
         result: response,
       });
-      if (!result?.ok) throw new Error(result?.message || result?.error || 'Your response could not be submitted.');
+      if (!result?.ok) {
+        if (result.error === 'ACP_SESSION_NOT_FOUND') {
+          const closed = await window.electron?.agentRuntime?.sessions?.close?.(binding.id);
+          if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The unavailable runtime session could not be replaced.');
+          setBinding(null);
+          setEvents([]);
+          setPendingRequests([]);
+          setRequestValues({});
+          setStartRequested(true);
+          toast.info('Starting a fresh runtime session', { description: 'The previous provider session is no longer connected. Your task context is preserved.' });
+          return;
+        }
+        throw new Error(result.message || result.error || 'Your response could not be submitted.');
+      }
       setRequestValues({});
       await refreshSession();
     } catch (caught) {
