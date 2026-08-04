@@ -12,6 +12,7 @@ import { AgentRuntimeNotifications } from './components/AgentRuntimeNotification
 import { OnboardingDialog } from './components/OnboardingDialog.tsx';
 import { hasCompletedOnboarding } from './utils/onboarding.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AgentSessionSupervisorProvider } from './components/AgentSessionSupervisor';
 
 function AppContent() {
   const appShell = useAppShell();
@@ -87,13 +88,15 @@ function AppContent() {
 
   return (
     <>
-      <div className="flex h-dvh flex-col bg-gray-50">
-        <AppHeader {...appShell.headerProps} />
-        <AppMainViews {...appShell.mainViewsProps} />
-        <AppStatusBar {...appShell.statusBarProps} />
-        <AppPanels {...appShell.panelsProps} />
-        <UpdateAvailablePopup {...appShell.updatePopupProps} />
-      </div>
+      <AgentSessionSupervisorProvider>
+        <div className="flex h-dvh flex-col bg-gray-50">
+          <AppHeader {...appShell.headerProps} />
+          <AppMainViews {...appShell.mainViewsProps} />
+          <AppStatusBar {...appShell.statusBarProps} />
+          <AppPanels {...appShell.panelsProps} />
+          <UpdateAvailablePopup {...appShell.updatePopupProps} />
+        </div>
+      </AgentSessionSupervisorProvider>
 
       <DeleteConfirmDialog {...appShell.deleteConfirmProps} />
       <OnboardingDialog open={onboardingOpen} onClose={closeOnboarding} />

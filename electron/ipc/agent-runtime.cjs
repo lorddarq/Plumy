@@ -25,6 +25,7 @@ function registerAgentRuntimeIpcHandlers({
   createAgentRuntimeSessionBinding,
   evaluateAgentRuntimeGovernance,
   listAgentRuntimeSessions,
+  reconcileAgentRuntimeSessions = null,
   prepareAgentExecution,
   prepareAgentRuntimeSessionArchive,
   updateAgentRuntimeSessionBinding,
@@ -82,7 +83,7 @@ function registerAgentRuntimeIpcHandlers({
       return { ...confirmAgentExecutionStart(payload), connection };
     });
   });
-  ipcMain.handle('agent-runtime/sessions/list', (_, payload) => listAgentRuntimeSessions(payload));
+  ipcMain.handle('agent-runtime/sessions/list', (_, payload) => (reconcileAgentRuntimeSessions || listAgentRuntimeSessions)(payload));
   ipcMain.handle('agent-runtime/sessions/requests', (_, bindingId) => listAgentRuntimeSessionRequests(bindingId));
   ipcMain.handle('agent-runtime/sessions/create-binding', (_, payload) => createAgentRuntimeSessionBinding(payload));
   ipcMain.handle('agent-runtime/sessions/update-binding', (_, payload) => updateAgentRuntimeSessionBinding(payload));

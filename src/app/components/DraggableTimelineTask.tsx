@@ -4,7 +4,7 @@ import { Play, Trash2 } from 'lucide-react';
 import { Task } from '../types';
 import { PenWritingIcon } from './icons/PenWritingIcon';
 import { FilesCopyIcon } from './icons/FilesCopyIcon';
-import { TaskExecutionAction } from './TaskExecutionAction';
+import { useAgentSessionSupervisor } from './AgentSessionSupervisor';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -48,7 +48,7 @@ export function DraggableTimelineTask({
   const ref = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
-  const [startWorkRequest, setStartWorkRequest] = useState(0);
+  const { requestTask } = useAgentSessionSupervisor();
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const dragOffsetXRef = useRef(0);
 
@@ -168,7 +168,7 @@ export function DraggableTimelineTask({
           <PenWritingIcon />
           Edit
         </ContextMenuItem>
-        <ContextMenuItem onSelect={() => setStartWorkRequest(request => request + 1)}>
+        <ContextMenuItem onSelect={() => requestTask(task, { repositoryFolder })}>
           <Play />
           Start work
         </ContextMenuItem>
@@ -182,7 +182,6 @@ export function DraggableTimelineTask({
         </ContextMenuItem>
       </ContextMenuContent>
       </ContextMenu>
-      <TaskExecutionAction task={task} repositoryFolder={repositoryFolder} openRequest={startWorkRequest} onOpenRequestHandled={() => setStartWorkRequest(0)} trigger={null} />
     </>
   );
 }

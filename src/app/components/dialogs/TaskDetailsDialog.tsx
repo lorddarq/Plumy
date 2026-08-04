@@ -17,7 +17,7 @@ import { TaskCommentsSection } from '../TaskCommentsSection';
 import { TaskDescriptionSection } from '../TaskDescriptionSection';
 import { TaskContextHistorySection } from '../TaskContextHistorySection';
 import { TaskDetailsActionMenu } from '../TaskDetailsActionMenu';
-import { TaskExecutionAction } from '../TaskExecutionAction';
+import { useAgentSessionSupervisor } from '../AgentSessionSupervisor';
 import { TaskFooterActions } from '../TaskFooterActions';
 import { TaskDependencyDetailsSection, TaskLoadDetailsSection, TaskSummarySection } from '../TaskSummarySection';
 import { AnchoredPanel, AnchoredPanelSection } from '../AnchoredPanel';
@@ -68,7 +68,7 @@ export function TaskDetailsDialog({
   milestones = [],
   readModel,
 }: TaskDetailsDialogProps) {
-  const [startWorkRequest, setStartWorkRequest] = useState(0);
+  const { requestTask } = useAgentSessionSupervisor();
   const [newComment, setNewComment] = useState('');
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -312,8 +312,8 @@ export function TaskDetailsDialog({
               onCopy={handleCopyTaskDetails}
               onExportPdf={handleExportPdf}
               onStartWork={() => {
+                if (task) requestTask(task, { repositoryFolder: swimlanes.find(project => project.id === task.swimlaneId || task.projectIds?.includes(project.id))?.repositoryFolder });
                 onClose();
-                setStartWorkRequest(request => request + 1);
               }}
             />
           )}
@@ -434,15 +434,6 @@ export function TaskDetailsDialog({
             />
           </AnchoredPanelSection>
         </AnchoredPanel>
-        {task && (
-          <TaskExecutionAction
-            task={task}
-            repositoryFolder={swimlanes.find(project => project.id === task.swimlaneId || task.projectIds?.includes(project.id))?.repositoryFolder}
-            openRequest={startWorkRequest}
-            onOpenRequestHandled={() => setStartWorkRequest(0)}
-            trigger={null}
-          />
-        )}
       </DialogSurface>
     </Dialog>
   );

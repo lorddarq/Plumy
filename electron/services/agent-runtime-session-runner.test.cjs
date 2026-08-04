@@ -75,6 +75,7 @@ test('injects the bounded Omvra context pack into a new native session', async (
   const responses = [];
   let storedBinding = null;
   let notify;
+  let lifecycle;
   const statusMoves = [];
   const client = {
     initialize: async () => ({ capabilities: { prompt: true } }),
@@ -89,6 +90,7 @@ test('injects the bounded Omvra context pack into a new native session', async (
       return { accepted: true };
     },
     onNotification: callback => { notify = callback; },
+    onLifecycle: callback => { lifecycle = callback; },
     respond: (requestId, response, error) => { responses.push({ requestId, response, error }); },
   };
   const runner = createAgentRuntimeSessionRunner({
@@ -153,8 +155,11 @@ test('injects the bounded Omvra context pack into a new native session', async (
   assert.equal(storedBinding.state, 'active');
   notify({ method: 'error', params: { error: { message: 'Task tool failed.' }, willRetry: false } });
   assert.equal(events.at(-1).outcome, 'Task tool failed.');
-  notify({ method: 'turn/completed', params: { turn: { status: 'interrupted' } } });
+  lifecycle({ kind: 'exit', code: 'ACP_SESSION_INTERRUPTED' });
   assert.equal(storedBinding.state, 'interrupted');
+  assert.equal(events.at(-1).nativeEventType, 'omvra/runtime/connection-lost');
+  assert.equal(runner.listRequests('binding-1').length, 0);
+  notify({ method: 'turn/completed', params: { turn: { status: 'interrupted' } } });
 });
 
 test('resuming interrupted task work immediately sends the current authoritative task context', async () => {

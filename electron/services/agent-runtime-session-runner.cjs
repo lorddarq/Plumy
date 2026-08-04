@@ -113,6 +113,38 @@ function createAgentRuntimeSessionRunner({
     return result.binding || current;
   }
 
+  function reconcileBindingLoss(bindingId, lifecycle = {}) {
+    clients.delete(bindingId);
+    for (const key of pendingRequests.keys()) if (key.startsWith(`${bindingId}:`)) pendingRequests.delete(key);
+    const current = bindingFor(bindingId);
+    if (!current || ['interrupted', 'closed', 'failed'].includes(current.state)) return current;
+    const reason = lifecycle.code === 'ACP_RUNTIME_MISSING' ? 'runtime-missing' : lifecycle.kind === 'exit' ? 'process-exit' : 'protocol-error';
+    let updated = updateBinding(store, { bindingId, expectedRevision: current.revision, state: 'interrupted', terminalReason: reason });
+    if (!updated.ok && updated.error === 'REVISION_MISMATCH') {
+      const latest = bindingFor(bindingId);
+      if (latest && !['interrupted', 'closed', 'failed'].includes(latest.state)) {
+        updated = updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'interrupted', terminalReason: reason });
+      }
+    }
+    const binding = updated.ok ? updated.binding : bindingFor(bindingId) || current;
+    appendEvent(store, {
+      bindingId,
+      runtimeProfileId: binding.runtimeProfileId,
+      kind: 'session',
+      nativeEventType: 'omvra/runtime/connection-lost',
+      state: 'interrupted',
+      outcome: lifecycle.kind === 'exit' ? 'process-exit' : lifecycle.code || 'transport-error',
+      idempotencyKey: `runtime:${bindingId}:connection-lost:${binding.revision}`,
+    });
+    log('warn', 'session.connection-lost', { bindingId, runtimeProfileId: binding.runtimeProfileId, reason, lastObservedAt: binding.lastObservedAt || null });
+    return binding;
+  }
+
+  function attachClient(binding, client) {
+    client.onLifecycle?.(lifecycle => reconcileBindingLoss(binding.id, lifecycle));
+    client.onNotification?.(message => recordNotification(binding, message));
+  }
+
   function recordNotification(binding, message) {
     const method = typeof message?.method === 'string' ? message.method : 'runtime/notification';
     const lower = method.toLowerCase();
@@ -279,7 +311,7 @@ function createAgentRuntimeSessionRunner({
       log('info', 'runtime.initializing', { bindingId: binding.id, runtimeProfileId: profile.id });
       const negotiated = await client.initialize();
       log('info', 'runtime.initialized', { bindingId: binding.id, authentication: negotiated.authentication || 'unknown', capabilities: Object.keys(negotiated.capabilities || {}).filter(key => negotiated.capabilities[key] === true) });
-      client.onNotification?.(message => recordNotification(binding, message));
+      attachClient(binding, client);
       const session = await client.startSession(mcp.configuration);
       log('info', 'session.created', { bindingId: binding.id });
       const ready = updateBinding(store, {
@@ -345,7 +377,7 @@ function createAgentRuntimeSessionRunner({
     try {
       client = createClient(profileResolution.profile, { workspacePath: payload.workspacePath, logger });
       const negotiated = await client.initialize();
-      client.onNotification?.(message => recordNotification(binding, message));
+      attachClient(binding, client);
       const session = await client.startSession(mcp.configuration);
       const ready = updateBinding(store, {
         bindingId: binding.id,
@@ -436,7 +468,7 @@ function createAgentRuntimeSessionRunner({
     try {
       client = createClient(profileResolution.profile, { workspacePath, logger });
       const negotiated = await client.initialize();
-      client.onNotification?.(message => recordNotification(starting.binding, message));
+      attachClient(starting.binding, client);
       await client.resumeSession(current.opaqueSessionRef, mcp.configuration);
       const ready = updateBinding(store, {
         bindingId,
@@ -490,7 +522,14 @@ function createAgentRuntimeSessionRunner({
     }
   }
 
-  return { close, continueTask, invoke, listRequests, respond, resume, start, startGoalNode };
+  function reconcile() {
+    for (const [bindingId, session] of clients.entries()) {
+      if (typeof session.client.isAlive === 'function' && !session.client.isAlive()) reconcileBindingLoss(bindingId, { code: 'ACP_SESSION_INTERRUPTED', kind: 'error' });
+    }
+    return listSessions(store, { limit: 100 });
+  }
+
+  return { close, continueTask, invoke, listRequests, reconcile, respond, resume, start, startGoalNode };
 }
 
 module.exports = { createAgentRuntimeSessionRunner };

@@ -75,6 +75,7 @@ class JsonLineTransport {
     this.closed = false;
     this.jsonRpc = options.jsonRpc === true;
     this.logger = options.logger || null;
+    this.lifecycleListeners = new Set();
     const spawnProcess = options.spawnProcess || spawn;
     this.logger?.info?.('[agent-runtime:transport] process.starting', { executable: path.basename(command), workspacePath: options.workspacePath });
     this.child = spawnProcess(command, args, {
@@ -88,13 +89,13 @@ class JsonLineTransport {
     this.child.stderr?.on('data', chunk => { this.stderr = `${this.stderr}${chunk}`.slice(-2048); });
     this.child.once('error', error => {
       this.logger?.error?.('[agent-runtime:transport] process.error', { code: error.code || null, message: error.message || String(error) });
-      this.#fail(runtimeError(error.code === 'ENOENT' ? 'ACP_RUNTIME_MISSING' : 'ACP_RUNTIME_UNAVAILABLE', error.message));
+      this.#fail(runtimeError(error.code === 'ENOENT' ? 'ACP_RUNTIME_MISSING' : 'ACP_RUNTIME_UNAVAILABLE', error.message), { kind: 'error', processCode: error.code || null });
     });
     this.child.once('exit', code => {
       if (!this.closed) {
         const detail = this.stderr.trim();
         this.logger?.error?.('[agent-runtime:transport] process.exited', { code: code ?? null, stderr: detail || null });
-        this.#fail(runtimeError('ACP_SESSION_INTERRUPTED', `Runtime exited unexpectedly (${code ?? 'unknown'}).${detail ? ` ${detail}` : ''}`));
+        this.#fail(runtimeError('ACP_SESSION_INTERRUPTED', `Runtime exited unexpectedly (${code ?? 'unknown'}).${detail ? ` ${detail}` : ''}`), { kind: 'exit', processCode: code ?? null });
       }
     });
   }
@@ -102,6 +103,11 @@ class JsonLineTransport {
   onNotification(listener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  onLifecycle(listener) {
+    this.lifecycleListeners.add(listener);
+    return () => this.lifecycleListeners.delete(listener);
   }
 
   request(method, params = {}, timeoutMs = this.timeoutMs) {
@@ -198,9 +204,10 @@ class JsonLineTransport {
     this.pending.clear();
   }
 
-  #fail(error) {
+  #fail(error, details = {}) {
     if (this.closed) return;
     this.closed = true;
+    for (const listener of this.lifecycleListeners) listener({ state: 'lost', code: error.code || 'ACP_RUNTIME_UNAVAILABLE', ...details });
     if (this.child && !this.child.killed) this.child.kill();
     this.#rejectPending(error);
   }
@@ -250,6 +257,8 @@ class AcpStdioClient {
   }
 
   onNotification(listener) { return this.transport.onNotification(listener); }
+  onLifecycle(listener) { return this.transport.onLifecycle(listener); }
+  isAlive() { return !this.transport.closed; }
   respond(id, result, error) { return this.transport.respond(id, result, error); }
 
   async initialize() {
@@ -332,6 +341,8 @@ class CodexAppServerClient {
   }
 
   onNotification(listener) { return this.transport.onNotification(listener); }
+  onLifecycle(listener) { return this.transport.onLifecycle(listener); }
+  isAlive() { return !this.transport.closed; }
   respond(id, result, error) { return this.transport.respond(id, result, error); }
 
   async initialize() {
@@ -448,6 +459,13 @@ class ClaudeStreamJsonClient {
     if (!this.transport) throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session has not started.');
     return this.transport.onNotification(listener);
   }
+
+  onLifecycle(listener) {
+    if (!this.transport) throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session has not started.');
+    return this.transport.onLifecycle(listener);
+  }
+
+  isAlive() { return Boolean(this.transport && !this.transport.closed); }
 
   prompt(_sessionId, text) {
     if (!this.transport) throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session has not started.');

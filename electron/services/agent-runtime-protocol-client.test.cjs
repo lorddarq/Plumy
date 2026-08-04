@@ -208,6 +208,18 @@ test('transport rejects malformed runtime messages and bounds pending requests',
   await Promise.all(pending);
 });
 
+test('transport reports an idle provider exit even with no pending request', async () => {
+  const child = createChild(() => {});
+  const lifecycle = [];
+  const transport = new JsonLineTransport('/usr/bin/fixture', [], {
+    workspacePath: '/tmp/workspace', spawnProcess: () => child, timeoutMs: 100,
+  });
+  transport.onLifecycle(event => lifecycle.push(event));
+  child.emit('exit', 23);
+  assert.equal(transport.closed, true);
+  assert.deepEqual(lifecycle, [{ state: 'lost', code: 'ACP_SESSION_INTERRUPTED', kind: 'exit', processCode: 23 }]);
+});
+
 test('runtime process exit rejects active requests instead of leaving a falsely active client', async () => {
   const child = createChild(() => {});
   const logs = [];

@@ -68,6 +68,7 @@ interface TaskExecutionActionProps {
   openRequest?: number;
   onOpenRequestHandled?: () => void;
   startOnTrigger?: boolean;
+  startOnOpenRequest?: boolean;
   onOpen?: () => void;
 }
 
@@ -86,7 +87,7 @@ function taskStatusLabel(status: Task['status']) {
   return 'Open';
 }
 
-export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, startOnTrigger = false, onOpen }: TaskExecutionActionProps) {
+export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
   const [open, setOpen] = useState(false);
   const [startRequested, setStartRequested] = useState(false);
   const [sessionLoaded, setSessionLoaded] = useState(false);
@@ -122,11 +123,11 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
 
   useEffect(() => {
     if (openRequest) {
-      setStartRequested(true);
+      setStartRequested(startOnOpenRequest);
       setOpen(true);
       onOpenRequestHandled?.();
     }
-  }, [onOpenRequestHandled, openRequest]);
+  }, [onOpenRequestHandled, openRequest, startOnOpenRequest]);
 
   useEffect(() => {
     if (!open || !window.electron?.agentRuntime) return;
@@ -513,7 +514,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             <div className="flex shrink-0 justify-end gap-2">
               <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={() => setOpen(false)}>Close</button>
               {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40">Open externally</button>}
-              {(binding?.state === 'interrupted' || binding?.state === 'failed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' ? resumeSession() : startWork())} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' ? 'Resume work' : binding?.state === 'failed' ? 'Start new session' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
+              {(binding?.state === 'interrupted' || binding?.state === 'failed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume work' : binding?.state === 'interrupted' ? 'Start new session' : binding?.state === 'failed' ? 'Start new session' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
             </div>
           </SheetFooter>
         </SheetContent>
