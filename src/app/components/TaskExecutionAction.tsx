@@ -342,7 +342,19 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setError(null);
     try {
       const result = await window.electron?.agentRuntime?.sessions?.continueTask?.(binding.id);
-      if (!result?.ok) throw new Error(result?.message || result?.error || 'Work could not be continued.');
+      if (!result?.ok) {
+        if (result.error === 'ACP_SESSION_NOT_FOUND') {
+          const closed = await window.electron?.agentRuntime?.sessions?.close?.(binding.id);
+          if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The unavailable runtime session could not be replaced.');
+          setBinding(null);
+          setEvents([]);
+          setPendingRequests([]);
+          setStartRequested(true);
+          toast.info('Starting a fresh runtime session', { description: 'The previous provider session is no longer connected. Your task context is preserved.' });
+          return;
+        }
+        throw new Error(result.message || result.error || 'Work could not be continued.');
+      }
       await refreshSession();
       toast.success('Agent continued work', { description: task.title });
     } catch (caught) {
