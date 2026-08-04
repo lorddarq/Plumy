@@ -88,15 +88,13 @@ function AppContent() {
 
   return (
     <>
-      <AgentSessionSupervisorProvider>
-        <div className="flex h-dvh flex-col bg-gray-50">
-          <AppHeader {...appShell.headerProps} />
-          <AppMainViews {...appShell.mainViewsProps} />
-          <AppStatusBar {...appShell.statusBarProps} />
-          <AppPanels {...appShell.panelsProps} />
-          <UpdateAvailablePopup {...appShell.updatePopupProps} />
-        </div>
-      </AgentSessionSupervisorProvider>
+      <div className="flex h-dvh flex-col bg-gray-50">
+        <AppHeader {...appShell.headerProps} />
+        <AppMainViews {...appShell.mainViewsProps} />
+        <AppStatusBar {...appShell.statusBarProps} />
+        <AppPanels {...appShell.panelsProps} />
+        <UpdateAvailablePopup {...appShell.updatePopupProps} />
+      </div>
 
       <DeleteConfirmDialog {...appShell.deleteConfirmProps} />
       <OnboardingDialog open={onboardingOpen} onClose={closeOnboarding} />
@@ -122,7 +120,9 @@ function AppStoreShell() {
       milestones={milestones}
     >
       <AgentRuntimeNotifications tasks={tasks} />
-      <AppContent />
+      <AgentSessionSupervisorProvider>
+        <AppContent />
+      </AgentSessionSupervisorProvider>
     </UiLayoutStoreProvider>
   );
 }

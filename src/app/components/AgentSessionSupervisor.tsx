@@ -38,6 +38,7 @@ export function AgentSessionSupervisorProvider({ children }: { children: ReactNo
       {children}
       {request && (
         <TaskExecutionAction
+          key={request.requestId}
           task={request.task}
           repositoryFolder={request.repositoryFolder}
           openRequest={request.requestId}

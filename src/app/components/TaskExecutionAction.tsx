@@ -217,7 +217,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     if (!index?.ok) {
       console.warn('[agent-runtime:ui] session-refresh.rejected', { taskId: task.id, error: index?.error || 'Session list unavailable.' });
       setSessionLoaded(true);
-      return;
+      return null;
     }
     const nextBinding = (index.bindings || []).findLast((candidate: SessionBinding) => candidate.scope?.taskId === task.id) || null;
     if (!nextBinding) {
@@ -226,7 +226,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       setPendingRequests([]);
       setHasMoreEvents(false);
       setSessionLoaded(true);
-      return;
+      return null;
     }
     const detail = await window.electron?.agentRuntime?.sessions?.list?.({ bindingId: nextBinding.id, limit: 100 });
     const requests = await window.electron?.agentRuntime?.sessions?.requests?.(nextBinding.id);
@@ -235,6 +235,20 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setPendingRequests(Array.isArray(requests) ? requests as PendingRuntimeRequest[] : []);
     setHasMoreEvents(Boolean(detail?.hasMore));
     setSessionLoaded(true);
+    return (detail?.bindings || [nextBinding])[0] || nextBinding;
+  };
+
+  const recoverOrphanedSession = async (bindingId: string) => {
+    const closed = await window.electron?.agentRuntime?.sessions?.close?.(bindingId);
+    if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The unavailable runtime session could not be replaced.');
+    setBinding(null);
+    setEvents([]);
+    setPendingRequests([]);
+    const replacement = await refreshSession();
+    if (!replacement || !['starting', 'ready', 'active', 'needs-input', 'cancelling'].includes(replacement.state)) {
+      setStartRequested(true);
+    }
+    toast.info('Runtime session recovered', { description: 'The previous provider session was replaced while preserving your task context.' });
   };
 
   const startWork = async (replaceBinding = false) => {
@@ -312,14 +326,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       });
       if (!result?.ok) {
         if (result.error === 'ACP_SESSION_NOT_FOUND') {
-          const closed = await window.electron?.agentRuntime?.sessions?.close?.(binding.id);
-          if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The unavailable runtime session could not be replaced.');
-          setBinding(null);
-          setEvents([]);
-          setPendingRequests([]);
           setRequestValues({});
-          setStartRequested(true);
-          toast.info('Starting a fresh runtime session', { description: 'The previous provider session is no longer connected. Your task context is preserved.' });
+          await recoverOrphanedSession(binding.id);
           return;
         }
         throw new Error(result.message || result.error || 'Your response could not be submitted.');
@@ -357,13 +365,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       const result = await window.electron?.agentRuntime?.sessions?.continueTask?.(binding.id);
       if (!result?.ok) {
         if (result.error === 'ACP_SESSION_NOT_FOUND') {
-          const closed = await window.electron?.agentRuntime?.sessions?.close?.(binding.id);
-          if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The unavailable runtime session could not be replaced.');
-          setBinding(null);
-          setEvents([]);
-          setPendingRequests([]);
-          setStartRequested(true);
-          toast.info('Starting a fresh runtime session', { description: 'The previous provider session is no longer connected. Your task context is preserved.' });
+          await recoverOrphanedSession(binding.id);
           return;
         }
         throw new Error(result.message || result.error || 'Work could not be continued.');
