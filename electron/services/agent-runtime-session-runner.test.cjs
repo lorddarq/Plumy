@@ -75,6 +75,7 @@ test('injects the bounded Omvra context pack into a new native session', async (
   const responses = [];
   let storedBinding = null;
   let notify;
+  const statusMoves = [];
   const client = {
     initialize: async () => ({ capabilities: { prompt: true } }),
     startSession: async () => {
@@ -101,6 +102,10 @@ test('injects the bounded Omvra context pack into a new native session', async (
       contractDigest: 'digest',
     }),
     transitionContribution: () => ({ ok: true }),
+    moveTaskToStatus: (_store, input) => {
+      statusMoves.push(input);
+      return { ok: true, task: { __mcpRevision: input.expectedRevision + 1, status: 'in-progress' } };
+    },
     createBinding: (_store, input) => {
       bindingInputs.push(input);
       storedBinding = { id: 'binding-1', revision: 0, runtimeProfileId: 'runtime-1', state: 'starting', scope: { kind: 'task', taskId: 'task-1' } };
@@ -120,6 +125,13 @@ test('injects the bounded Omvra context pack into a new native session', async (
 
   const result = await runner.start({ confirmed: true, taskId: 'task-1', workspacePath: '/tmp/workspace', idempotencyKey: 'start-1' });
   assert.equal(result.ok, true);
+  assert.deepEqual(statusMoves[0], {
+    taskId: 'task-1',
+    statusId: 'in-progress',
+    statusTitle: 'In Progress',
+    expectedRevision: 4,
+    actor: 'agent-runtime',
+  });
   assert.equal(bindingInputs[0].extensions.workspacePath, '/tmp/workspace');
   assert.equal(prompts.length, 1);
   assert.match(prompts[0], /Continue from accepted checkpoint/);

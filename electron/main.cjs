@@ -76,6 +76,7 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   resolveProfile: resolveAgentRuntimeProfile,
   confirmStart: (runtimeStore, payload) => confirmAgentExecutionStart(runtimeStore, payload),
   transitionContribution: (runtimeStore, payload) => require('./services/workspace-service.cjs').transitionTaskContribution(runtimeStore, payload),
+  moveTaskToStatus: (runtimeStore, payload) => require('./services/workspace-service.cjs').moveTaskToStatus(runtimeStore, payload),
   createBinding: (runtimeStore, payload) => createAgentRuntimeSessionBinding(runtimeStore, payload),
   updateBinding: (runtimeStore, payload) => updateAgentRuntimeSessionBinding(runtimeStore, payload),
   appendEvent: (runtimeStore, payload) => appendAgentRuntimeEvent(runtimeStore, payload),

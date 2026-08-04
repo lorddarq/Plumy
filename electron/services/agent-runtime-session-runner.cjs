@@ -9,6 +9,7 @@ function createAgentRuntimeSessionRunner({
   resolveProfile,
   confirmStart,
   transitionContribution,
+  moveTaskToStatus = null,
   createBinding,
   updateBinding,
   appendEvent,
@@ -209,14 +210,28 @@ function createAgentRuntimeSessionRunner({
     const mcp = prepareMcp(profile, scope);
     if (!mcp.ok) return failure(mcp.error, mcp.message, { preflight: confirmed });
     const actorPersonId = payload.actorPersonId || confirmed.task?.assigneeId || confirmed.context?.assignee?.id;
-    const latestRevision = Number(confirmed.task?.__mcpRevision || confirmed.contractSnapshot.taskRevision);
+    let latestRevision = Number(confirmed.task?.__mcpRevision ?? confirmed.contractSnapshot.taskRevision);
+    let started = { ok: true, task: confirmed.task };
+    if (typeof moveTaskToStatus === 'function') {
+      const moved = moveTaskToStatus(store, {
+        taskId: confirmed.contractSnapshot.taskId,
+        statusId: 'in-progress',
+        statusTitle: 'In Progress',
+        expectedRevision: latestRevision,
+        actor: 'agent-runtime',
+      });
+      if (!moved?.ok) {
+        return failure(moved?.error || 'TASK_STATUS_UPDATE_FAILED', moved?.message || 'The task could not be moved to In Progress.', { preflight: confirmed });
+      }
+      latestRevision = Number(moved.task?.__mcpRevision ?? latestRevision);
+      started = { ...started, task: moved.task || started.task };
+    }
     const transitionBase = {
       taskId: confirmed.contractSnapshot.taskId,
       contributionId: confirmed.contractSnapshot.contributionId,
       actorPersonId,
       expectedRevision: latestRevision,
     };
-    let started = { ok: true, task: confirmed.task };
     if (confirmed.contractSnapshot.contributionId) {
       const acknowledged = transitionContribution(store, { ...transitionBase, command: 'acknowledge', idempotencyKey: `${payload.idempotencyKey}:acknowledge` });
       if (!acknowledged.ok) return failure(acknowledged.error, acknowledged.message || 'The contribution could not be acknowledged.', { preflight: confirmed });
