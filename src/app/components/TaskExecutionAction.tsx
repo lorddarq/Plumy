@@ -113,7 +113,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const startableContribution = task.collaboration?.contributions?.find(contribution =>
     contribution.state === 'pending' || contribution.state === 'revision-requested'
   );
-  const activeAttempt = Boolean(binding) || (Boolean(activeContribution?.latestAttemptId) && (
+  const terminalBinding = binding?.state === 'closed' || binding?.state === 'failed';
+  const activeAttempt = Boolean(binding && !terminalBinding) || (Boolean(activeContribution?.latestAttemptId) && (
     !preflight || preflight.blockers?.some(blocker => blocker.code === 'ACP_EXECUTION_ALREADY_ACTIVE') === true
   ));
   const executionContributionId = preflight?.contractSnapshot?.contributionId || startableContribution?.id;
@@ -550,7 +551,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             <div className="flex shrink-0 justify-end gap-2">
               <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={() => setOpen(false)}>Close</button>
               {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40">Open externally</button>}
-              {(binding?.state === 'interrupted' || binding?.state === 'failed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume work' : binding?.state === 'interrupted' ? 'Start new session' : binding?.state === 'failed' ? 'Start new session' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
+              {(binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume work' : binding?.state === 'interrupted' || terminalBinding ? 'Start new session' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
             </div>
           </SheetFooter>
         </SheetContent>
