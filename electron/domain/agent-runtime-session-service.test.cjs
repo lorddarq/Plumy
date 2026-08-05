@@ -44,6 +44,20 @@ test('session bindings are provider-neutral, revisioned, idempotent, and keep on
   assert.equal(state.bindings.length, 1);
 });
 
+test('session bindings enforce one active session across task and Goal-node scopes', () => {
+  const { service } = harness();
+  const first = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'task-binding' });
+  const second = service.createBinding(null, {
+    runtimeProfileId: 'runtime-1',
+    scope: { kind: 'goal-node', goalId: 'goal-1', goalElementId: 'node-1', goalExecutionId: 'execution-1', executionAttempt: 0, goalRevision: 1 },
+    idempotencyKey: 'goal-binding',
+  });
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, false);
+  assert.equal(second.error, 'ACP_EXECUTION_ALREADY_ACTIVE');
+  assert.equal(second.bindingId, first.binding.id);
+});
+
 test('a completed model turn returns an active session to ready', () => {
   const { service } = harness();
   const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
@@ -122,10 +136,10 @@ test('usage preserves missing versus measured zero and ambiguous aggregation rem
 });
 
 test('governance returns bounded cancel pause and warning decisions without automatic retry', () => {
-  const { service } = harness();
+  const { service, state } = harness();
   const first = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
   const secondScope = { ...scope, executionAttemptId: 'attempt-2' };
-  service.createBinding(null, { runtimeProfileId: 'runtime-1', scope: secondScope, idempotencyKey: 'binding-2' });
+  state.bindings.push({ ...first, id: 'binding-2', idempotencyKey: 'binding-2', scope: secondScope });
   service.appendEvent(null, { bindingId: first.id, runtimeProfileId: 'runtime-1', kind: 'turn', idempotencyKey: 'turn-1' });
   service.appendEvent(null, { bindingId: first.id, runtimeProfileId: 'runtime-1', kind: 'turn', idempotencyKey: 'turn-2' });
   service.appendEvent(null, { bindingId: first.id, runtimeProfileId: 'runtime-1', kind: 'tool', idempotencyKey: 'tool-1' });

@@ -1,18 +1,66 @@
 # Agent Session Supervision, Launch Routing, and Concurrency
 
-Date: 2026-08-04
-Status: proposed implementation plan
+Date: 2026-08-05
+Status: authoritative product and roadmap handoff
 Scope: Omvra desktop ACP/runtime sessions launched from Task Details, Kanban, Roadmap, Timeline, and Goal surfaces
+
+Related source contracts:
+
+- [ACP runtime/session lifecycle contract](./acp-runtime-session-lifecycle-contract.md) — provider-neutral runtime, binding, recovery, MCP-grant, and privacy rules.
+- [Task orchestration and multi-agent collaboration](./task-orchestration-and-multi-agent-collaboration.md) — contribution attempts, evidence, revisions, dependencies, and human acceptance.
+- [Omvra product polish task list](../plans/OMVRA-POLISH-TASK-LIST.md) — umbrella visual and interaction rollout; this work contributes to P0.2, P0.3, and P0.4.
 
 ## Executive decision
 
-Omvra should have one app-level session supervisor and one active local agent session at a time.
+For the first-release supervision experience, Omvra has one app-level session supervisor and one active local agent session at a time.
 
 The supervisor must remain mounted independently of task dialogs, milestone sheets, Kanban cards, and Roadmap panels. Those surfaces should request supervision for a task or Goal node; they must not own the ACP session panel or its lifecycle.
 
 Closing the supervisor must mean **hide/minimize**. It must not cancel the runtime or close the provider connection. Cancellation and provider-session termination must be separate, explicit actions.
 
 The one-session limit is an intentional first-release operating constraint. It protects local CPU/memory, avoids ambiguous MCP writes, keeps repository execution predictable, and creates a simpler user model. The limit must be enforced in the main process, not only by disabling buttons in the renderer.
+
+This is a supervision-product policy, not a rewrite of the provider-neutral runtime contract. The runtime remains capable of representing one binding per execution attempt and provider-specific capabilities; enabling concurrent sessions later requires a separately accepted capacity and UX decision. It is not implied by this handoff.
+
+## Scope, non-goals, and ownership
+
+### In scope
+
+- One app-level renderer supervisor with stable visibility, reopen, hide, cancel, and end-session semantics.
+- Main-process enforcement of one active task or Goal-node session across all launch surfaces.
+- A normalized session registry and bounded event projection that remain available when the originating dialog, sheet, card, or panel unmounts.
+- Provider liveness, interruption, recovery, and resumability signals for the supported local provider profiles.
+- Rollout and QA evidence for the existing provider-neutral runtime, task contribution lifecycle, Goal lifecycle, and polish surfaces.
+
+### Non-goals
+
+- No cloud synchronization, remote/shared agent pool, HTTP/WebSocket runtime gateway, or provider credential service.
+- No automatic task completion, contribution acceptance, Goal completion, dependency advancement, or human acceptance from ACP events, provider completion, session close, or session cancellation.
+- No watcher-triggered launch, automatic retry/relaunch, silent provider failover, transcript persistence, or second runtime/persistence abstraction.
+- No removal of the broader provider-neutral capability model; unsupported provider capabilities remain unavailable rather than simulated.
+
+### State ownership and acceptance ownership
+
+These states remain separate and must be reported separately:
+
+| State | Authority | What may change it | What it cannot imply |
+| --- | --- | --- | --- |
+| Task contribution/attempt | Existing task collaboration lifecycle | Governed task commands with current revision, evidence, and dependency rules | ACP session health or human acceptance |
+| ACP session/binding | Main-process runtime/session service | Explicit start, resume, cancel, provider events, liveness, and end-session commands | Contribution submission, task status, Goal completion, or acceptance |
+| Human acceptance/review | Existing trusted human/task or Goal acceptance path | Human review/approval commands and required evidence | Provider completion or agent-authored notes alone |
+
+Goal acknowledgement, dispatch, retry, pause, evidence, handoff, approval, and completion remain owned by the Goal lifecycle. The session supervisor is a visibility and runtime-control surface; it is not a Goal state machine or task database.
+
+### Dependencies and acceptance ownership
+
+- **Runtime/session owner:** Electron main-process session service and native protocol clients, governed by the [ACP runtime/session lifecycle contract](./acp-runtime-session-lifecycle-contract.md).
+- **Task contribution owner:** existing task collaboration lifecycle and revision-protected task commands, governed by the [task orchestration contract](./task-orchestration-and-multi-agent-collaboration.md).
+- **Goal owner:** existing Goal lifecycle service and approval/evidence gates; ACP only binds to the immutable Goal execution attempt.
+- **Renderer owner:** the app-level `AgentSessionSupervisor`; launch surfaces issue requests and do not own session lifecycle.
+- **Product/human acceptance owner:** the human reviewer and existing task/Goal acceptance path. Engineering QA may report evidence and blockers but cannot accept the work on behalf of the product owner.
+- **Release/architecture dependency:** integration QA `task-f6e301e0-9137-4d53-8469-f52536404d18`; ACP release QA `task-0e98041c-40d4-4c00-86b7-d9c2022e615e`; post-ACP consolidation entry `task-b5f23e60-4174-431b-b5a5-d939ed8fb4f6` remains downstream of release QA.
+
+The one-session rule applies to explicit task/contribution and Goal-node starts in this first-release supervision surface. It does not authorize cloud coordination or automatic dispatch, and it does not alter the durable identities, revisions, evidence, dependency gates, or acceptance rules of those existing lifecycles.
 
 ## Evidence and diagnosis
 
@@ -258,7 +306,17 @@ Opaque provider session references must remain outside renderer-authored durable
 - Main-process tests cover task plus Goal-node global concurrency and slot release after terminal states.
 - Manual QA covers Kanban, Roadmap, Timeline, Task Details, Goals, hidden active work, pending input, failure, resume, cancel, and restart/reopen behavior.
 - Build and relevant MCP/runtime contract tests pass.
-- No raw provider transcript or hidden reasoning is persisted or displayed as activity.
+
+## Rollout sequence and QA handoff
+
+1. **Contract gate:** preserve the provider-neutral runtime/session contract, task contribution revisions/evidence, Goal lifecycle gates, scoped MCP access, and local-only boundaries. No implementation work starts if the change requires a second source of truth.
+2. **Main-process gate:** implement and test the global one-session reservation, provider liveness/recovery, terminal slot release, and deterministic second-start rejection for task and Goal-node scopes.
+3. **Supervisor gate:** route Task Details, Kanban, Roadmap, Timeline, and Goals through the app-level supervisor; verify parent unmount, hide/reopen, pending input, cancel, end-session, and status-dock discovery.
+4. **Lifecycle gate:** verify that session events and provider completion do not mutate contribution acceptance, task completion, Goal completion, dependencies, or human review state without their existing governed commands.
+5. **Polish gate:** include the guided execution, attention hierarchy, terminology, keyboard/focus, reduced-motion, contrast, narrow-width, and error-state checks in [P0.2–P0.4 of the Omvra polish umbrella](../plans/OMVRA-POLISH-TASK-LIST.md). Findings must retain surface, reproduction, severity, evidence, and owner.
+6. **Release handoff:** attach runtime contract results, focused renderer/main-process results, provider-specific Codex and Claude recovery evidence, and the manual QA report to ACP release QA `task-0e98041c-40d4-4c00-86b7-d9c2022e615e` and integration QA `task-f6e301e0-9137-4d53-8469-f52536404d18`. Only after those gates may post-ACP consolidation `task-b5f23e60-4174-431b-b5a5-d939ed8fb4f6` audit the implemented boundaries.
+
+QA handoff is evidence for review, not acceptance. The task contribution, ACP session, and human acceptance states must be re-read independently in the persisted model before release sign-off. A passing provider/session test is insufficient to mark a task or Goal complete.
 
 ## Non-goals
 

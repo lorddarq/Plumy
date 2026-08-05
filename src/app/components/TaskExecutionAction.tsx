@@ -475,7 +475,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
               </div>
             )}
             {binding && (
-              <div className="flex min-h-0 flex-1 flex-col rounded-md border border-slate-200 p-3">
+              <div className="flex min-h-0 flex-1 flex-col">
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Agent status <StateBadge label={sessionSummary?.label || 'Unavailable'} value="" tone={agentStatusTone} title={sessionSummary?.detail} /></div>
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Task status <StateBadge label={taskStatusLabel(task.status)} value="" tone={task.status === 'done' ? 'success' : task.status === 'under-review' ? 'warning' : task.status === 'in-progress' ? 'success' : 'muted'} /></div>
@@ -508,7 +508,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between"><div className="text-xs font-semibold text-slate-700">Agent activity</div><div className="text-[11px] text-slate-400">Task progress only</div></div>
-                <div className="mt-2 min-h-24 flex-1 space-y-1 overflow-auto rounded border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600" aria-live="polite">
+                <div className="mt-2 min-h-24 flex-1 space-y-1 overflow-auto rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600" aria-live="polite">
                   {visibleActivity.length ? visibleActivity.map(item => <div key={item.id} className="flex items-start gap-2 rounded px-1.5 py-1.5">
                     <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${item.tone === 'danger' ? 'bg-red-500' : item.tone === 'warning' ? 'bg-amber-500' : item.tone === 'positive' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                     <div className="min-w-0 flex-1"><div className="font-medium text-slate-700">{item.label}{item.count > 1 ? ` × ${item.count}` : ''}</div>{item.detail && <div className="mt-0.5 text-[11px] text-slate-500">{item.detail}</div>}</div>

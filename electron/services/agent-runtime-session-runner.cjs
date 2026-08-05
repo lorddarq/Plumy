@@ -36,6 +36,16 @@ function createAgentRuntimeSessionRunner({
   );
   const log = (level, event, details = {}) => logger?.[level]?.(`[agent-runtime] ${event}`, details);
   const requestKey = (bindingId, requestId) => `${bindingId}:${typeof requestId}:${String(requestId)}`;
+  const safeBinding = binding => {
+    const { opaqueSessionRef: _opaqueSessionRef, mcpGrantId: _mcpGrantId, ...safe } = binding;
+    return safe;
+  };
+  const activeSession = () => (listSessions(store, { activeOnly: true, limit: 1 })?.bindings || []).find(binding => ACTIVE_STATES.has(binding.state));
+  const activeSessionFailure = binding => failure(
+    'ACP_EXECUTION_ALREADY_ACTIVE',
+    'Another runtime session is already active. Open its supervision before starting new work.',
+    { bindingId: binding.id, binding: safeBinding(binding) },
+  );
 
   function prepareMcp(profile, scope) {
     if (typeof issueMcpGrant !== 'function') return { ok: true, grant: null, configuration: {} };
@@ -238,11 +248,10 @@ function createAgentRuntimeSessionRunner({
       return failure('ACP_REPOSITORY_FOLDER_REQUIRED', 'A repository folder is required before starting work.');
     }
 
-    const existingSessions = listSessions(store, { limit: 100 });
-    const activeExisting = (existingSessions?.bindings || []).find(binding => binding.scope?.kind === 'task' && binding.scope.taskId === payload.taskId && ACTIVE_STATES.has(binding.state));
+    const activeExisting = activeSession();
     if (activeExisting) {
       log('warn', 'start.rejected', { taskId: payload.taskId, bindingId: activeExisting.id, error: 'ACP_EXECUTION_ALREADY_ACTIVE' });
-      return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'This task already has an active runtime session.', { bindingId: activeExisting.id, binding: activeExisting });
+      return activeSessionFailure(activeExisting);
     }
 
     const confirmed = confirmStart(store, payload);
@@ -374,12 +383,8 @@ function createAgentRuntimeSessionRunner({
     const goalRevision = Number(payload.goalRevision);
     const executionAttempt = Number(payload.executionAttempt);
     if (!Number.isInteger(goalRevision) || goalRevision < 0 || !Number.isInteger(executionAttempt) || executionAttempt < 0) return failure('ACP_GOAL_SCOPE_REQUIRED', 'Goal revision and execution attempt are required.');
-    const existingSessions = listSessions(store, { limit: 100 });
-    const activeExisting = (existingSessions?.bindings || []).find(binding => binding.scope?.kind === 'goal-node'
-      && binding.scope.goalId === payload.goalId && binding.scope.goalElementId === payload.goalElementId
-      && binding.scope.goalExecutionId === payload.goalExecutionId && binding.scope.executionAttempt === executionAttempt
-      && ACTIVE_STATES.has(binding.state));
-    if (activeExisting) return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'This Goal agent-node already has an active runtime session.', { bindingId: activeExisting.id, binding: activeExisting });
+    const activeExisting = activeSession();
+    if (activeExisting) return activeSessionFailure(activeExisting);
     const profileResolution = resolveProfile(store, payload);
     if (!profileResolution.ok || !profileResolution.profile) {
       if (profileResolution.state === 'disabled') return failure('ACP_RUNTIME_ACCESS_DISABLED', profileResolution.error, { state: 'disabled' });

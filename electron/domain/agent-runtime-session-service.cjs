@@ -51,6 +51,19 @@ function createAgentRuntimeSessionService({
 
   const failure = (error, message, details = {}) => ({ ok: false, error, message, ...details });
   const clone = value => JSON.parse(JSON.stringify(value));
+  const safeBinding = binding => clone({
+    schemaVersion: binding.schemaVersion,
+    id: binding.id,
+    revision: binding.revision,
+    runtimeProfileId: binding.runtimeProfileId,
+    scope: binding.scope,
+    state: binding.state,
+    capabilities: binding.capabilities,
+    createdAt: binding.createdAt,
+    updatedAt: binding.updatedAt,
+    lastObservedAt: binding.lastObservedAt,
+    ...(binding.terminalReason ? { terminalReason: binding.terminalReason } : {}),
+  });
 
   function safeIdentifier(value, maxLength = 160) {
     const normalized = normalizeString(value);
@@ -131,8 +144,8 @@ function createAgentRuntimeSessionService({
       if (!attached.ok) return { ...attached, binding: clone(existing), reconciliationRequired: true };
       return { ok: true, idempotent: true, binding: clone(existing) };
     }
-    const active = bindings.find(item => item.scope?.executionAttemptId === scope.executionAttemptId && ACTIVE_STATES.has(item.state));
-    if (active) return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'This execution attempt already has an active session binding.', { bindingId: active.id });
+    const active = bindings.find(item => ACTIVE_STATES.has(item.state));
+    if (active) return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'Another runtime session is already active. Open its supervision before starting new work.', { bindingId: active.id, binding: safeBinding(active) });
     const timestamp = now();
     const binding = {
       schemaVersion: SESSION_SCHEMA_VERSION,
@@ -422,7 +435,9 @@ function createAgentRuntimeSessionService({
   function list(store, input = {}) {
     const bindingId = normalizeString(input.bindingId);
     const limit = Number.isFinite(Number(input.limit)) ? Math.max(1, Math.min(MAX_READ_LIMIT, Math.floor(Number(input.limit)))) : 50;
-    const bindings = (Array.isArray(readBindings(store)) ? readBindings(store) : []).filter(item => !bindingId || item.id === bindingId);
+    const bindings = (Array.isArray(readBindings(store)) ? readBindings(store) : [])
+      .filter(item => !bindingId || item.id === bindingId)
+      .filter(item => input.activeOnly !== true || ACTIVE_STATES.has(item.state));
     const bindingIds = new Set(bindings.map(item => item.id));
     const events = (Array.isArray(readEvents(store)) ? readEvents(store) : []).filter(item => bindingIds.has(item.bindingId));
     return { ok: true, bindings: clone(bindings.slice(-limit)), events: clone(events.slice(-limit)), hasMore: bindings.length > limit || events.length > limit };
