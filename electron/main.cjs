@@ -466,6 +466,10 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
+  if (!app.isReady()) {
+    console.warn('[app] activate ignored until Electron is ready');
+    return;
+  }
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
