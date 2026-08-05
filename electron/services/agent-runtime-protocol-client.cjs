@@ -333,7 +333,14 @@ class AcpStdioClient {
 class CodexAppServerClient {
   constructor(profile, options) {
     this.profile = profile;
-    this.transport = new JsonLineTransport(profile.executablePath, [...(profile.fixedArgs || []), 'app-server', '--stdio'], options);
+    // Do not inherit either desktop Omvra endpoint from ~/.codex/config.toml.
+    // thread/start supplies the current app's scoped endpoint instead.
+    this.transport = new JsonLineTransport(profile.executablePath, [
+      ...(profile.fixedArgs || []),
+      '-c', 'mcp_servers.omvra.enabled=false',
+      '-c', 'mcp_servers.omvra_testing_mcp.enabled=false',
+      'app-server', '--stdio',
+    ], options);
     this.workspacePath = validateWorkspacePath(options.workspacePath);
     this.approvalPolicy = profile.approvalPolicy;
     this.activeTurns = new Map();

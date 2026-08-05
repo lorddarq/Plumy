@@ -124,7 +124,12 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
   const client = createNativeRuntimeClient({
     integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', fixedArgs: ['-c', 'model="gpt"'], approvalPolicy: 'never',
   }, { workspacePath: '/tmp/workspace', spawnProcess: (_command, args) => {
-    assert.deepEqual(args, ['-c', 'model="gpt"', 'app-server', '--stdio']);
+    assert.deepEqual(args, [
+      '-c', 'model="gpt"',
+      '-c', 'mcp_servers.omvra.enabled=false',
+      '-c', 'mcp_servers.omvra_testing_mcp.enabled=false',
+      'app-server', '--stdio',
+    ]);
     return child;
   }, timeoutMs: 100 });
 

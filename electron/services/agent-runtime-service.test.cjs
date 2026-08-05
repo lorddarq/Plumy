@@ -102,7 +102,12 @@ test('Codex connection test uses app-server directly and reuses its authenticate
   const result = await testConnection(store, { workspacePath: '/tmp/workspace' }, {
     spawnProcess: (command, args) => {
       assert.equal(command, '/usr/bin/codex');
-      assert.deepEqual(args, ['-c', 'model="gpt-5"', 'app-server', '--stdio']);
+      assert.deepEqual(args, [
+        '-c', 'model="gpt-5"',
+        '-c', 'mcp_servers.omvra.enabled=false',
+        '-c', 'mcp_servers.omvra_testing_mcp.enabled=false',
+        'app-server', '--stdio',
+      ]);
       return child;
     },
     timeoutMs: 100,
