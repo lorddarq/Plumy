@@ -541,6 +541,7 @@ function createAgentRuntimeSessionRunner({
       const mcpGrantId = session?.mcpGrantId || latest.mcpGrantId;
       if (mcpGrantId && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, mcpGrantId);
       clients.delete(bindingId);
+      for (const key of pendingRequests.keys()) if (key.startsWith(`${bindingId}:`)) pendingRequests.delete(key);
       return result;
     } catch (error) {
       return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The runtime session could not be closed.');

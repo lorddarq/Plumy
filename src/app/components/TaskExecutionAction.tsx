@@ -480,7 +480,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Agent status <StateBadge label={sessionSummary?.label || 'Unavailable'} value="" tone={agentStatusTone} title={sessionSummary?.detail} /></div>
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Task status <StateBadge label={taskStatusLabel(task.status)} value="" tone={task.status === 'done' ? 'success' : task.status === 'under-review' ? 'warning' : task.status === 'in-progress' ? 'success' : 'muted'} /></div>
                 </div>
-                {pendingRequests.map(request => {
+                {!terminalBinding && pendingRequests.map(request => {
                   const missingRequired = request.fields.some(field => field.required && (requestValues[field.name] ?? field.defaultValue ?? '') === '');
                   return <div key={`${request.method}-${request.requestId}`} className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
                     <div className="text-xs font-semibold text-amber-900">The agent needs your input</div>
