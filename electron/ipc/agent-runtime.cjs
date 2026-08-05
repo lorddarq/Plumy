@@ -27,6 +27,7 @@ function registerAgentRuntimeIpcHandlers({
   listAgentRuntimeSessions,
   reconcileAgentRuntimeSessions = null,
   prepareAgentExecution,
+  recoverOrphanedTaskExecution = null,
   prepareAgentRuntimeSessionArchive,
   updateAgentRuntimeSessionBinding,
   startAgentRuntimeSession,
@@ -66,6 +67,7 @@ function registerAgentRuntimeIpcHandlers({
   ipcMain.handle('agent-runtime/resolve-managed-workspace', (_, taskId) => resultOf(() => resolveManagedWorkspace(taskId)));
   ipcMain.handle('agent-runtime/prepare-execution', async (_, payload = {}) => {
     return logged('prepare-execution', { taskId: payload.taskId || null }, async () => {
+      recoverOrphanedTaskExecution?.(payload);
       const prepared = prepareAgentExecution({ ...payload, deferConnection: true });
       if (prepared.blockers?.length) return prepared;
       const connection = await testConnection(store, payload);
@@ -75,6 +77,7 @@ function registerAgentRuntimeIpcHandlers({
   });
   ipcMain.handle('agent-runtime/confirm-start', async (_, payload = {}) => {
     return logged('confirm-start', { taskId: payload.taskId || null, confirmed: payload.confirmed === true }, async () => {
+      recoverOrphanedTaskExecution?.(payload);
       if (payload.confirmed !== true) return confirmAgentExecutionStart(payload);
       const prepared = prepareAgentExecution({ ...payload, deferConnection: true });
       if (prepared.blockers?.length) return prepared;

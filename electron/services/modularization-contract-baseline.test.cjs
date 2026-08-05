@@ -92,6 +92,7 @@ const WORKSPACE_FACADE_EXPORTS = [
   'prepareAgentExecution',
   'prepareAgentRuntimeSessionArchive',
   'reconcileInterruptedAgentRuntimeSessions',
+  'recoverOrphanedTaskExecution',
   'removeTaskAttachment',
   'resolveGoalAgentDispatch',
   'resolveTaskExecutionContext',

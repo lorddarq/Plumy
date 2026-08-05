@@ -24,6 +24,7 @@ const TASKS_KEY = 'omvra.tasks.v1';
 const TASK_CONTRIBUTION_ATTEMPTS_KEY = 'omvra.taskContributionAttempts.v1';
 const TASK_COLLABORATION_EVENTS_KEY = 'omvra.taskCollaborationEvents.v1';
 const TASK_CONTEXT_ENTRIES_KEY = 'omvra.taskContextEntries.v1';
+const ACTIVE_RUNTIME_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
 const MILESTONES_KEY = 'omvra.milestones.v1';
 const PEOPLE_KEY = 'omvra.people.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
@@ -1908,8 +1909,30 @@ const {
 
 const {
   listHistory: getTaskCollaborationHistory,
+  recoverOrphanedAttempt,
   transition: transitionTaskContribution,
 } = taskCollaborationLifecycleService;
+
+function recoverOrphanedTaskExecution(store, { taskId } = {}) {
+  const task = taskService.getTaskById(store, normalizeString(taskId));
+  const contribution = task?.collaboration?.contributions?.find(item => item.state === 'working');
+  if (!task || !contribution?.latestAttemptId) return { ok: true, changed: false, task };
+  const activeBinding = readArray(store, SESSION_BINDINGS_KEY).find(binding => (
+    binding.scope?.kind === 'task'
+    && binding.scope.taskId === task.id
+    && binding.scope.executionAttemptId === contribution.latestAttemptId
+    && ACTIVE_RUNTIME_SESSION_STATES.has(binding.state)
+  ));
+  if (activeBinding) return { ok: true, changed: false, task, binding: activeBinding };
+  return recoverOrphanedAttempt(store, {
+    taskId: task.id,
+    contributionId: contribution.id,
+    attemptId: contribution.latestAttemptId,
+    actorPersonId: task.collaboration.orchestratorId,
+    expectedRevision: task.__mcpRevision || 0,
+    idempotencyKey: `runtime-recovery:${task.id}:${contribution.latestAttemptId}`,
+  });
+}
 
 const {
   append: appendTaskContextEntry,
@@ -1992,6 +2015,7 @@ module.exports = {
   listAssignedWorkForAgent,
   getTaskById,
   getTaskCollaborationHistory,
+  recoverOrphanedTaskExecution,
   listTaskContextEntries,
   getTaskContextEntry,
   appendTaskContextEntry,

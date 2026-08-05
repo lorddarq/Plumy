@@ -113,6 +113,25 @@ test('stopped and failed attempts preserve active contribution and aggregate sta
   }
 });
 
+test('orphaned runtime recovery makes a working contribution startable again', () => {
+  const harness = makeHarness();
+  harness.run('handoff', 'orchestrator');
+  const started = harness.run('acknowledge', 'contributor');
+  const recovered = harness.service.recoverOrphanedAttempt(harness.store, {
+    taskId: 'task-1',
+    contributionId: 'contribution-1',
+    attemptId: started.attempt.id,
+    actorPersonId: 'orchestrator',
+    expectedRevision: harness.getTask().__mcpRevision,
+    idempotencyKey: 'runtime-recovery-1',
+  });
+  assert.equal(recovered.ok, true);
+  assert.equal(recovered.contribution.state, 'pending');
+  assert.equal(recovered.attempt.state, 'failed');
+  assert.equal(recovered.attempt.failureReason, 'orphaned-runtime-session');
+  assert.equal(recovered.event.type, 'runtime-recovered');
+});
+
 test('lifecycle rejects stale revisions and makes matching retries idempotent', () => {
   const harness = makeHarness();
   const first = harness.service.transition(harness.store, {

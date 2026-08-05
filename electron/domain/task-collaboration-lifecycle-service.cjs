@@ -13,8 +13,9 @@ const COMMANDS = new Set([
   'stop',
   'fail',
   'complete',
+  'recover',
 ]);
-const ORCHESTRATOR_ONLY = new Set(['delegate', 'handoff', 'request-revision', 'accept', 'unblock']);
+const ORCHESTRATOR_ONLY = new Set(['delegate', 'handoff', 'request-revision', 'accept', 'unblock', 'recover']);
 const TERMINAL_ATTEMPT_STATES = new Set(['submitted', 'completed', 'stopped', 'failed']);
 const MAX_HISTORY_LIMIT = 100;
 const MAX_EVIDENCE_REFS = 50;
@@ -342,7 +343,91 @@ function createTaskCollaborationLifecycleService({
     };
   }
 
-  return { listHistory, transition };
+  function recoverOrphanedAttempt(store, options = {}) {
+    const taskId = normalizeString(options.taskId);
+    const contributionId = normalizeString(options.contributionId);
+    const attemptId = normalizeString(options.attemptId);
+    const actorPersonId = normalizeString(options.actorPersonId);
+    const idempotencyKey = normalizeString(options.idempotencyKey).slice(0, 160);
+    if (!taskId) return failure('TASK_ID_REQUIRED', 'taskId is required.');
+    if (!contributionId) return failure('CONTRIBUTION_ID_REQUIRED', 'contributionId is required.');
+    if (!attemptId) return failure('ATTEMPT_ID_REQUIRED', 'attemptId is required.');
+    if (!actorPersonId) return failure('ACTOR_PERSON_ID_REQUIRED', 'actorPersonId is required.');
+    if (!idempotencyKey) return failure('IDEMPOTENCY_KEY_REQUIRED', 'idempotencyKey is required.');
+
+    const task = getTaskById(store, taskId);
+    if (!task) return failure('TASK_NOT_FOUND', `Task "${taskId}" not found.`);
+    const contribution = task.collaboration?.contributions?.find(item => item.id === contributionId);
+    if (!contribution) return failure('CONTRIBUTION_NOT_FOUND', `Contribution "${contributionId}" not found.`);
+    const attempts = readAttempts(store);
+    const attempt = attempts.find(item => item.id === attemptId && item.taskId === taskId && item.contributionId === contributionId);
+    if (!attempt) return failure('ATTEMPT_NOT_FOUND', `Attempt "${attemptId}" not found.`);
+    const events = readEvents(store);
+    const existingEvent = events.find(event => event?.taskId === taskId && event.idempotencyKey === idempotencyKey);
+    if (existingEvent) return { ok: true, idempotent: true, task, contribution, attempt, event: existingEvent };
+    if (contribution.state !== 'working') return failure('CONTRIBUTION_NOT_ACTIVE', 'Only working contributions can be recovered.');
+    if (TERMINAL_ATTEMPT_STATES.has(attempt.state)) return failure('ATTEMPT_NOT_ACTIVE', 'Only non-terminal attempts can be recovered.');
+
+    const currentRevision = Number(task.__mcpRevision || 0);
+    const expectedRevision = Number(options.expectedRevision);
+    if (!Number.isFinite(expectedRevision) || Math.max(0, Math.floor(expectedRevision)) !== currentRevision) {
+      return failure('REVISION_MISMATCH', 'Task revision mismatch.', { currentRevision, expectedRevision });
+    }
+    if (actorPersonId !== task.collaboration.orchestratorId) {
+      return failure('CONTRIBUTION_TRANSITION_FORBIDDEN', 'Only the collaboration orchestrator can recover an orphaned attempt.');
+    }
+
+    const timestamp = now();
+    const event = {
+      schemaVersion: 1,
+      id: `collaboration-event-${randomUUID()}`,
+      idempotencyKey,
+      taskId,
+      contributionId,
+      attemptId,
+      actorPersonId,
+      command: 'recover',
+      type: 'runtime-recovered',
+      previousState: contribution.state,
+      nextState: 'pending',
+      baseTaskRevision: currentRevision,
+      nextTaskRevision: currentRevision + 1,
+      outcome: 'applied',
+      blockerRef: 'orphaned-runtime-session',
+      occurredAt: timestamp,
+    };
+    const nextAttempt = { ...attempt, state: 'failed', failureReason: 'orphaned-runtime-session', updatedAt: timestamp };
+    const nextContribution = {
+      ...contribution,
+      state: 'pending',
+      latestAttemptId: attempt.id,
+      lastLifecycleEventId: event.id,
+      updatedAt: timestamp,
+    };
+    const updated = updateTaskCollaboration(store, {
+      taskId,
+      expectedRevision: currentRevision,
+      collaboration: {
+        ...task.collaboration,
+        contributions: task.collaboration.contributions.map(item => item.id === contributionId ? nextContribution : item),
+      },
+      actor: actorPersonId,
+      allowIneligibleExistingContributionIds: new Set([contributionId]),
+    });
+    if (!updated.ok) return updated;
+    writeAttempts(store, attempts.map(item => item.id === attempt.id ? nextAttempt : item));
+    writeEvents(store, events.concat(event));
+    return {
+      ok: true,
+      idempotent: false,
+      task: updated.task,
+      contribution: updated.task.collaboration.contributions.find(item => item.id === contributionId),
+      attempt: nextAttempt,
+      event,
+    };
+  }
+
+  return { listHistory, recoverOrphanedAttempt, transition };
 }
 
 module.exports = {
