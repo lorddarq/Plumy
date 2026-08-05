@@ -39,5 +39,34 @@ test('the app-level supervisor is the only renderer owner of TaskExecutionAction
   const app = readFileSync(resolve(componentsDirectory, '../App.tsx'), 'utf8');
 
   assert.match(supervisor, /<TaskExecutionAction/);
-  assert.match(app, /<AgentSessionSupervisorProvider>/);
+  assert.match(app, /<AgentSessionSupervisorProvider\b/);
+  assert.match(app, /projects=\{timelineSwimlanes\}/);
+});
+
+test('the supervisor owns a live session registry and a reopenable active-session dock', () => {
+  const source = readComponent('AgentSessionSupervisor.tsx');
+  assert.match(source, /sessions\?\.list/);
+  assert.match(source, /setInterval\(\(\) => void refresh\(\), 2500\)/);
+  assert.match(source, /onStoreChanged/);
+  assert.match(source, /Reopen minimized supervision for/);
+  assert.match(source, /<AgentIcon/);
+  assert.match(source, /truncate text-\[11px\]/);
+  const execution = readComponent('TaskExecutionAction.tsx');
+  assert.match(execution, /showClose=\{false\}/);
+  assert.match(execution, /Minimize supervision/);
+  assert.match(execution, /Preparing your work session/);
+  assert.match(execution, /Ready to start/);
+  assert.ok(execution.indexOf('{error && <ExecutionNotice') < execution.indexOf('{binding && ('));
+  assert.match(execution, /TASK_ALREADY_COMPLETE/);
+  assert.match(execution, /Reopen it before starting new work/);
+  assert.match(execution, /new Set\(\[/);
+  assert.match(source, /workspacePath \|\| task\.repositoryFolder \|\| project\?\.repositoryFolder/);
+  assert.match(execution, /result\.error === 'ACP_SESSION_NOT_FOUND'/);
+  assert.match(execution, /onOpenChange=\{nextOpen => \{ setOpen\(nextOpen\); if \(!nextOpen\) setStartRequested\(false\); \}\}/);
+  assert.match(execution, /if \(!open \|\| !startRequested \|\| loading \|\| !sessionLoaded \|\| operationBusy\) return/);
+  const milestone = readComponent('MilestoneExecutionAction.tsx');
+  assert.match(milestone, /disabled=\{!row\.active && row\.blockers\.length > 0\}/);
+  assert.match(milestone, /Work blocked for/);
+  assert.match(source, /startOnRequest: false/);
+  assert.match(source, /'interrupted', 'failed'/);
 });

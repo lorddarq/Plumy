@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Folder, Play, Server } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Folder, Play, Server, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
 import { describeAgentRuntimeSession, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent } from '../utils/agentRuntimeActivity';
@@ -12,8 +12,9 @@ import {
   ContextMenuItem,
 } from './ui/context-menu';
 import { TaskSessionComposer } from './TaskSessionComposer';
+import { ExecutionNotice } from './ExecutionNotice';
 import { StateBadge } from './statuses/AppStatusBar';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from './ui/sheet';
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from './ui/sheet';
 
 interface RuntimeState {
   profiles?: Array<{ id: string; name: string; integrationMode: string; enabled: boolean }>;
@@ -124,7 +125,6 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     const message = caught instanceof Error ? caught.message : fallback;
     console.error(`[agent-runtime:ui] ${operation}.failed`, { taskId: task.id, bindingId: binding?.id || null, message, error: caught });
     setError(message);
-    toast.error(message);
   };
 
   useEffect(() => {
@@ -146,6 +146,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setPreflight(null);
     void (async () => {
       try {
+        if (task.status === 'done') {
+          setPreflight({ ok: false, blockers: [{ code: 'TASK_ALREADY_COMPLETE', message: 'This task is already complete. Reopen it before starting new work.' }] });
+          return;
+        }
         const stateResult = await window.electron.agentRuntime.getState();
         if (cancelled) return;
         if (!stateResult.ok || !stateResult.value) throw new Error(stateResult.error || 'Agent connections could not be loaded.');
@@ -190,13 +194,14 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   }, [open, task.id]);
 
   const observation = resolution?.profile ? runtimeState?.observations?.[resolution.profile.id] : undefined;
-  const blockers = [
+  const blockers = [...new Set([
+    ...(task.status === 'done' ? ['This task is already complete. Reopen it before starting new work.'] : []),
     ...(!resolvedRepositoryFolder && !loading ? ['A working directory could not be resolved.'] : []),
     ...(resolution?.profile?.integrationMode === 'external-handoff' ? ['The selected connection opens work externally and cannot be supervised in Omvra.'] : []),
     ...(resolution && !resolution.ok ? [resolution.error || 'The selected agent connection is unavailable.'] : []),
     ...(preflight?.connection?.ok === false ? [preflight.connection.error || `Agent connection is ${preflight.connection.state || 'unavailable'}.`] : []),
     ...(preflight?.blockers || []).map(blocker => blocker.message),
-  ];
+  ])];
   const warnings = preflight?.warnings || [];
   const hasCapability = (id: string) => binding?.capabilities?.some(capability => capability.id === id && capability.support === 'supported') ?? false;
   const sessionSummary = binding ? describeAgentRuntimeSession(binding.state, events) : null;
@@ -216,6 +221,22 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       : sessionSummary?.tone === 'danger' ? 'danger' : 'muted';
   const instructionsSent = latestTurnStartIndex >= 0 || events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent');
   const latestTurnCompleted = latestRunEvents.some(event => event.nativeEventType === 'turn/completed');
+  const executionTitle = binding
+    ? 'Open supervision'
+    : loading
+      ? 'Preparing work'
+      : blockers.length > 0
+        ? 'Action needed before work starts'
+        : preflight
+          ? 'Ready to start'
+          : 'Start work';
+  const executionDescription = binding
+    ? 'Follow the agent’s task progress, blockers, and outcome. Guidance is optional.'
+    : loading
+      ? 'Omvra is checking the assigned agent, working folder, model, and task instructions.'
+      : blockers.length > 0
+        ? 'Resolve the item below before Omvra can start the assigned work.'
+        : 'Omvra has checked the task context and will open supervision when work begins.';
 
   const refreshSession = async () => {
     const index = await window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 });
@@ -303,7 +324,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         const text = operation === 'cancel' ? undefined : steerText.trim();
         if (operation !== 'cancel' && !text) return;
         const result = await window.electron?.agentRuntime?.sessions?.[operation]?.({ bindingId: binding.id, ...(text ? { text } : {}) });
-        if (!result?.ok) throw new Error(result?.message || result?.error || 'The requested action failed.');
+        if (!result?.ok) {
+          if (result.error === 'ACP_SESSION_NOT_FOUND') {
+            await recoverOrphanedSession(binding.id);
+            return;
+          }
+          throw new Error(result?.message || result?.error || 'The requested action failed.');
+        }
         setSteerText('');
       }
       await refreshSession();
@@ -353,7 +380,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setError(null);
     try {
       const result = await window.electron?.agentRuntime?.sessions?.resume?.({ bindingId: binding.id, workspacePath: resolvedRepositoryFolder });
-      if (!result?.ok) throw new Error(result?.message || result?.error || 'Work could not be resumed.');
+      if (!result?.ok) {
+        if (result.error === 'ACP_SESSION_NOT_FOUND') {
+          await recoverOrphanedSession(binding.id);
+          return;
+        }
+        throw new Error(result?.message || result?.error || 'Work could not be resumed.');
+      }
       await refreshSession();
       toast.success('Agent resumed work', { description: task.title });
     } catch (caught) {
@@ -421,7 +454,6 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     if (!preflight || !resolution?.profile || !workspace) return;
     setStartRequested(false);
     if (blockers.length > 0) {
-      toast.error('Agent could not start work', { description: blockers[0] });
       return;
     }
     void startWork();
@@ -437,14 +469,27 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         <SheetContent
           className="omvra-settings-sheet !bottom-2 !left-auto !right-2 !top-2 !h-auto !w-[min(640px,calc(100vw-16px))] !translate-x-0 !translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-0 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
           overlayClassName="omvra-settings-overlay"
+          showClose={false}
         >
           <SheetHeader className="shrink-0 border-b border-black/6 px-6 py-5 pr-14 text-left">
-            <SheetTitle className="text-lg">{activeAttempt ? 'Open supervision' : 'Start work'}</SheetTitle>
-            <SheetDescription>{binding ? 'Follow the agent’s task progress, blockers, and outcome. Guidance is optional.' : 'Omvra is resolving the task context and starting the assigned work.'}</SheetDescription>
+            <SheetTitle className="text-lg">{executionTitle}</SheetTitle>
+            <SheetDescription>{executionDescription}</SheetDescription>
+            <SheetClose className="absolute right-5 top-5 rounded-md p-1.5 text-slate-500 outline-none transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-blue-500">
+              <X className="size-4" aria-hidden="true" />
+              <span className="sr-only">{binding ? 'Minimize supervision' : 'Close'}</span>
+            </SheetClose>
           </SheetHeader>
 
           <div className={`min-h-0 flex-1 overflow-y-auto px-6 py-5 text-sm ${binding ? 'flex flex-col' : 'space-y-3'}`}>
-            {mcpReadOnly && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><div className="font-semibold">Task access is read-only</div><div className="mt-1">The agent can inspect this task but cannot change its description or status. To allow updates, select Task Write under Settings → MCP Access and restart the listener.</div></div>}
+            {mcpReadOnly && <ExecutionNotice tone="warning" title="Task access is read-only">The agent can inspect this task but cannot change its description or status. Select Task Write under Settings → MCP Access, then restart the listener.</ExecutionNotice>}
+            {!binding && loading && <ExecutionNotice tone="info" title="Preparing your work session">Omvra is verifying the task instructions, assigned agent, runtime connection, and working directory.</ExecutionNotice>}
+            {!binding && !loading && preflight && blockers.length === 0 && <ExecutionNotice tone="info" title="Ready to start">The task context is prepared. Omvra will keep this supervision view available while the agent works.</ExecutionNotice>}
+            {error && <div className="mb-3"><ExecutionNotice tone="danger" title="Work could not continue">{error}</ExecutionNotice></div>}
+            {!error && blockers.length > 0 && (
+              <div className="mb-3"><ExecutionNotice tone="warning" title="Needs attention before work can start" assertive>
+                <ul className="space-y-1">{blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul>
+              </ExecutionNotice></div>
+            )}
             {!binding && <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-md border border-slate-200 p-3">
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Server className="size-3.5" />Agent connection</div>
@@ -458,21 +503,20 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
               </div>
             </div>}
             {!binding && observation && (
-              <div className="rounded-md border border-slate-200 p-3 text-xs text-slate-600">
-                <p>Connection details: {observation.availability || 'unknown'} · sign-in {observation.authentication || 'unknown'} · {observation.state || 'unknown'}.</p>
-                {observation.error && <p className="mt-1 text-rose-700">Last connection check: {observation.error}</p>}
-              </div>
+              <ExecutionNotice tone={observation.error ? 'warning' : 'info'} title="Connection details">
+                <span>{observation.availability || 'unknown'} · sign-in {observation.authentication || 'unknown'} · {observation.state || 'unknown'}.</span>
+                {observation.error && <span className="mt-1 block text-rose-700">Last connection check: {observation.error}</span>}
+              </ExecutionNotice>
             )}
             {!binding && preflight?.model && (preflight.model.requested || preflight.model.effective) && (
-              <div className="rounded-md border border-slate-200 p-3 text-xs text-slate-600">
-                Model: {preflight.model.effective || preflight.model.requested || 'agent default'}{preflight.model.requested && preflight.model.effective && preflight.model.requested !== preflight.model.effective ? ` · requested ${preflight.model.requested}` : ''}.
-              </div>
+              <ExecutionNotice tone="info" title="Model">
+                {preflight.model.effective || preflight.model.requested || 'Agent default'}{preflight.model.requested && preflight.model.effective && preflight.model.requested !== preflight.model.effective ? ` · requested ${preflight.model.requested}` : ''}.
+              </ExecutionNotice>
             )}
             {!binding && warnings.length > 0 && (
-              <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
-                <div className="font-semibold">Check before starting</div>
-                <ul className="mt-1 space-y-1">{warnings.map(warning => <li key={`${warning.code || 'warning'}-${warning.message}`}>• {warning.message}</li>)}</ul>
-              </div>
+              <ExecutionNotice tone="info" title="Check before starting">
+                <ul className="space-y-1">{warnings.map(warning => <li key={`${warning.code || 'warning'}-${warning.message}`}>{warning.message}</li>)}</ul>
+              </ExecutionNotice>
             )}
             {binding && (
               <div className="flex min-h-0 flex-1 flex-col">
@@ -482,10 +526,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                 </div>
                 {!terminalBinding && pendingRequests.map(request => {
                   const missingRequired = request.fields.some(field => field.required && (requestValues[field.name] ?? field.defaultValue ?? '') === '');
-                  return <div key={`${request.method}-${request.requestId}`} className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <div className="text-xs font-semibold text-amber-900">The agent needs your input</div>
-                    <div className="mt-1 text-xs leading-5 text-amber-800">{request.message}</div>
-                    {request.serverName && <div className="mt-1 text-[11px] text-amber-700">Requested by {request.serverName}</div>}
+                  return <div key={`${request.method}-${request.requestId}`} className="mt-3">
+                    <ExecutionNotice tone="warning" title="The agent needs your input" assertive>
+                      <div>{request.message}</div>
+                      {request.serverName && <div className="mt-1 text-[11px] text-amber-700">Requested by {request.serverName}</div>}
                     {request.fields.length > 0 && <div className="mt-3 space-y-2">{request.fields.map(field => {
                       const value = requestValues[field.name] ?? field.defaultValue ?? (field.type === 'boolean' ? false : '');
                       return <label key={field.name} className="block text-xs text-slate-700"><span className="font-medium">{field.title}{field.required ? ' *' : ''}</span>{field.description && <span className="ml-1 text-slate-500">{field.description}</span>}
@@ -496,7 +540,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                             : <input type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'} value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [field.name]: field.type === 'number' || field.type === 'integer' ? Number(event.target.value) : event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5" />}
                       </label>;
                     })}</div>}
-                    <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => void respondToRequest(request, 'decline')} disabled={requestBusy} className="rounded border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40">Decline</button><button type="button" onClick={() => void respondToRequest(request, 'accept')} disabled={requestBusy || missingRequired} className="rounded bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40">{request.responseKind === 'codex-approval' ? 'Allow' : 'Continue'}</button></div>
+                      <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => void respondToRequest(request, 'decline')} disabled={requestBusy} className="rounded border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40">Decline</button><button type="button" onClick={() => void respondToRequest(request, 'accept')} disabled={requestBusy || missingRequired} className="rounded bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40">{request.responseKind === 'codex-approval' ? 'Allow' : 'Continue'}</button></div>
+                    </ExecutionNotice>
                   </div>;
                 })}
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">
@@ -508,7 +553,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between"><div className="text-xs font-semibold text-slate-700">Agent activity</div><div className="text-[11px] text-slate-400">Task progress only</div></div>
-                <div className="mt-2 min-h-24 flex-1 space-y-1 overflow-auto rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600" aria-live="polite">
+                <div className="mt-2 min-h-24 flex-1 space-y-1 overflow-auto rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600" aria-live="polite">
                   {visibleActivity.length ? visibleActivity.map(item => <div key={item.id} className="flex items-start gap-2 rounded px-1.5 py-1.5">
                     <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${item.tone === 'danger' ? 'bg-red-500' : item.tone === 'warning' ? 'bg-amber-500' : item.tone === 'positive' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                     <div className="min-w-0 flex-1"><div className="font-medium text-slate-700">{item.label}{item.count > 1 ? ` × ${item.count}` : ''}</div>{item.detail && <div className="mt-0.5 text-[11px] text-slate-500">{item.detail}</div>}</div>
@@ -520,21 +565,14 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                     value={steerText}
                     running={isTurnActive}
                     busy={operationBusy}
-                    canSubmit={Boolean(steerText.trim()) && (isTurnActive ? hasCapability('steer') : hasCapability('prompt'))}
-                    canStop={hasCapability('cancel')}
+                    canSubmit={!terminalBinding && Boolean(steerText.trim()) && (isTurnActive ? hasCapability('steer') : hasCapability('prompt'))}
+                    canStop={!terminalBinding && hasCapability('cancel')}
                     placeholder={isTurnActive ? 'Add optional guidance' : 'Start an optional follow-up'}
                     onChange={setSteerText}
                     onSubmit={() => void runSessionOperation(isTurnActive && hasCapability('steer') ? 'steer' : 'prompt')}
                     onStop={() => void runSessionOperation('cancel')}
                   />
                 </div>
-              </div>
-            )}
-            {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</div>}
-            {!error && blockers.length > 0 && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-amber-900"><AlertTriangle className="size-3.5" />Needs attention before work can start</div>
-                <ul className="mt-2 space-y-1 text-xs text-amber-800">{blockers.map(blocker => <li key={blocker}>• {blocker}</li>)}</ul>
               </div>
             )}
           </div>
@@ -549,9 +587,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   : 'Omvra checks the agent, working directory, model, and task instructions before work starts.'}
             </div>
             <div className="flex shrink-0 justify-end gap-2">
-              <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={() => setOpen(false)}>Close</button>
+              <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={() => setOpen(false)}>{binding ? 'Minimize supervision' : 'Close'}</button>
               {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40">Open externally</button>}
-              {(binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume work' : binding?.state === 'interrupted' || terminalBinding ? 'Start new session' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
+              {task.status !== 'done' && (binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume work' : binding?.state === 'interrupted' || terminalBinding ? 'Start new session' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
             </div>
           </SheetFooter>
         </SheetContent>

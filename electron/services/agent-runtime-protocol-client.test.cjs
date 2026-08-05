@@ -238,6 +238,19 @@ test('runtime process exit rejects active requests instead of leaving a falsely 
   assert.equal(logs.some(entry => entry.message === '[agent-runtime:transport] process.exited' && entry.details.code === 9), true);
 });
 
+test('request timeout marks the provider connection lost instead of leaving it apparently alive', async () => {
+  const child = createChild(() => {});
+  const lifecycle = [];
+  const transport = new JsonLineTransport('/usr/bin/fixture', [], {
+    workspacePath: '/tmp/workspace', spawnProcess: () => child, timeoutMs: 5,
+  });
+  transport.onLifecycle(event => lifecycle.push(event));
+  const result = await transport.request('session/prompt').catch(error => error);
+  assert.equal(result.code, 'ACP_RUNTIME_UNAVAILABLE');
+  assert.equal(transport.closed, true);
+  assert.deepEqual(lifecycle, [{ state: 'lost', code: 'ACP_RUNTIME_UNAVAILABLE', kind: 'timeout' }]);
+});
+
 test('bidirectional request IDs cannot resolve an unrelated client request', async () => {
   const outgoing = [];
   const child = createChild(message => outgoing.push(message));

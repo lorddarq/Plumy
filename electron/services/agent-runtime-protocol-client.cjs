@@ -120,9 +120,8 @@ class JsonLineTransport {
     return new Promise((resolve, reject) => {
       const timer = Number.isFinite(timeoutMs) && timeoutMs > 0
         ? setTimeout(() => {
-          this.pending.delete(id);
           this.logger?.error?.('[agent-runtime:transport] request.timed-out', { id, method, timeoutMs });
-          reject(runtimeError('ACP_RUNTIME_UNAVAILABLE', `${method} timed out after ${timeoutMs} ms.`));
+          this.#fail(runtimeError('ACP_RUNTIME_UNAVAILABLE', `${method} timed out after ${timeoutMs} ms.`), { kind: 'timeout' });
         }, timeoutMs)
         : null;
       this.pending.set(id, { method, resolve, reject, timer });

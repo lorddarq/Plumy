@@ -7,6 +7,7 @@ import { ContextMenuItem } from './ui/context-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { useAgentSessionSupervisor } from './AgentSessionSupervisor';
 import { OverflowActionMenu } from './OverflowActionMenu';
+import { ExecutionNotice } from './ExecutionNotice';
 
 interface MilestoneExecutionActionProps {
   milestone: ProjectMilestone;
@@ -119,9 +120,9 @@ export function MilestoneExecutionAction({ milestone, tasks, projects, trigger, 
           {rows.map(row => <div key={row.task.id} className="rounded-md border border-slate-200 p-3">
             <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><div className="font-medium text-slate-900">{row.task.title}</div><div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500"><span className="inline-flex items-center gap-1"><Server className="size-3" />{row.runtime}{row.sessionState ? ` · ${row.sessionState}` : ''}</span><span className="inline-flex items-center gap-1"><Folder className="size-3" />{row.folderSource}: {row.folder || 'Unavailable'}</span>{row.accepted > 0 && <span>{row.accepted} accepted contribution{row.accepted === 1 ? '' : 's'}</span>}{row.usage && <span>Usage {row.usage}</span>}</div></div>{row.active ? <span className="text-xs font-semibold text-blue-700">{row.sessionState === 'needs-input' ? 'Needs input' : 'Active session'}</span> : row.blockers.length ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><AlertTriangle className="size-3" />Blocked</span> : <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><CheckCircle2 className="size-3" />Eligible</span>}</div>
             {row.blockers.length > 0 && <ul className="mt-2 space-y-1 text-xs text-amber-800">{row.blockers.map(blocker => <li key={blocker}>• {blocker}</li>)}</ul>}
-            <div className="mt-2 flex justify-end"><button type="button" onClick={() => { requestTask(row.task, { repositoryFolder: projects.find(project => row.task.projectIds?.includes(project.id))?.repositoryFolder, startOnRequest: !row.active }); setOpen(false); }} className="rounded border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">{row.active ? 'Open supervision' : 'Start work'}</button></div>
+            <div className="mt-2 flex justify-end"><button type="button" onClick={() => { requestTask(row.task, { repositoryFolder: projects.find(project => row.task.projectIds?.includes(project.id))?.repositoryFolder, startOnRequest: !row.active }); setOpen(false); }} disabled={!row.active && row.blockers.length > 0} aria-label={row.active ? `Open supervision for ${row.task.title}` : row.blockers.length > 0 ? `Work blocked for ${row.task.title}` : `Start work for ${row.task.title}`} className="rounded border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">{row.active ? 'Open supervision' : row.blockers.length > 0 ? 'Blocked' : 'Start work'}</button></div>
           </div>)}
-          {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</div>}
+          {error && <ExecutionNotice tone="danger" title="Milestone preflight could not complete">{error}</ExecutionNotice>}
         </div>
         <DialogFooter><button type="button" onClick={() => setOpen(false)} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600">Close</button></DialogFooter>
       </DialogContent>

@@ -120,7 +120,7 @@ function AppStoreShell() {
       milestones={milestones}
     >
       <AgentRuntimeNotifications tasks={tasks} />
-      <AgentSessionSupervisorProvider>
+      <AgentSessionSupervisorProvider tasks={tasks} projects={timelineSwimlanes}>
         <AppContent />
       </AgentSessionSupervisorProvider>
     </UiLayoutStoreProvider>

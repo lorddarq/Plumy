@@ -62,6 +62,7 @@ const { getBundledSkillsRoot } = require('./services/skill-service.cjs');
 const { resolveWorkspaceUserDataPath } = require('./services/workspace-paths.cjs');
 
 const APP_NAME = 'Omvra';
+const AGENT_RUNTIME_RECONCILIATION_INTERVAL_MS = 5_000;
 // Consider the app to be in dev mode when it's not packaged. This avoids trying to load a dev server in packaged builds.
 const isDev = !app.isPackaged;
 const storeName = isDev ? 'omvra-store-dev' : 'omvra-store';
@@ -102,6 +103,7 @@ const goalRuntime = createGoalRuntimeService({ store });
 let mcpHttpServer = null;
 let updateController = null;
 let goalScheduleTimer = null;
+let agentRuntimeReconciliationTimer = null;
 let mcpRuntimeState = {
   status: 'stopped',
   listening: false,
@@ -182,6 +184,19 @@ function startGoalScheduleRuntime() {
   };
   tick();
   goalScheduleTimer = setInterval(tick, 30_000);
+}
+
+function startAgentRuntimeReconciliation() {
+  if (agentRuntimeReconciliationTimer) clearInterval(agentRuntimeReconciliationTimer);
+  const tick = () => {
+    try {
+      agentRuntimeSessionRunner.reconcile();
+    } catch (error) {
+      console.error('[agent-runtime] reconciliation failed:', error?.message || error);
+    }
+  };
+  tick();
+  agentRuntimeReconciliationTimer = setInterval(tick, AGENT_RUNTIME_RECONCILIATION_INTERVAL_MS);
 }
 
 function broadcastStoreDidChange() {
@@ -455,6 +470,7 @@ app.whenReady().then(() => {
   syncUpdateChannelFromStore();
   restartMcpServer();
   startGoalScheduleRuntime();
+  startAgentRuntimeReconciliation();
   createWindow();
   if (updateController && app.isPackaged) {
     void updateController.checkForUpdates();
@@ -477,6 +493,10 @@ app.on('before-quit', () => {
   if (goalScheduleTimer) {
     clearInterval(goalScheduleTimer);
     goalScheduleTimer = null;
+  }
+  if (agentRuntimeReconciliationTimer) {
+    clearInterval(agentRuntimeReconciliationTimer);
+    agentRuntimeReconciliationTimer = null;
   }
   if (mcpHttpServer) {
     mcpHttpServer.close();
