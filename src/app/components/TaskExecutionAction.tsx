@@ -34,6 +34,7 @@ interface ExecutionPreflight {
   warnings?: Array<{ code?: string; message: string }>;
   model?: { requested?: string | null; effective?: string | null };
   contractDigest?: string;
+  contractSnapshot?: { taskRevision?: number; contributionId?: string | null };
   connection?: { ok?: boolean; error?: string; state?: string };
 }
 
@@ -112,7 +113,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const startableContribution = task.collaboration?.contributions?.find(contribution =>
     contribution.state === 'pending' || contribution.state === 'revision-requested'
   );
-  const activeAttempt = Boolean(activeContribution?.latestAttemptId);
+  const activeAttempt = Boolean(binding) || (Boolean(activeContribution?.latestAttemptId) && (
+    !preflight || preflight.blockers?.some(blocker => blocker.code === 'ACP_EXECUTION_ALREADY_ACTIVE') === true
+  ));
+  const executionContributionId = preflight?.contractSnapshot?.contributionId || startableContribution?.id;
   const resolvedRepositoryFolder = workspace?.workspacePath || '';
   const repositorySource = agentRuntimeWorkspaceSourceLabel(workspace?.source);
   const reportRuntimeError = (operation: string, caught: unknown, fallback: string) => {
@@ -265,12 +269,12 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       const result = await window.electron?.agentRuntime?.sessions?.start?.({
         confirmed: true,
         taskId: task.id,
-        contributionId: startableContribution?.id,
+        contributionId: executionContributionId,
         actorPersonId: task.assigneeId,
         projectId: task.projectIds?.[0] || task.swimlaneId,
         executionProfileId: resolution.profile.id,
         workspacePath: resolvedRepositoryFolder,
-        expectedRevision: task.__mcpRevision ?? 0,
+        expectedRevision: preflight?.contractSnapshot?.taskRevision ?? task.__mcpRevision ?? 0,
         expectedContractDigest: preflight?.contractDigest,
         idempotencyKey: `renderer-start-${task.id}-${Date.now()}`,
       });
