@@ -2,6 +2,50 @@
    Timeline & Kanban Component Styles
    ============================================================================ */
 
+.agent-loading-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 4px);
+  gap: 1.5px;
+}
+
+.agent-loading-cell {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.agent-loading-cell.is-round {
+  border-radius: 999px;
+}
+
+.agent-loading-label {
+  background: linear-gradient(90deg, #94a3b8 35%, #334155 50%, #94a3b8 65%);
+  background-clip: text;
+  background-size: 200% 100%;
+  color: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  animation: agent-loading-shimmer 1.4s linear infinite;
+}
+
+@keyframes agent-loading-pixel {
+  0%, 100% { opacity: 0.15; transform: scale(0.75); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes agent-loading-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-loading-cell,
+  .agent-loading-label {
+    animation: none !important;
+  }
+}
+
 .view-toggle {
   position: relative;
   display: grid;

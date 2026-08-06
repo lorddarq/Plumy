@@ -64,8 +64,9 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(execution, /onVisibilityChange\?\.\(open\)/);
   assert.match(execution, /if \(!open \|\| !startRequested \|\| loading \|\| !sessionLoaded \|\| operationBusy\) return/);
   const milestone = readComponent('MilestoneExecutionAction.tsx');
-  assert.match(milestone, /disabled=\{!row\.active && row\.blockers\.length > 0\}/);
-  assert.match(milestone, /Work blocked for/);
+  assert.match(milestone, /getSessionAttentionState/);
+  assert.match(milestone, /row\.attention\.nextStep/);
+  assert.match(milestone, /disabled=\{row\.attention\.kind === 'blocked'\}/);
   assert.match(source, /startOnRequest: false/);
   assert.match(source, /'interrupted', 'failed'/);
   assert.match(source, /HISTORY_SESSION_STATES/);
@@ -73,9 +74,9 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   const statusBar = readComponent('statuses/AppStatusBar.tsx');
   assert.match(statusBar, /useAgentSessionSupervisor/);
   assert.match(statusBar, /No active work/);
-  assert.match(statusBar, /getAttentionState\('needs-input'\)/);
-  assert.match(statusBar, /getAttentionState\('active'\)/);
-  assert.match(statusBar, /Completed session/);
+  assert.match(statusBar, /getSessionAttentionState/);
+  assert.match(statusBar, /outcome-review/);
+  assert.match(statusBar, /No action pending/);
   assert.match(statusBar, /getAttentionState\('blocked'\)/);
   assert.match(statusBar, /Open supervision:/);
 });

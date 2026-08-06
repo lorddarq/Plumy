@@ -13,7 +13,7 @@ export function TaskFooterActions({
   onClose,
 }: TaskFooterActionsProps) {
   return (
-    <DialogFooter className="min-w-0">
+    <DialogFooter className="min-w-0 flex-wrap">
       {canMoveToReview && onMoveToReview && (
         <Button
           variant="outline"

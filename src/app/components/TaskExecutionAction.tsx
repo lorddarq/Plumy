@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Folder, Play, Server, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, Folder, MessageSquarePlus, Play, Server, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
 import { describeAgentRuntimeSession, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent } from '../utils/agentRuntimeActivity';
@@ -13,6 +13,7 @@ import {
 } from './ui/context-menu';
 import { TaskSessionComposer } from './TaskSessionComposer';
 import { ExecutionNotice } from './ExecutionNotice';
+import { AgentLoadingState } from './AgentLoadingState';
 import { StateBadge } from './statuses/AppStatusBar';
 import { getAttentionState } from '../utils/attention';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from './ui/sheet';
@@ -240,7 +241,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     ['turn/started', 'turn/completed', 'item/agentMessage/delta', 'item/started', 'item/completed', 'warning', 'error', 'omvra/taskBatch/automatic-continuing', 'omvra/taskBatch/automatic-limit-reached'].includes(event.nativeEventType || '')
   );
   const activity = summarizeAgentRuntimeActivity(latestRunEvents);
-  const visibleActivity = activity.length > 0 ? activity : binding?.state === 'interrupted'
+  const agentOutput = latestRunEvents
+    .filter(event => event.nativeEventType === 'item/agentMessage/delta' && event.messagePreview)
+    .map(event => event.messagePreview)
+    .join('')
+    .trim();
+  const activityWithoutOutput = activity.filter(item => item.label !== 'Agent shared an update');
+  const visibleActivity = activityWithoutOutput.length > 0 ? activityWithoutOutput : binding?.state === 'interrupted'
     ? [{ id: `${binding.id}-interrupted`, label: 'Work was interrupted', detail: 'Start work again to reconnect and continue with the task instructions.', count: 1, tone: 'warning' as const }]
     : binding?.state === 'failed'
       ? [{ id: `${binding.id}-failed`, label: 'Previous runtime unavailable', detail: 'Start a new session to reconnect; the current task context is preserved.', count: 1, tone: 'danger' as const }]
@@ -274,6 +281,15 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
           : binding?.state === 'needs-input'
             ? { tone: 'warning' as const, title: 'Agent is waiting', body: 'The agent cannot continue until the pending request above is answered.' }
             : null;
+  const copyAgentOutput = async () => {
+    if (!agentOutput) return;
+    try {
+      await navigator.clipboard.writeText(agentOutput);
+      toast.success('Agent output copied');
+    } catch {
+      toast.error('Could not copy agent output');
+    }
+  };
   const executionTitle = binding
     ? 'Open supervision'
     : loading
@@ -552,7 +568,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
 
           <div className={`min-h-0 flex-1 overflow-y-auto px-6 py-5 text-sm ${binding ? 'flex flex-col' : 'space-y-3'}`}>
             {mcpReadOnly && <ExecutionNotice tone="warning" title="Task access is read-only">The agent can inspect this task but cannot change its description or status. Select Task Write under Settings → MCP Access, then restart the listener.</ExecutionNotice>}
-            {!binding && loading && <ExecutionNotice tone="info" title="Preparing your work session">Omvra is verifying the task instructions, assigned agent, runtime connection, and working directory.</ExecutionNotice>}
+            {!binding && loading && <ExecutionNotice tone="info" title="Preparing your work session"><AgentLoadingState label="Checking the work session" variant="Drive" /><span className="mt-2 block">Omvra is verifying the task instructions, assigned agent, runtime connection, and working directory.</span></ExecutionNotice>}
             {!binding && !loading && preflight && blockers.length === 0 && <ExecutionNotice tone="info" title={getAttentionState('ready').label} nextStep={getAttentionState('ready').nextStep}>The task context is prepared. Omvra will keep this supervision view available while the agent works.</ExecutionNotice>}
             {error && <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('failed').label} nextStep={getAttentionState('failed').nextStep}>{error}</ExecutionNotice></div>}
             {!error && blockers.length > 0 && (
@@ -624,8 +640,19 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                     <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${isTurnActive ? 'bg-emerald-500' : latestTurnCompleted ? 'bg-amber-400' : 'bg-slate-300'}`} /><span className="font-medium text-slate-700">Agent work</span><span className="ml-auto text-slate-500">{isTurnActive ? 'In progress' : latestTurnCompleted ? 'Batch finished' : binding.state === 'closed' ? 'Session closed' : 'Not started'}</span></div>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between"><div className="text-xs font-semibold text-slate-700">Agent activity</div><div className="text-[11px] text-slate-400">Task progress only</div></div>
+                <div className="mt-3 flex items-center justify-between"><div className="text-xs font-semibold text-slate-700">Agent activity</div>{isTurnActive ? <AgentLoadingState label="Thinking through the task" variant="Dots" /> : <div className="text-[11px] text-slate-400">Task progress only</div>}</div>
                 <div className="mt-2 min-h-24 flex-1 space-y-1 overflow-auto rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600" aria-live="polite">
+                  {agentOutput && <div className="mb-2 rounded-lg border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Agent output</div>
+                      <div className="text-[10px] text-slate-400">{isTurnActive ? 'Streaming' : 'Latest response'}</div>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-[13px] leading-5 text-slate-700">{agentOutput}</p>
+                    <div className="mt-2 flex items-center gap-1 border-t border-slate-100 pt-2">
+                      <button type="button" onClick={() => void copyAgentOutput()} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 outline-none hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"><Copy className="size-3.5" aria-hidden="true" />Copy output</button>
+                      <button type="button" onClick={() => { setSteerText(agentOutput); toast.success('Output added to the follow-up field'); }} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-slate-500 outline-none hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"><MessageSquarePlus className="size-3.5" aria-hidden="true" />Use as follow-up</button>
+                    </div>
+                  </div>}
                   {visibleActivity.length ? visibleActivity.map(item => <div key={item.id} className="flex items-start gap-2 rounded px-1.5 py-1.5">
                     <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${item.tone === 'danger' ? 'bg-red-500' : item.tone === 'warning' ? 'bg-amber-500' : item.tone === 'positive' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                     <div className="min-w-0 flex-1"><div className="font-medium text-slate-700">{item.label}{item.count > 1 ? ` × ${item.count}` : ''}</div>{item.detail && <div className="mt-0.5 text-[11px] text-slate-500">{item.detail}</div>}</div>
@@ -649,8 +676,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             )}
           </div>
 
-          <SheetFooter className="sticky bottom-0 z-10 mt-0 shrink-0 border-t border-black/6 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 flex-1 items-start gap-2 text-left text-xs text-slate-500">
+          <SheetFooter className="sticky bottom-0 z-10 mt-0 shrink-0 flex-col gap-3 border-t border-black/6 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 w-full flex-1 items-start gap-2 text-left text-xs text-slate-500 sm:w-auto">
               <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
               {binding
                 ? sessionSummary?.detail
@@ -658,11 +685,11 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   ? 'Work is already active for this task.'
                   : 'Omvra checks the agent, working directory, model, and task instructions before work starts.'}
             </div>
-            <div className="flex shrink-0 justify-end gap-2">
-              <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={() => setOpen(false)}>{binding ? 'Minimize supervision' : 'Close'}</button>
-              {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40">Open externally</button>}
-              {task.status !== 'done' && binding?.state === 'ready' && <button type="button" onClick={() => void continueTaskSession()} disabled={operationBusy} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{operationBusy ? 'Continuing…' : 'Continue work'}</button>}
-              {task.status !== 'done' && (binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume task' : binding?.state === 'closed' ? 'Continue task' : binding?.state === 'failed' ? 'Reconnect and continue' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
+            <div className="flex w-full shrink-0 flex-wrap justify-end gap-2 sm:w-auto">
+              <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1" onClick={() => setOpen(false)}>{binding ? 'Minimize supervision' : 'Close'}</button>
+              {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1">Open externally</button>}
+              {task.status !== 'done' && binding?.state === 'ready' && <button type="button" onClick={() => void continueTaskSession()} disabled={operationBusy} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1">{operationBusy ? 'Continuing…' : 'Continue work'}</button>}
+              {task.status !== 'done' && (binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white outline-none disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume task' : binding?.state === 'closed' ? 'Continue task' : binding?.state === 'failed' ? 'Reconnect and continue' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
             </div>
           </SheetFooter>
         </SheetContent>

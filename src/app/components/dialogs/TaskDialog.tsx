@@ -422,7 +422,7 @@ export function TaskDialog({
           description={task ? 'Edit the task details below.' : 'Enter the task details below.'}
           navGroups={editNavGroups}
           footer={(
-            <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 {task && onDelete && (
                   <Button
@@ -436,7 +436,7 @@ export function TaskDialog({
                   </Button>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-3">
+              <div className="flex w-full shrink-0 items-center justify-end gap-3 sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"

@@ -182,7 +182,7 @@ export function AnchoredPanel({
             {children}
           </AnchoredPanelScrollView>
           {footer && (
-            <div className="pointer-events-none absolute -bottom-px -left-px -right-px z-10 flex h-[82px] items-end bg-gradient-to-t from-white via-white to-white/0 px-8 pb-[17px]">
+            <div className="pointer-events-none absolute -bottom-px -left-px -right-px z-10 flex min-h-[82px] items-end bg-gradient-to-t from-white via-white to-white/0 px-8 py-3">
               <div className="pointer-events-auto w-full">
                 {footer}
               </div>
@@ -203,8 +203,8 @@ interface AnchoredPanelNavProps {
 
 export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: AnchoredPanelNavProps) {
   return (
-    <nav className="omvra-settings-nav min-h-0 overflow-hidden px-2 pb-2 pt-7" aria-label="Panel sections">
-      <div className="flex gap-4 sm:block">
+    <nav className="omvra-settings-nav min-h-0 overflow-x-auto overflow-y-hidden px-2 pb-2 pt-7" aria-label="Panel sections">
+      <div className="flex min-w-max gap-4 sm:min-w-0 sm:block">
         {onBack && (
           <Button type="button" variant="ghost" onClick={onBack} className="justify-start px-3">
             Back

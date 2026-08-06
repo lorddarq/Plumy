@@ -109,6 +109,8 @@ const WORKSPACE_FACADE_EXPORTS = [
   'updateTaskDescription',
   'updateTaskDetails',
   'updateAgentRuntimeSessionBinding',
+  'updateAgentRuntimeTaskExecution',
+  'finalizeAgentRuntimeAttempt',
 ].sort();
 
 const ADMIN_MCP_TOOLS = [

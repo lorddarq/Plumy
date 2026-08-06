@@ -194,13 +194,13 @@ export function MilestoneDetailsDialog({
             <DialogTitle>{milestone?.title || 'Roadmap milestone'}</DialogTitle>
             <DialogDescription>Review milestone details, linked tasks, and dependency context.</DialogDescription>
           </div>
-          <div className="flex items-start justify-between border-b border-black/6 px-8 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/6 px-8 py-5">
             <div className="min-w-0">
               <h2 className="break-words text-[18px] font-normal tracking-[-0.02em] text-[#71717a] [overflow-wrap:anywhere]">
                 {milestone?.title || 'Roadmap milestone'}
               </h2>
             </div>
-            <div className="ml-4 shrink-0">
+            <div className="ml-0 shrink-0 sm:ml-4">
               <TaskDetailsActionMenu
                 copyState={copyState}
                 canEdit={Boolean(milestone)}

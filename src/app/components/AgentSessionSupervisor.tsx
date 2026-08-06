@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type Context, type ReactNode } from 'react';
 import type { Task, TimelineSwimlane } from '../types';
 import { TaskExecutionAction } from './TaskExecutionAction';
+import { getSessionAttentionState } from '../utils/attention';
 
 export const ACTIVE_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
 const HISTORY_SESSION_STATES = new Set(['interrupted', 'failed', 'closed', 'complete', 'completed']);
@@ -39,7 +40,15 @@ export interface SessionDockProjection {
   items: SessionDockItem[];
 }
 
-const AgentSessionSupervisorContext = createContext<AgentSessionSupervisorContextValue | null>(null);
+type AgentSessionSupervisorGlobal = typeof globalThis & {
+  __omvraAgentSessionSupervisorContext?: Context<AgentSessionSupervisorContextValue | null>;
+};
+
+// Vite can refresh this module while preserving mounted children. Keep the
+// context identity stable so those children do not lose access to the provider.
+const agentSessionSupervisorGlobal = globalThis as AgentSessionSupervisorGlobal;
+const AgentSessionSupervisorContext = agentSessionSupervisorGlobal.__omvraAgentSessionSupervisorContext
+  || (agentSessionSupervisorGlobal.__omvraAgentSessionSupervisorContext = createContext<AgentSessionSupervisorContextValue | null>(null));
 
 export function useAgentSessionSupervisor() {
   const context = useContext(AgentSessionSupervisorContext);
@@ -104,6 +113,10 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
   const historyBinding = [...bindings].reverse().find(binding => HISTORY_SESSION_STATES.has(binding.state));
   const dockBinding = activeBinding || historyBinding;
   const dockTask = dockBinding?.scope?.taskId ? tasks.find(task => task.id === dockBinding.scope?.taskId) : undefined;
+  const activeTask = activeBinding?.scope?.taskId ? tasks.find(task => task.id === activeBinding.scope?.taskId) : undefined;
+  const activeAttention = activeBinding
+    ? getSessionAttentionState({ bindingState: activeBinding.state, executionState: activeBinding.taskExecution?.state, taskStatus: activeTask?.status })
+    : undefined;
   const dockItems = [...bindings]
     .filter(binding => binding.scope?.kind === 'task' && tasks.some(task => task.id === binding.scope?.taskId))
     .sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''))
@@ -112,7 +125,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
   const blockedByActiveSession = Boolean(activeBinding && request && activeBinding.scope?.taskId !== request.task.id);
   const sessionDock = useMemo<SessionDockProjection>(() => ({
     state: blockedByActiveSession ? 'blocked' : activeBinding
-      ? activeBinding.state === 'starting' ? 'starting' : activeBinding.state === 'needs-input' ? 'needs-input' : activeBinding.state === 'ready' && activeBinding.taskExecution?.state === 'batch-finished' ? 'ready' : supervisionVisible ? 'working' : 'hidden-active'
+      ? activeBinding.state === 'starting' ? 'starting' : activeBinding.state === 'needs-input' ? 'needs-input' : ['batch-finished', 'outcome-review', 'review'].includes(activeAttention?.kind || '') ? 'ready' : activeBinding.state === 'ready' ? 'ready' : supervisionVisible ? 'working' : 'hidden-active'
       : historyBinding?.state === 'interrupted' ? 'interrupted'
         : historyBinding?.state === 'failed' ? 'failed'
           : historyBinding ? 'history' : 'none',
@@ -120,7 +133,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
     task: dockTask,
     historyCount: bindings.filter(binding => HISTORY_SESSION_STATES.has(binding.state)).length,
     items: dockItems,
-  }), [activeBinding, bindings, blockedByActiveSession, dockBinding, dockItems, dockTask, historyBinding, supervisionVisible]);
+  }), [activeAttention, activeBinding, bindings, blockedByActiveSession, dockBinding, dockItems, dockTask, historyBinding, supervisionVisible]);
   const value = useMemo(() => ({ requestTask, sessionDock, openSession: openBinding }), [openBinding, requestTask, sessionDock]);
   return (
     <AgentSessionSupervisorContext.Provider value={value}>
