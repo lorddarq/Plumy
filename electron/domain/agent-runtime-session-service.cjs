@@ -250,6 +250,7 @@ function createAgentRuntimeSessionService({
       ...(startedAt && finishedAt ? { durationMs: Date.parse(finishedAt) - Date.parse(startedAt) } : {}),
       ...(safeIdentifier(input.state, 80) ? { state: safeIdentifier(input.state, 80) } : {}),
       ...(safeIdentifier(input.outcome, 80) ? { outcome: safeIdentifier(input.outcome, 80) } : {}),
+      ...(typeof input.messagePreview === 'string' && input.messagePreview.trim() ? { messagePreview: input.messagePreview.trim().slice(0, 500) } : {}),
       ...(safeIdentifier(input.requestId === undefined || input.requestId === null ? '' : String(input.requestId)) ? { requestId: safeIdentifier(String(input.requestId)) } : {}),
       ...(safeIdentifier(input.toolName) ? { toolName: safeIdentifier(input.toolName) } : {}),
       ...(capabilityId ? { capabilityId } : {}),

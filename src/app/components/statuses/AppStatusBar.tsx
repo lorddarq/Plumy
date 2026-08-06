@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useState } from 'react';
 import { cn } from '../ui/utils';
 import {
   deriveAgentStatuses,
@@ -13,6 +14,7 @@ import type { AgentWatchConfig } from '../../utils/workspaceSanitizers';
 import type { AgentWatchRuntimeState } from '../../hooks/useAgentWatchRuntime';
 import { AgentIcon } from '../icons/AgentIcon';
 import { FiltersIcon } from '../SettingsPanel';
+import { useAgentSessionSupervisor } from '../AgentSessionSupervisor';
 
 export interface AppStatusBarProps {
   tasks: Task[];
@@ -35,6 +37,7 @@ export function AppStatusBar({
   mcpListenerStatus,
   mcpRestartPending,
 }: AppStatusBarProps) {
+  const { sessionDock, openSession } = useAgentSessionSupervisor();
   const agents = rollupAgentStatuses(
     deriveAgentStatuses({ people, tasks, agentWatchConfigs, agentWatchRuntime, mcpAuditLog })
   );
@@ -77,7 +80,7 @@ export function AppStatusBar({
   return (
     <div
       className="flex min-h-8 items-center gap-3 border-t border-black/5 bg-gray-50 px-4 py-2 text-xs text-gray-600"
-      aria-label={`Agent status: ${agents.counts.writing} writing to MCP, ${agents.counts.working} working, ${agents.counts.idle} idle, ${agents.counts.unavailable} unavailable. ${mcp.label}.`}
+      aria-label={`Agent status: ${agents.counts.writing} writing to MCP, ${agents.counts.working} working, ${agents.counts.idle} idle, ${agents.counts.unavailable} unavailable. Work status: ${getSessionDockLabel(sessionDock)}. ${mcp.label}.`}
     >
       <div className="flex min-w-0 items-center gap-2">
         <span className="shrink-0 text-gray-500">
@@ -114,6 +117,7 @@ export function AppStatusBar({
           </>
         ) : null}
       </div>
+      <SessionDockStatus sessionDock={sessionDock} onOpen={openSession} />
       <StatusPill
         icon={<FiltersIcon className="size-3.5" aria-hidden="true" />}
         label="MCP:"
@@ -123,6 +127,91 @@ export function AppStatusBar({
       />
     </div>
   );
+}
+
+function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<typeof useAgentSessionSupervisor>['sessionDock']; onOpen: ReturnType<typeof useAgentSessionSupervisor>['openSession'] }) {
+  const [expanded, setExpanded] = useState(false);
+  const label = getSessionDockLabel(sessionDock);
+  const detail = sessionDock.task?.title
+    ? sessionDock.task.title
+    : (sessionDock.historyCount > 0 ? `${sessionDock.historyCount} session${sessionDock.historyCount === 1 ? '' : 's'} in history` : 'No session selected');
+  const buttonLabel = sessionDock.binding && sessionDock.task ? `Open supervision: ${label} for ${sessionDock.task.title}` : undefined;
+  const hasSessions = sessionDock.items.length > 0;
+  return (
+    <div className="relative min-w-0 shrink">
+      <button
+        type="button"
+        onClick={() => hasSessions && setExpanded(current => !current)}
+        aria-expanded={expanded}
+        aria-label={buttonLabel || `Work status: ${label}`}
+        className="flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+      >
+        <span className={`size-2 shrink-0 rounded-full ${sessionDock.state === 'working' || sessionDock.state === 'hidden-active' ? 'bg-emerald-500' : sessionDock.state === 'needs-input' ? 'bg-amber-500' : sessionDock.state === 'failed' ? 'bg-red-500' : 'bg-slate-300'}`} aria-hidden="true" />
+        <span className="whitespace-nowrap text-center text-xs font-medium text-[#828282]">Work:</span>
+        <span className="whitespace-nowrap text-[11px] font-semibold text-slate-600">{label}</span>
+        <span className="max-w-44 truncate text-[11px] text-slate-400" title={detail}>{detail}</span>
+        {hasSessions && <span className={`ml-0.5 text-[10px] text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>}
+      </button>
+
+      {expanded && hasSessions && (
+        <div className="absolute bottom-full left-0 z-30 mb-2 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-[0_14px_36px_rgba(15,23,42,0.16)]">
+          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
+            <div>
+              <div className="text-xs font-semibold text-slate-800">Agent work</div>
+              <div className="mt-0.5 text-[11px] text-slate-400">Latest and recent task sessions</div>
+            </div>
+            <span className="text-[11px] text-slate-400">{sessionDock.items.length} shown</span>
+          </div>
+          {sessionDock.items.map(({ binding, task }, index) => {
+            const state = getSessionItemState(binding.state);
+            const isLatest = index === 0;
+            return (
+              <div key={binding.id} className={`border-b border-slate-100 last:border-0 ${isLatest ? 'bg-slate-50/80' : 'bg-white'}`}>
+                <button type="button" onClick={() => { setExpanded(false); onOpen(binding); }} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500">
+                  <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${state.className}`}>{state.icon}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-xs font-medium text-slate-700">{task?.title || 'Untitled task'}</span>
+                      {isLatest && <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Latest</span>}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] text-slate-400">{state.label}{task?.status === 'done' ? ' · Task complete' : ''}</span>
+                  </span>
+                  <span className="shrink-0 text-[11px] font-medium text-slate-500">Open</span>
+                </button>
+                {isLatest && binding.state === 'needs-input' && (
+                  <div className="mx-3 mb-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+                    <div className="text-[11px] font-semibold text-amber-900">The agent needs your input</div>
+                    <div className="mt-0.5 text-[11px] leading-4 text-amber-800">Open supervision to review the request and continue.</div>
+                    <button type="button" onClick={() => { setExpanded(false); onOpen(binding); }} className="mt-2 rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-slate-700">Review request</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getSessionItemState(state: string) {
+  if (state === 'active' || state === 'starting' || state === 'cancelling') return { label: state === 'starting' ? 'Starting work' : state === 'cancelling' ? 'Stopping work' : 'Working now', icon: '2', className: 'bg-blue-100 text-blue-700' };
+  if (state === 'needs-input') return { label: 'Waiting for your input', icon: '!', className: 'bg-amber-100 text-amber-700' };
+  if (state === 'failed') return { label: 'Failed · Review needed', icon: '×', className: 'bg-red-100 text-red-700' };
+  if (state === 'interrupted') return { label: 'Interrupted · Can resume', icon: '↻', className: 'bg-amber-100 text-amber-700' };
+  if (state === 'ready') return { label: 'Batch finished · More work possible', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };
+  return { label: 'Completed session', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };
+}
+
+function getSessionDockLabel(sessionDock: ReturnType<typeof useAgentSessionSupervisor>['sessionDock']): string {
+  return sessionDock.state === 'none' ? 'No active work'
+    : sessionDock.state === 'starting' ? 'Starting'
+      : sessionDock.state === 'working' ? 'Working'
+        : sessionDock.state === 'hidden-active' ? 'Hidden active session'
+          : sessionDock.state === 'needs-input' ? 'Needs your input'
+            : sessionDock.state === 'interrupted' ? 'Interrupted'
+              : sessionDock.state === 'failed' ? 'Failed'
+              : sessionDock.state === 'blocked' ? 'Second start blocked by active session' : 'Completed / history';
 }
 
 function getMcpBadgeValue(label: string): string {

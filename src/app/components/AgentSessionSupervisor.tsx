@@ -1,16 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Task, TimelineSwimlane } from '../types';
-import { AgentIcon } from './icons/AgentIcon';
 import { TaskExecutionAction } from './TaskExecutionAction';
 
-const ACTIVE_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
-const RECOVERABLE_SESSION_STATES = new Set([...ACTIVE_SESSION_STATES, 'interrupted', 'failed']);
+export const ACTIVE_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
+const HISTORY_SESSION_STATES = new Set(['interrupted', 'failed', 'closed', 'complete', 'completed']);
 
-interface SessionBinding {
+export interface SessionBinding {
   id: string;
   state: string;
   workspacePath?: string;
   scope?: { kind?: string; taskId?: string; goalId?: string; goalElementId?: string };
+}
+
+export interface SessionDockItem {
+  binding: SessionBinding;
+  task?: Task;
 }
 
 interface AgentSessionRequest {
@@ -22,6 +26,16 @@ interface AgentSessionRequest {
 
 interface AgentSessionSupervisorContextValue {
   requestTask: (task: Task, options?: { repositoryFolder?: string; startOnRequest?: boolean }) => void;
+  sessionDock: SessionDockProjection;
+  openSession: (binding: SessionBinding) => void;
+}
+
+export interface SessionDockProjection {
+  state: 'none' | 'starting' | 'working' | 'hidden-active' | 'needs-input' | 'interrupted' | 'failed' | 'history' | 'blocked';
+  binding?: SessionBinding;
+  task?: Task;
+  historyCount: number;
+  items: SessionDockItem[];
 }
 
 const AgentSessionSupervisorContext = createContext<AgentSessionSupervisorContextValue | null>(null);
@@ -35,6 +49,7 @@ export function useAgentSessionSupervisor() {
 export function AgentSessionSupervisorProvider({ children, tasks, projects }: { children: ReactNode; tasks: Task[]; projects: TimelineSwimlane[] }) {
   const [request, setRequest] = useState<AgentSessionRequest | null>(null);
   const [bindings, setBindings] = useState<SessionBinding[]>([]);
+  const [supervisionVisible, setSupervisionVisible] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -50,8 +65,12 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       }
     };
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 2500);
-    const unsubscribe = window.electron?.onStoreChanged?.(() => void refresh());
+    const timer = window.setInterval(() => void refresh(), 10000);
+    const unsubscribe = window.electron?.agentRuntime?.sessions?.onEvent?.((payload) => {
+      const nextBinding = payload?.binding as SessionBinding | undefined;
+      if (!nextBinding) return;
+      setBindings(current => [...current.filter(binding => binding.id !== nextBinding.id), nextBinding]);
+    });
     return () => {
       disposed = true;
       window.clearInterval(timer);
@@ -67,10 +86,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       requestId: (current?.requestId || 0) + 1,
     }));
   }, []);
-  const value = useMemo(() => ({ requestTask }), [requestTask]);
-  const visibleBinding = [...bindings].reverse().find(binding => RECOVERABLE_SESSION_STATES.has(binding.state));
-  const visibleTask = visibleBinding?.scope?.taskId ? tasks.find(task => task.id === visibleBinding.scope?.taskId) : undefined;
-  const openBinding = (binding: SessionBinding) => {
+  const openBinding = useCallback((binding: SessionBinding) => {
     const task = binding.scope?.taskId ? tasks.find(candidate => candidate.id === binding.scope?.taskId) : undefined;
     if (!task) return;
     const project = projects.find(candidate => task.projectIds?.includes(candidate.id) || candidate.id === task.swimlaneId);
@@ -80,32 +96,32 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       startOnRequest: false,
       requestId: (current?.requestId || 0) + 1,
     }));
-  };
-  const visibleStatusLabel = visibleBinding?.state === 'needs-input'
-    ? 'Input needed'
-    : visibleBinding?.state === 'interrupted'
-      ? 'Session interrupted'
-      : visibleBinding?.state === 'failed'
-        ? 'Session failed'
-        : 'Agent working';
-  const visibleStatusClass = visibleBinding?.state === 'needs-input'
-    ? 'text-amber-600'
-    : visibleBinding?.state === 'failed'
-      ? 'text-red-600'
-      : visibleBinding?.state === 'interrupted'
-        ? 'text-orange-600'
-        : 'text-emerald-600';
-
+  }, [projects, tasks]);
+  const activeBinding = [...bindings].reverse().find(binding => ACTIVE_SESSION_STATES.has(binding.state));
+  const historyBinding = [...bindings].reverse().find(binding => HISTORY_SESSION_STATES.has(binding.state));
+  const dockBinding = activeBinding || historyBinding;
+  const dockTask = dockBinding?.scope?.taskId ? tasks.find(task => task.id === dockBinding.scope?.taskId) : undefined;
+  const dockItems = [...bindings]
+    .filter(binding => binding.scope?.kind === 'task' && tasks.some(task => task.id === binding.scope?.taskId))
+    .sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''))
+    .slice(0, 8)
+    .map(binding => ({ binding, task: tasks.find(task => task.id === binding.scope?.taskId) }));
+  const blockedByActiveSession = Boolean(activeBinding && request && activeBinding.scope?.taskId !== request.task.id);
+  const sessionDock = useMemo<SessionDockProjection>(() => ({
+    state: blockedByActiveSession ? 'blocked' : activeBinding
+      ? activeBinding.state === 'starting' ? 'starting' : activeBinding.state === 'needs-input' ? 'needs-input' : supervisionVisible ? 'working' : 'hidden-active'
+      : historyBinding?.state === 'interrupted' ? 'interrupted'
+        : historyBinding?.state === 'failed' ? 'failed'
+          : historyBinding ? 'history' : 'none',
+    binding: dockBinding,
+    task: dockTask,
+    historyCount: bindings.filter(binding => HISTORY_SESSION_STATES.has(binding.state)).length,
+    items: dockItems,
+  }), [activeBinding, bindings, blockedByActiveSession, dockBinding, dockItems, dockTask, historyBinding, supervisionVisible]);
+  const value = useMemo(() => ({ requestTask, sessionDock, openSession: openBinding }), [openBinding, requestTask, sessionDock]);
   return (
     <AgentSessionSupervisorContext.Provider value={value}>
       {children}
-      {visibleBinding && visibleTask && <button type="button" onClick={() => openBinding(visibleBinding)} className="fixed bottom-12 right-4 z-50 flex min-h-11 max-w-[min(320px,calc(100vw-2rem))] items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-lg shadow-slate-900/10 hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label={`Reopen minimized supervision for ${visibleTask.title}`}>
-        <AgentIcon className={`size-4 shrink-0 ${visibleStatusClass}`} aria-hidden="true" />
-        <span className="min-w-0 text-left">
-          <span className={`block truncate ${visibleStatusClass}`}>{visibleStatusLabel}</span>
-          <span className="block truncate text-[11px] font-medium text-slate-500" title={visibleTask.title}>{visibleTask.title}</span>
-        </span>
-      </button>}
       {request && (
         <TaskExecutionAction
           key={request.requestId}
@@ -113,6 +129,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
           repositoryFolder={request.repositoryFolder}
           openRequest={request.requestId}
           startOnOpenRequest={request.startOnRequest}
+          onVisibilityChange={setSupervisionVisible}
           trigger={null}
         />
       )}

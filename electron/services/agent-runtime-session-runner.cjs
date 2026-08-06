@@ -21,6 +21,7 @@ function createAgentRuntimeSessionRunner({
   issueMcpGrant = null,
   revokeMcpGrant = null,
   updateTaskExecutionState = null,
+  emitRuntimeEvent = null,
   createClient = createNativeRuntimeClient,
   now = () => new Date().toISOString(),
   logger = null,
@@ -40,10 +41,21 @@ function createAgentRuntimeSessionRunner({
     'This runtime session is not active in the current Omvra app process. It may belong to an earlier app process or provider history state. Start a new session; Omvra will keep the current task context.',
   );
   const log = (level, event, details = {}) => logger?.[level]?.(`[agent-runtime] ${event}`, details);
+  const emit = (payload) => {
+    try { emitRuntimeEvent?.(payload); } catch (error) { log('warn', 'live-event.emit-failed', { message: error?.message || String(error) }); }
+  };
+  const appendRuntimeEvent = (payload) => {
+    const result = appendEvent(store, payload);
+    if (result?.ok && !result.idempotent && result.event) {
+      emit({ kind: 'event', event: result.event, binding: bindingFor(result.event.bindingId) });
+    }
+    return result;
+  };
   const syncTaskExecution = (binding, state, details = {}) => {
     if (typeof updateTaskExecutionState !== 'function' || binding?.scope?.kind !== 'task') return null;
     const result = updateTaskExecutionState(store, { taskId: binding.scope.taskId, attemptId: binding.scope.executionAttemptId, state, ...details });
     if (!result?.ok) log('warn', 'task-execution.state-sync-failed', { bindingId: binding.id, state, error: result?.error });
+    else emit({ kind: 'binding', binding: bindingFor(binding.id) || binding });
     return result;
   };
   const requestKey = (bindingId, requestId) => `${bindingId}:${typeof requestId}:${String(requestId)}`;
@@ -158,6 +170,7 @@ function createAgentRuntimeSessionRunner({
     else {
       const taskState = { starting: 'starting', ready: 'ready', active: 'working', 'needs-input': 'waiting', cancelling: 'stopping', interrupted: 'interrupted', failed: 'failed', closed: 'stopped' }[state];
       if (taskState) syncTaskExecution(result.binding || current, taskState, { reason: state });
+      emit({ kind: 'binding', binding: result.binding || current });
       log('info', 'binding.state-changed', { bindingId, from: current.state, to: state });
     }
     return result.binding || current;
@@ -177,7 +190,7 @@ function createAgentRuntimeSessionRunner({
       }
     }
     const binding = updated.ok ? updated.binding : bindingFor(bindingId) || current;
-    appendEvent(store, {
+    appendRuntimeEvent({
       bindingId,
       runtimeProfileId: binding.runtimeProfileId,
       kind: 'session',
@@ -208,7 +221,7 @@ function createAgentRuntimeSessionRunner({
     const completedBatches = (automaticBatchCounts.get(bindingId) || 0) + 1;
     automaticBatchCounts.set(bindingId, completedBatches);
     if (completedBatches > maxAutomaticBatches) {
-      appendEvent(store, {
+      appendRuntimeEvent({
         bindingId,
         runtimeProfileId: current.runtimeProfileId,
         kind: 'session',
@@ -224,7 +237,7 @@ function createAgentRuntimeSessionRunner({
       try {
         const latest = bindingFor(bindingId);
         if (!latest || latest.state !== 'ready' || !taskMayContinue(latest)) return;
-        appendEvent(store, {
+      appendRuntimeEvent({
           bindingId,
           runtimeProfileId: latest.runtimeProfileId,
           kind: 'session',
@@ -267,7 +280,7 @@ function createAgentRuntimeSessionRunner({
     log(summary.state === 'failed' ? 'warn' : 'debug', 'notification', summary);
     const elicitation = sanitizedElicitation(binding.id, message);
     if (elicitation) pendingRequests.set(requestKey(binding.id, elicitation.requestId), elicitation);
-    const appended = appendEvent(store, {
+    const appended = appendRuntimeEvent({
       bindingId: binding.id,
       runtimeProfileId: binding.runtimeProfileId,
       kind,
@@ -285,6 +298,9 @@ function createAgentRuntimeSessionRunner({
       contextTokens: params.usage?.contextTokens,
       cost: params.usage?.cost,
       currency: params.usage?.currency,
+      messagePreview: method === 'item/agentMessage/delta'
+        ? (typeof params.delta === 'string' ? params.delta : typeof params.text === 'string' ? params.text : undefined)
+        : undefined,
       idempotencyKey: `runtime:${binding.id}:${randomUUID()}`,
     });
     if (method === 'turn/started') syncBindingState(binding.id, 'active');
@@ -430,7 +446,7 @@ function createAgentRuntimeSessionRunner({
       clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profile.id, mcpGrantId: mcp.grant?.grantId || null });
       if (contextPack.text) {
         log('info', 'context.prompting', { bindingId: binding.id, contextEntryCount: confirmed.contractSnapshot.contextEntryIds?.length || 0 });
-        appendEvent(store, { bindingId: binding.id, runtimeProfileId: profile.id, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${binding.id}:task-instructions` });
+        appendRuntimeEvent({ bindingId: binding.id, runtimeProfileId: profile.id, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${binding.id}:task-instructions` });
         syncTaskExecution(bindingFor(binding.id) || binding, 'working', { batchNumber: 1, reason: 'initial-prompt' });
         await client.prompt(session.sessionId, contextPack.text);
         log('info', 'context.accepted', { bindingId: binding.id });
@@ -552,7 +568,7 @@ function createAgentRuntimeSessionRunner({
     try {
       if (automatic && current.state === 'ready') syncBindingState(bindingId, 'active');
       syncTaskExecution(bindingFor(bindingId) || current, automatic ? 'continuing' : 'working', { reason: automatic ? 'automatic-batch' : 'manual-batch', batchNumber: Number(current.taskExecution?.batchNumber || 0) + 1 });
-      appendEvent(store, { bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${randomUUID()}` });
+      appendRuntimeEvent({ bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${randomUUID()}` });
       await session.client.prompt(current.opaqueSessionRef, text);
       return { ok: true, binding: bindingFor(bindingId) || current };
     } catch (error) {
@@ -611,7 +627,7 @@ function createAgentRuntimeSessionRunner({
       const contextPack = buildCurrentTaskContext(ready.binding);
       if (!contextPack.ok) throw Object.assign(new Error(contextPack.message), { code: contextPack.error });
       if (contextPack.text) {
-        appendEvent(store, { bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${ready.binding.revision}` });
+        appendRuntimeEvent({ bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${ready.binding.revision}` });
         await client.prompt(current.opaqueSessionRef, contextPack.text);
       }
       return { ...ready, binding: bindingFor(bindingId) || ready.binding };

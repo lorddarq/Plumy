@@ -54,6 +54,8 @@ interface SessionBinding {
 
 interface SessionEvent extends AgentRuntimeActivityEvent {
   requestId?: string | number;
+  bindingId?: string;
+  workScope?: string;
 }
 
 interface PendingRuntimeRequest {
@@ -73,6 +75,7 @@ interface TaskExecutionActionProps {
   trigger?: ReactNode;
   openRequest?: number;
   onOpenRequestHandled?: () => void;
+  onVisibilityChange?: (visible: boolean) => void;
   startOnTrigger?: boolean;
   startOnOpenRequest?: boolean;
   onOpen?: () => void;
@@ -95,7 +98,7 @@ function taskStatusLabel(status: Task['status']) {
 
 const ACTIVE_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
 
-export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
+export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, onVisibilityChange, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
   const [open, setOpen] = useState(false);
   const [startRequested, setStartRequested] = useState(false);
   const [sessionLoaded, setSessionLoaded] = useState(false);
@@ -132,6 +135,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     console.error(`[agent-runtime:ui] ${operation}.failed`, { taskId: task.id, bindingId: binding?.id || null, message, error: caught });
     setError(message);
   };
+
+  useEffect(() => {
+    onVisibilityChange?.(open);
+  }, [onVisibilityChange, open]);
 
   useEffect(() => {
     if (openRequest) {
@@ -195,9 +202,21 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   useEffect(() => {
     if (!open) return;
     void refreshSession();
-    const timer = window.setInterval(() => void refreshSession(), 2500);
-    return () => window.clearInterval(timer);
-  }, [open, task.id]);
+    const unsubscribe = window.electron?.agentRuntime?.sessions?.onEvent?.((payload) => {
+      const nextBinding = payload?.binding as SessionBinding | undefined;
+      const nextEvent = payload?.event as SessionEvent | undefined;
+      if (nextBinding?.scope?.taskId !== task.id && nextEvent?.workScope !== 'task') return;
+      if (nextBinding?.scope?.taskId === task.id) {
+        refreshSequence.current += 1;
+        setBinding(nextBinding);
+      }
+      if (nextEvent?.bindingId && (nextBinding?.scope?.taskId === task.id || binding?.id === nextEvent.bindingId)) {
+        setEvents(current => current.some(event => event.id === nextEvent.id) ? current : [...current, nextEvent].slice(-100));
+      }
+    });
+    const timer = window.setInterval(() => void refreshSession(), 10000);
+    return () => { window.clearInterval(timer); unsubscribe?.(); };
+  }, [open, task.id, binding?.id]);
 
   const observation = resolution?.profile ? runtimeState?.observations?.[resolution.profile.id] : undefined;
   const blockers = [...new Set([
@@ -215,7 +234,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', complete: 'Complete' };
   const latestTurnStartIndex = events.findLastIndex(event => event.nativeEventType === 'turn/started');
   const latestRunEvents = latestTurnStartIndex < 0 ? [] : events.slice(latestTurnStartIndex).filter(event =>
-    ['turn/started', 'turn/completed', 'item/started', 'item/completed', 'warning', 'error', 'omvra/taskBatch/automatic-continuing', 'omvra/taskBatch/automatic-limit-reached'].includes(event.nativeEventType || '')
+    ['turn/started', 'turn/completed', 'item/agentMessage/delta', 'item/started', 'item/completed', 'warning', 'error', 'omvra/taskBatch/automatic-continuing', 'omvra/taskBatch/automatic-limit-reached'].includes(event.nativeEventType || '')
   );
   const activity = summarizeAgentRuntimeActivity(latestRunEvents);
   const visibleActivity = activity.length > 0 ? activity : binding?.state === 'interrupted'

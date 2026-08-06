@@ -2,6 +2,23 @@ const { contextBridge, ipcRenderer } = require('electron');
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';
 const GOAL_RUNTIME_CHANGED_CHANNEL = 'goals/runtime-changed';
+const AGENT_RUNTIME_EVENT_CHANNEL = 'agent-runtime/event';
+const RENDERER_DIAGNOSTIC_CHANNEL = 'renderer/diagnostic';
+
+function reportRendererDiagnostic(kind, error) {
+  const value = error?.reason || error?.error || error;
+  ipcRenderer.send(RENDERER_DIAGNOSTIC_CHANNEL, {
+    kind,
+    message: typeof value === 'string' ? value.slice(0, 1000) : value?.message?.slice?.(0, 1000) || String(value).slice(0, 1000),
+    stack: value?.stack?.slice?.(0, 4000) || null,
+    url: typeof window !== 'undefined' ? window.location.href : null,
+  });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', event => reportRendererDiagnostic('window-error', event.error || event.message));
+  window.addEventListener('unhandledrejection', event => reportRendererDiagnostic('unhandled-rejection', event.reason));
+}
 
 contextBridge.exposeInMainWorld('electron', {
   // Store
@@ -96,6 +113,12 @@ contextBridge.exposeInMainWorld('electron', {
     openExternal: (payload) => ipcRenderer.invoke('agent-runtime/open-external', payload),
     sessions: {
       list: (payload) => ipcRenderer.invoke('agent-runtime/sessions/list', payload),
+      onEvent: (listener) => {
+        if (typeof listener !== 'function') return () => {};
+        const wrappedListener = (_event, payload) => listener(payload);
+        ipcRenderer.on(AGENT_RUNTIME_EVENT_CHANNEL, wrappedListener);
+        return () => ipcRenderer.removeListener(AGENT_RUNTIME_EVENT_CHANNEL, wrappedListener);
+      },
       requests: (bindingId) => ipcRenderer.invoke('agent-runtime/sessions/requests', bindingId),
       createBinding: (payload) => ipcRenderer.invoke('agent-runtime/sessions/create-binding', payload),
       updateBinding: (payload) => ipcRenderer.invoke('agent-runtime/sessions/update-binding', payload),

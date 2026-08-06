@@ -7,6 +7,7 @@ export interface AgentRuntimeActivityEvent {
   observedAt?: string;
   toolName?: string;
   usage?: { totalTokens?: number; inputTokens?: number; outputTokens?: number; cost?: number; currency?: string };
+  messagePreview?: string;
 }
 
 export interface AgentRuntimeActivityItem {
@@ -28,7 +29,7 @@ function describeEvent(event: AgentRuntimeActivityEvent): Omit<AgentRuntimeActiv
     : state === 'interrupted'
       ? { label: 'Agent work was interrupted', tone: 'warning' }
       : { label: 'Agent finished the latest run', tone: 'positive' };
-  if (native === 'item/agentMessage/delta') return { label: 'Agent shared an update', tone: 'neutral' };
+  if (native === 'item/agentMessage/delta') return { label: 'Agent shared an update', detail: event.messagePreview, tone: 'neutral' };
   if (native === 'item/started') {
     const labels: Record<string, string> = { reasoning: 'Thinking through the task', commandExecution: 'Running a command', fileSearch: 'Searching project files', fileChange: 'Editing files', mcpToolCall: 'Using a task tool', webSearch: 'Researching', agentMessage: 'Preparing an update' };
     return { label: labels[event.toolName || ''] || 'Working on a task step', tone: 'neutral' };

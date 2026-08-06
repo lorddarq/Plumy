@@ -46,11 +46,9 @@ test('the app-level supervisor is the only renderer owner of TaskExecutionAction
 test('the supervisor owns a live session registry and a reopenable active-session dock', () => {
   const source = readComponent('AgentSessionSupervisor.tsx');
   assert.match(source, /sessions\?\.list/);
-  assert.match(source, /setInterval\(\(\) => void refresh\(\), 2500\)/);
-  assert.match(source, /onStoreChanged/);
-  assert.match(source, /Reopen minimized supervision for/);
-  assert.match(source, /<AgentIcon/);
-  assert.match(source, /truncate text-\[11px\]/);
+  assert.match(source, /setInterval\(\(\) => void refresh\(\), 10000\)/);
+  assert.match(source, /sessions\?\.onEvent/);
+  assert.match(source, /openSession/);
   const execution = readComponent('TaskExecutionAction.tsx');
   assert.match(execution, /showClose=\{false\}/);
   assert.match(execution, /Minimize supervision/);
@@ -63,12 +61,23 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(source, /workspacePath \|\| task\.repositoryFolder \|\| project\?\.repositoryFolder/);
   assert.match(execution, /result\.error === 'ACP_SESSION_NOT_FOUND'/);
   assert.match(execution, /onOpenChange=\{nextOpen => \{ setOpen\(nextOpen\); if \(!nextOpen\) setStartRequested\(false\); \}\}/);
+  assert.match(execution, /onVisibilityChange\?\.\(open\)/);
   assert.match(execution, /if \(!open \|\| !startRequested \|\| loading \|\| !sessionLoaded \|\| operationBusy\) return/);
   const milestone = readComponent('MilestoneExecutionAction.tsx');
   assert.match(milestone, /disabled=\{!row\.active && row\.blockers\.length > 0\}/);
   assert.match(milestone, /Work blocked for/);
   assert.match(source, /startOnRequest: false/);
   assert.match(source, /'interrupted', 'failed'/);
+  assert.match(source, /HISTORY_SESSION_STATES/);
+  assert.match(source, /sessionDock/);
+  const statusBar = readComponent('statuses/AppStatusBar.tsx');
+  assert.match(statusBar, /useAgentSessionSupervisor/);
+  assert.match(statusBar, /No active work/);
+  assert.match(statusBar, /Needs your input/);
+  assert.match(statusBar, /Hidden active session/);
+  assert.match(statusBar, /Completed \/ history/);
+  assert.match(statusBar, /Second start blocked by active session/);
+  assert.match(statusBar, /Open supervision:/);
 });
 
 test('task supervision prefers a live binding over a newer closed historical binding', () => {

@@ -83,6 +83,7 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   createBinding: (runtimeStore, payload) => createAgentRuntimeSessionBinding(runtimeStore, payload),
   updateBinding: (runtimeStore, payload) => updateAgentRuntimeSessionBinding(runtimeStore, payload),
   appendEvent: (runtimeStore, payload) => appendAgentRuntimeEvent(runtimeStore, payload),
+  emitRuntimeEvent: (payload) => broadcastAgentRuntimeEvent(payload),
   updateTaskExecutionState: (runtimeStore, payload) => updateAgentRuntimeTaskExecution(runtimeStore, payload),
   listSessions: (runtimeStore, payload) => listAgentRuntimeSessions(runtimeStore, payload),
   getTaskById: (runtimeStore, taskId) => require('./services/workspace-service.cjs').getTaskById(runtimeStore, taskId),
@@ -97,6 +98,14 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   logger: console,
 });
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
+const AGENT_RUNTIME_EVENT_CHANNEL = 'agent-runtime/event';
+const RENDERER_DIAGNOSTIC_CHANNEL = 'renderer/diagnostic';
+const RENDERER_FAILURES_KEY = 'omvra.rendererFailures.v1';
+const AGENT_RUNTIME_STORE_KEYS = new Set([
+  'omvra.acpSessionBindings.v1',
+  'omvra.acpSessionEvents.v1',
+  'omvra.taskContributionAttempts.v1',
+]);
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';
 const GOAL_RUNTIME_CHANGED_CHANNEL = 'goals/runtime-changed';
 const PREFERENCES_KEY = 'omvra.preferences.v1';
@@ -211,6 +220,27 @@ function broadcastStoreDidChange() {
       window.webContents.send(STORE_DID_CHANGE_CHANNEL, payload);
     }
   }
+}
+
+function broadcastAgentRuntimeEvent(payload) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send(AGENT_RUNTIME_EVENT_CHANNEL, payload);
+  }
+}
+
+function recordRendererFailure(details = {}) {
+  const current = Array.isArray(store.get(RENDERER_FAILURES_KEY)) ? store.get(RENDERER_FAILURES_KEY) : [];
+  const sessions = listAgentRuntimeSessions(store, { limit: 20 });
+  const report = {
+    id: randomUUID(),
+    occurredAt: new Date().toISOString(),
+    ...Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined && value !== null)),
+    activeRuntimeBindings: (sessions?.bindings || [])
+      .filter(binding => ['starting', 'ready', 'active', 'needs-input', 'cancelling'].includes(binding.state))
+      .map(binding => ({ id: binding.id, state: binding.state, taskId: binding.scope?.taskId || null, updatedAt: binding.updatedAt || null, lastObservedAt: binding.lastObservedAt || null })),
+  };
+  store.set(RENDERER_FAILURES_KEY, current.concat(report).slice(-20));
+  console.error('[renderer-diagnostic]', report);
 }
 
 goalRuntime.onChanged((event) => {
@@ -409,13 +439,18 @@ function createWindow() {
   // Detect render process crashes or terminations
   win.webContents.on('render-process-gone', (event, details) => {
     console.error('Renderer process gone:', details);
+    recordRendererFailure({ kind: 'render-process-gone', reason: details?.reason, exitCode: details?.exitCode, signal: details?.signal, killed: details?.killed });
     try { dialog.showErrorBox('Renderer error', `Renderer process terminated: ${details.reason}`); } catch (e) {}
   });
 
   win.webContents.on('crashed', (event) => {
     console.error('Renderer crashed');
+    recordRendererFailure({ kind: 'crashed' });
     try { dialog.showErrorBox('Renderer crashed', 'The renderer process crashed.'); } catch (e) {}
   });
+
+  win.webContents.on('unresponsive', () => recordRendererFailure({ kind: 'unresponsive' }));
+  win.webContents.on('responsive', () => console.log('[renderer] responsive again'));
 
   const loadProd = async () => {
     const prodIndex = path.join(__dirname, '../dist/index.html');
@@ -458,9 +493,13 @@ app.whenReady().then(() => {
     } catch (error) {
       console.error('[task-context] checkpoint capture failed:', error?.message || error);
     }
-    broadcastStoreDidChange();
+    const changedKeys = new Set([...Object.keys(nextStore || {}), ...Object.keys(previousStore || {})]);
+    const runtimeOnlyChange = [...AGENT_RUNTIME_STORE_KEYS].some(key => JSON.stringify(nextStore?.[key]) !== JSON.stringify(previousStore?.[key]))
+      && [...changedKeys].every(key => AGENT_RUNTIME_STORE_KEYS.has(key) || JSON.stringify(nextStore?.[key]) === JSON.stringify(previousStore?.[key]));
+    if (!runtimeOnlyChange) broadcastStoreDidChange();
     syncUpdateChannelFromStore();
   });
+  ipcMain.on(RENDERER_DIAGNOSTIC_CHANNEL, (_event, details) => recordRendererFailure({ kind: 'renderer-unhandled-error', ...details }));
   updateController = createUpdateController({
     app,
     updater: autoUpdater,

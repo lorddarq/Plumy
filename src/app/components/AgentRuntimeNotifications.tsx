@@ -9,7 +9,7 @@ export function AgentRuntimeNotifications({ tasks }: { tasks: Task[] }) {
 
   useEffect(() => {
     const runtime = window.electron?.agentRuntime;
-    if (!runtime?.sessions?.list || !window.electron?.onStoreChanged) return;
+    if (!runtime?.sessions?.list) return;
     let disposed = false;
     let initialized = false;
     let refreshRunning = false;
@@ -46,10 +46,19 @@ export function AgentRuntimeNotifications({ tasks }: { tasks: Task[] }) {
     };
 
     void refresh();
-    const unsubscribe = window.electron.onStoreChanged(() => void refresh());
+    const unsubscribe = runtime.sessions.onEvent?.((payload) => {
+      if (disposed || !initialized || payload?.kind !== 'event' || !payload.event || !payload.binding) return;
+      const completedRuns = findNewCompletedTaskRuns([payload.event], [payload.binding], seenEventIds);
+      for (const run of completedRuns) {
+        const task = tasksRef.current.find(candidate => candidate.id === run.taskId);
+        toast.success('Agent run finished', { id: run.eventId, description: task?.title || run.taskId });
+      }
+    });
+    const timer = window.setInterval(() => void refresh(), 10000);
     return () => {
       disposed = true;
-      unsubscribe();
+      unsubscribe?.();
+      window.clearInterval(timer);
     };
   }, []);
 

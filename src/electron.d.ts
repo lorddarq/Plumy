@@ -267,6 +267,7 @@ declare global {
         }) => Promise<AgentRuntimeOperationResult>;
         sessions: {
           list: (payload?: { bindingId?: string; limit?: number }) => Promise<any>;
+          onEvent: (listener: (payload: { kind: 'event' | 'binding'; event?: any; binding?: any }) => void) => () => void;
           requests: (bindingId: string) => Promise<Array<{ bindingId: string; requestId: string | number; method: string; serverName: string; mode: string; message: string; fields: Array<{ name: string; type: string; title: string; description: string; required: boolean; defaultValue?: unknown; options?: unknown[] }> }>>;
           createBinding: (payload: Record<string, unknown>) => Promise<any>;
           updateBinding: (payload: Record<string, unknown>) => Promise<any>;
