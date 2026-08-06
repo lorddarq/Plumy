@@ -1155,9 +1155,9 @@ export function AgentsSettingsSection({ children, empty = false, action, seconda
   return (
     <AnchoredPanelSection
       id="agents"
-      title="Agents"
+      title="Agent profiles"
       icon={AgentIcon}
-      description="The information below is used to calculate individual person and agentic load, for better capacity management."
+      description="Manage the agents Omvra can assign work to and the instructions they use."
       className={popupOpen ? 'relative z-[100]' : 'relative z-0'}
     >
       <div className="space-y-6">

@@ -86,6 +86,13 @@ export interface TaskContributionAttemptV1 {
   state: 'handed-off' | 'acknowledged' | 'working' | 'submitted' | 'completed' | 'stopped' | 'failed';
   createdAt: string;
   updatedAt: string;
+  runtimeExecution?: {
+    schemaVersion: 1;
+    state: 'starting' | 'ready' | 'working' | 'continuing' | 'waiting' | 'stopping' | 'batch-finished' | 'interrupted' | 'stopped' | 'failed' | 'ready-for-review' | 'complete';
+    batchNumber: number;
+    updatedAt: string;
+    reason?: string;
+  };
   [extension: string]: unknown;
 }
 

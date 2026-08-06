@@ -117,7 +117,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
     const result = await runtimeBridge.saveDefaults({ ...state.defaults, acpRuntimeAccessEnabled: enabled });
     setBusy(false);
     if (!result.ok) return setFeedback(result.error || 'Unable to change ACP runtime access.');
-    setFeedback(enabled ? 'ACP runtime access enabled.' : 'ACP runtime access disabled; MCP remains available.');
+    setFeedback(enabled ? 'Runtime access enabled.' : 'Runtime access disabled; connected agent access remains available.');
     await load();
   };
 
@@ -155,13 +155,13 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
         Profiles contain configuration only—never credentials. Omvra uses the exact resolved profile and does not silently fall back to another runtime.
       </p>
 
-      <section className="space-y-2 rounded-xl border border-[#ececf0] p-4" aria-labelledby="acp-runtime-access-title">
+      <section className="space-y-2 rounded-xl border border-[#ececf0] p-4" aria-labelledby="runtime-access-toggle-title">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 space-y-1">
-            <h3 id="acp-runtime-access-title" className="text-base font-medium text-[#5f6068]">Allow ACP runtime access</h3>
-            <p className="text-xs leading-5 text-[#7f8796]">When off, runtime profiles, connections, sessions, and external handoffs are hidden or blocked. MCP access and ordinary task/Goal behavior remain available.</p>
+            <h3 id="runtime-access-toggle-title" className="text-base font-medium text-[#5f6068]">Allow runtime connections</h3>
+            <p className="text-xs leading-5 text-[#7f8796]">When off, Omvra cannot start or hand off work to configured runtimes. Connected agent access and ordinary task/Goal behavior remain available.</p>
           </div>
-          <Switch checked={acpRuntimeAccessEnabled} disabled={busy} aria-label="Toggle ACP runtime access" onCheckedChange={toggleAcpRuntimeAccess} />
+          <Switch checked={acpRuntimeAccessEnabled} disabled={busy} aria-label="Toggle runtime connections" onCheckedChange={toggleAcpRuntimeAccess} />
         </div>
       </section>
 

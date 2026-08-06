@@ -39,7 +39,7 @@ export function McpActivityLogSection({
         <div className="space-y-3">
           <div className="text-sm font-semibold leading-5 text-[#71717a]">Activity Log</div>
           <p className="text-xs leading-4 text-[#6a7282] text-pretty">
-            Recent MCP reads and writes recorded by the local listener. Useful for debugging agent behavior.
+            Recent requests from connected agents, recorded locally. Use this when an agent action does not behave as expected.
           </p>
         </div>
 
@@ -65,8 +65,8 @@ export function McpActivityLogSection({
         <EmptyStateCard
           compact
           icon={<Activity className="size-4" />}
-          title="No MCP activity recorded yet"
-          description="Run a tool call or refresh after MCP traffic starts and the latest reads and writes will appear here."
+          title="No agent activity recorded yet"
+          description="Use a connected agent or refresh after activity starts to see the latest requests and results."
         />
       ) : (
         <div className="max-h-[422px] overflow-y-auto rounded-xl bg-[#f7f7f8] px-3 py-3">
@@ -101,7 +101,7 @@ function McpAuditSummaryCard({ summary }: { summary: McpAuditSummary | null }) {
         compact
           icon={<LoadIcon className="size-4" />}
         title="No benchmark summary yet"
-        description="Once MCP activity is recorded, this area will show bounded success, failure, timing, and provenance metrics."
+        description="Once agent activity is recorded, this area will show grouped success, failure, timing, and source metrics."
       />
     );
   }
@@ -221,7 +221,7 @@ export function McpHealthDiagnosticsSection({
   return (
     <div className="space-y-2 rounded-md border border-dashed p-3">
       <div className="flex items-center justify-between">
-        <Label>MCP health diagnostics (dev)</Label>
+        <Label>Advanced connection check (dev)</Label>
         <Button type="button" variant="outline" onClick={onRun} disabled={running}>
           {running ? 'Running...' : 'Run health check'}
         </Button>
@@ -231,7 +231,7 @@ export function McpHealthDiagnosticsSection({
           compact
           icon={<ShieldAlert className="size-4" />}
           title="No diagnostic run yet"
-          description="Run the health check to inspect MCP tools, read availability, snapshot parity, and logical call count."
+          description="Run the check to inspect available capabilities, workspace parity, and logical call count."
         />
       )}
       {result && (

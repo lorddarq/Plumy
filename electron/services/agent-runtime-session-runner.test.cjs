@@ -30,7 +30,7 @@ test('does not start a second active task session', async () => {
 test('does not create a session when ACP runtime access is disabled', async () => {
   let bindingsCreated = false;
   const runner = createAgentRuntimeSessionRunner({
-    store: {},
+    store: { get: () => [], set: () => {} },
     resolveProfile: () => ({ ok: false, state: 'disabled', error: 'ACP runtime access is disabled.' }),
     confirmStart: () => ({ canStart: true, contractSnapshot: { taskId: 'task-1', taskRevision: 0 }, task: {} }),
     transitionContribution: () => ({ ok: true }),
@@ -175,6 +175,7 @@ test('resuming interrupted task work immediately sends the current authoritative
   let binding = { id: 'binding-resume', revision: 2, runtimeProfileId: 'runtime-1', state: 'interrupted', opaqueSessionRef: 'thread-1', scope: { kind: 'task', taskId: 'task-1', executionAttemptId: 'attempt-1', taskRevision: 4 } };
   const runner = createAgentRuntimeSessionRunner({
     store: {},
+    maxAutomaticBatches: 0,
     resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'codex-app-server-stdio', executablePath: '/tmp/codex' } }),
     confirmStart: () => ({ canStart: false }),
     transitionContribution: () => ({ ok: true }),
@@ -208,6 +209,50 @@ test('resuming interrupted task work immediately sends the current authoritative
   assert.equal((await runner.continueTask('binding-resume')).ok, true);
   assert.equal(prompts.length, 2);
   assert.match(prompts[1], /Update the task description with the agent details/);
+});
+
+test('automatically starts the next bounded batch after a completed turn', async () => {
+  const prompts = [];
+  const events = [];
+  let notify;
+  let binding = null;
+  const initialBinding = { id: 'binding-auto', revision: 0, runtimeProfileId: 'runtime-1', state: 'starting', scope: { kind: 'task', taskId: 'task-1', executionAttemptId: 'attempt-1', taskRevision: 1 } };
+  const client = {
+    initialize: async () => ({ capabilities: { prompt: true } }),
+    onNotification: callback => { notify = callback; },
+    onLifecycle: () => {},
+    startSession: async () => ({ sessionId: 'thread-auto' }),
+    prompt: async () => {
+      prompts.push(true);
+      notify({ method: 'turn/started', params: { turn: { status: 'inProgress' } } });
+      return { turnId: `turn-${prompts.length}` };
+    },
+    close: () => {},
+  };
+  const runner = createAgentRuntimeSessionRunner({
+    store: { get: () => [], set: () => {} },
+    maxAutomaticBatches: 1,
+    resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'codex-app-server-stdio', executablePath: '/tmp/codex' } }),
+    confirmStart: () => ({ canStart: true, task: { __mcpRevision: 1 }, contractSnapshot: { taskId: 'task-1', taskRevision: 1, contributionId: null }, contractDigest: 'digest' }),
+    transitionContribution: () => ({ ok: true }),
+    moveTaskToStatus: () => ({ ok: true, task: { __mcpRevision: 2, status: 'in-progress' } }),
+    createBinding: () => { binding = initialBinding; return { ok: true, binding }; },
+    updateBinding: (_store, input) => { binding = { ...binding, ...input, revision: input.expectedRevision + 1 }; return { ok: true, binding }; },
+    appendEvent: (_store, event) => { events.push(event); return { ok: true }; },
+    listSessions: () => ({ bindings: binding ? [binding] : [], events }),
+    getTaskById: () => ({ id: 'task-1', status: 'in-progress', __mcpRevision: 2 }),
+    createClient: () => client,
+  });
+
+  const started = await runner.start({ confirmed: true, taskId: 'task-1', workspacePath: '/tmp/workspace', idempotencyKey: 'auto-start' });
+  assert.equal(started.ok, true, JSON.stringify(started));
+  await runner.continueTask('binding-auto');
+  assert.equal(prompts.length, 1);
+  notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(prompts.length, 2);
+  assert.equal(events.some(event => event.nativeEventType === 'omvra/taskBatch/automatic-continuing'), true);
+  assert.equal(binding.state, 'active');
 });
 
 test('closing a Codex session retires the binding when remote thread close is unsupported', async () => {

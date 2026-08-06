@@ -117,7 +117,10 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
     if (message.method === 'model/list') respond(currentChild, message.id, { data: [{ id: 'gpt', isDefault: true }] });
     if (message.method === 'thread/start') respond(currentChild, message.id, { thread: { id: 'thread-1' } });
     if (message.method === 'thread/resume') respond(currentChild, message.id, { thread: { id: 'thread-1' } });
-    if (message.method === 'turn/start') setTimeout(() => respond(currentChild, message.id, { turn: { id: 'turn-1', status: 'inProgress' } }), 150);
+    if (message.method === 'turn/start') setTimeout(() => {
+      currentChild.stdout.write(`${JSON.stringify({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'inProgress' } } })}\n`);
+      respond(currentChild, message.id, { turn: { id: 'turn-1', status: 'inProgress' } });
+    }, 150);
     if (message.method === 'turn/steer') respond(currentChild, message.id, { turnId: 'turn-1' });
     if (message.method === 'turn/interrupt') respond(currentChild, message.id, {});
   });

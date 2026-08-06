@@ -48,7 +48,23 @@ const {
   moveTaskToReadyForHumanReview,
   assignTaskToPerson,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
+  TASK_CONTRIBUTION_ATTEMPTS_KEY,
+  updateAgentRuntimeTaskExecution,
 } = require('./workspace-service.cjs');
+
+test('task runtime execution state persists on the canonical attempt and survives session reads', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(TASK_CONTRIBUTION_ATTEMPTS_KEY, [{ id: 'attempt-runtime', taskId: 'task-1', state: 'working', updatedAt: '2026-08-06T00:00:00.000Z' }]);
+  const updated = updateAgentRuntimeTaskExecution(store, { taskId: 'task-1', attemptId: 'attempt-runtime', state: 'working', batchNumber: 2, reason: 'provider-turn-started' });
+  assert.equal(updated.ok, true);
+  assert.deepEqual(store.get(TASK_CONTRIBUTION_ATTEMPTS_KEY)[0].runtimeExecution, {
+    schemaVersion: 1,
+    state: 'working',
+    batchNumber: 2,
+    updatedAt: store.get(TASK_CONTRIBUTION_ATTEMPTS_KEY)[0].runtimeExecution.updatedAt,
+    reason: 'provider-turn-started',
+  });
+});
 
 test('workspace snapshot contract has expected keys and stable counts', () => {
   const store = makeStoreFromFixture('workspace-basic');

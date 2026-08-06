@@ -1956,6 +1956,41 @@ const {
   updateBinding: updateAgentRuntimeSessionBinding,
 } = agentRuntimeSessionService;
 
+const TASK_EXECUTION_STATES = new Set(['starting', 'ready', 'working', 'continuing', 'waiting', 'stopping', 'batch-finished', 'interrupted', 'stopped', 'failed', 'ready-for-review', 'complete']);
+
+function updateAgentRuntimeTaskExecution(store, { taskId, attemptId, state, reason, batchNumber, lastEventAt } = {}) {
+  const normalizedTaskId = normalizeString(taskId);
+  const normalizedAttemptId = normalizeString(attemptId);
+  if (!normalizedTaskId || !normalizedAttemptId) return { ok: false, error: 'ACP_EXECUTION_ATTEMPT_REQUIRED', message: 'A task and execution attempt are required.' };
+  if (!TASK_EXECUTION_STATES.has(state)) return { ok: false, error: 'INVALID_TASK_EXECUTION_STATE', message: `Unsupported task execution state "${state}".` };
+  const attempts = readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY);
+  const attempt = attempts.find(item => item.id === normalizedAttemptId && item.taskId === normalizedTaskId);
+  if (!attempt) return { ok: false, error: 'ACP_EXECUTION_ATTEMPT_NOT_FOUND', message: 'The task execution attempt was not found.' };
+  const previous = attempt.runtimeExecution || {};
+  const updatedAt = lastEventAt || new Date().toISOString();
+  const runtimeExecution = {
+    schemaVersion: 1,
+    state,
+    batchNumber: Number.isInteger(batchNumber) && batchNumber >= 0 ? batchNumber : Number(previous.batchNumber || 0),
+    updatedAt,
+    ...(normalizeString(reason) ? { reason: normalizeString(reason).slice(0, 500) } : {}),
+  };
+  const nextAttempt = { ...attempt, runtimeExecution, updatedAt };
+  store.set(TASK_CONTRIBUTION_ATTEMPTS_KEY, attempts.map(item => item.id === normalizedAttemptId ? nextAttempt : item));
+  return { ok: true, attempt: nextAttempt, runtimeExecution };
+}
+
+function attachTaskExecutionProjection(store, binding) {
+  if (binding?.scope?.kind !== 'task' || !binding.scope.executionAttemptId) return binding;
+  const attempt = readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY).find(item => item.id === binding.scope.executionAttemptId);
+  return attempt?.runtimeExecution ? { ...binding, taskExecution: attempt.runtimeExecution } : binding;
+}
+
+function listAgentRuntimeSessionsWithTaskExecution(store, input) {
+  const result = listAgentRuntimeSessions(store, input);
+  return result?.ok ? { ...result, bindings: result.bindings.map(binding => attachTaskExecutionProjection(store, binding)) } : result;
+}
+
 const {
   listMilestones,
   getMilestoneById,
@@ -2025,9 +2060,10 @@ module.exports = {
   createAgentRuntimeSessionBinding,
   updateAgentRuntimeSessionBinding,
   appendAgentRuntimeEvent,
+  updateAgentRuntimeTaskExecution,
   appendAgentRuntimeOutcome,
   evaluateAgentRuntimeGovernance,
-  listAgentRuntimeSessions,
+  listAgentRuntimeSessions: listAgentRuntimeSessionsWithTaskExecution,
   prepareAgentRuntimeSessionArchive,
   reconcileInterruptedAgentRuntimeSessions,
   listKanbanCards,

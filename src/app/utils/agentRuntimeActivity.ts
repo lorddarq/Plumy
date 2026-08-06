@@ -56,6 +56,8 @@ function describeEvent(event: AgentRuntimeActivityEvent): Omit<AgentRuntimeActiv
   if (native === 'account/rateLimits/updated') return { label: 'Provider limits updated', tone: 'neutral' };
   if (native === 'thread/status/changed') return { label: 'Work session status changed', tone: 'neutral' };
   if (native === 'thread/goal/cleared') return { label: 'Agent cleared the active goal', tone: 'neutral' };
+  if (native === 'omvra/taskBatch/automatic-continuing') return { label: 'Continuing with the next work batch', detail: event.outcome, tone: 'positive' };
+  if (native === 'omvra/taskBatch/automatic-limit-reached') return { label: 'Automatic continuation paused', detail: event.outcome, tone: 'warning' };
   if (event.type === 'permission-request') return { label: 'Permission requested', detail: event.toolName, tone: 'warning' };
   if (event.type === 'input-request') return { label: 'Agent needs input', tone: 'warning' };
   if (event.type === 'tool-state') return { label: event.toolName ? `Tool activity: ${event.toolName}` : 'Tool activity', tone: 'neutral' };
@@ -87,8 +89,8 @@ export function describeAgentRuntimeSession(bindingState: string, events: AgentR
   if (bindingState === 'active') return { label: 'Agent is working', detail: 'The agent is actively working on the task.', tone: 'positive' as const, isTurnActive: true };
   if (bindingState === 'cancelling') return { label: 'Agent is stopping', detail: 'The agent is stopping the current run.', tone: 'warning' as const, isTurnActive: false };
   if (bindingState === 'starting') return { label: 'Agent is starting', detail: 'Omvra is connecting to the assigned agent.', tone: 'neutral' as const, isTurnActive: false };
-  if (bindingState === 'closed') return { label: 'Work session closed', detail: 'The agent is not working on this task.', tone: 'neutral' as const, isTurnActive: false };
+  if (bindingState === 'closed') return { label: 'No agent is working', detail: 'This supervision is showing a closed session. The task may still need more work.', tone: 'warning' as const, isTurnActive: false };
   const latestTurn = [...events].reverse().find(event => event.nativeEventType === 'turn/started' || event.nativeEventType === 'turn/completed');
-  if (latestTurn?.nativeEventType === 'turn/completed') return { label: 'Agent is idle', detail: 'The latest run ended. This does not mean the task is complete.', tone: 'neutral' as const, isTurnActive: false };
-  return { label: 'Agent is idle', detail: 'The work session is connected, but no run is active.', tone: 'neutral' as const, isTurnActive: false };
+  if (latestTurn?.nativeEventType === 'turn/completed') return { label: 'Batch finished', detail: 'The latest work batch ended. The task is not complete unless its task status or handoff says so.', tone: 'warning' as const, isTurnActive: false };
+  return { label: 'Session connected, no run active', detail: 'The agent is connected but is not currently doing work. Continue work to start another batch.', tone: 'warning' as const, isTurnActive: false };
 }

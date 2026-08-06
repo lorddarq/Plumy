@@ -344,6 +344,11 @@ class CodexAppServerClient {
     this.approvalPolicy = profile.approvalPolicy;
     this.activeTurns = new Map();
     this.transport.onNotification(message => {
+      if (message.method === 'turn/started') {
+        const threadId = message.params?.threadId;
+        const turnId = message.params?.turn?.id || message.params?.turnId;
+        if (threadId && turnId) this.activeTurns.set(threadId, turnId);
+      }
       if (message.method === 'turn/completed' && message.params?.threadId) this.activeTurns.delete(message.params.threadId);
     });
   }

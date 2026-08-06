@@ -85,18 +85,18 @@ export function McpAccessSettingsSection({
   return (
     <div className="space-y-8">
       <p className="max-w-[440px] text-xs leading-5 text-[#8a8a92] text-pretty">
-        This information is used to configure the MCP server that comes bundled with the solution.
+        Agent access lets connected tools work with this workspace. It is independent from Runtime access: turning Runtime access off does not turn off this connection.
       </p>
 
       <section className="space-y-5" aria-labelledby="mcp-server-title">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 space-y-1">
-            <div className={LABEL_CLASS}>Allow agent MCP access</div>
-            <p className={DESCRIPTION_CLASS}>When off, agent MCP clients cannot access this workspace.</p>
+            <div className={LABEL_CLASS}>Allow connected agents</div>
+            <p className={DESCRIPTION_CLASS}>When off, external agent tools cannot access this workspace. Runtime access remains controlled separately.</p>
           </div>
           <Switch
             checked={agentAccessEnabled}
-            aria-label="Toggle agent MCP access"
+            aria-label="Toggle connected agent access"
             onCheckedChange={onAgentAccessToggle}
             className="mt-0.5"
           />
@@ -105,14 +105,14 @@ export function McpAccessSettingsSection({
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-4">
             <Label id="mcp-server-title" htmlFor="mcp-bind-host" className={LABEL_CLASS}>
-              MCP listener
+              Connection service
             </Label>
             <button type="button" onClick={onRestartServer} className={ACTION_CLASS}>
               <RefreshCcw className="size-4" />
               Restart
             </button>
           </div>
-          <p className={DESCRIPTION_CLASS}>Change host/port then press restart to rebind the MCP listener.</p>
+          <p className={DESCRIPTION_CLASS}>Change the host or port, then restart the service to apply the connection settings.</p>
           <div className="grid grid-cols-[minmax(0,1fr)_160px] gap-2 max-sm:grid-cols-1">
             <Input
               id="mcp-bind-host"
@@ -146,8 +146,8 @@ export function McpAccessSettingsSection({
 
         <ReadOnlyCopyField
           id="mcp-stdio-command"
-          label="Local MCP"
-          description="Use this when your client supports command-based MCP servers. It avoids ports and tunnels."
+          label="Local connection"
+          description="Use this when your client supports command-based connections. It avoids ports and tunnels."
           value={stdioCommand}
           copied={copiedStdioCommand}
           onCopy={onCopyStdioCommand}
@@ -218,9 +218,9 @@ export function McpAccessSettingsSection({
                 <SelectItem value="admin">Admin</SelectItem>
               </SelectContent>
             </Select>
-            <p className={DESCRIPTION_CLASS}>`task_write` and `admin` expose safe write MCP tools.</p>
+            <p className={DESCRIPTION_CLASS}>Choose whether connected agents can only read workspace data or also make approved changes.</p>
           </div>
-          <p className={DESCRIPTION_CLASS}>Restart listener after changing.</p>
+          <p className={DESCRIPTION_CLASS}>Restart the connection service after changing.</p>
         </div>
       </section>
 
@@ -232,9 +232,9 @@ export function McpAccessSettingsSection({
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-3">
-              <div className={LABEL_CLASS}>MCP Health</div>
+              <div className={LABEL_CLASS}>Connection health</div>
               <p className={DESCRIPTION_CLASS}>
-                Checks MCP tools, resources/read availability, snapshot parity, and median logical call count.
+                Checks the connection, available capabilities, workspace parity, and recent response performance.
               </p>
             </div>
             <button type="button" onClick={onRunHealthCheck} disabled={healthRunning} className={ACTION_CLASS}>
@@ -414,7 +414,7 @@ function buildHealthResultLines(
       listenerStatusLabel,
       connectionStatusLabel,
       tokenExpiryLabel,
-      restartPending ? 'Restart required after MCP settings changes.' : 'Listener config applied.',
+      restartPending ? 'Restart required after connection settings change.' : 'Connection settings applied.',
     ];
   }
 

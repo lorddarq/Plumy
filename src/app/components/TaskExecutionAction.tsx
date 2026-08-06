@@ -47,6 +47,9 @@ interface SessionBinding {
   opaqueSessionRef?: string;
   capabilities?: Array<{ id: string; support: string }>;
   scope?: { taskId?: string };
+  updatedAt?: string;
+  lastObservedAt?: string;
+  taskExecution?: { state?: string; batchNumber?: number; reason?: string; updatedAt?: string };
 }
 
 interface SessionEvent extends AgentRuntimeActivityEvent {
@@ -205,9 +208,11 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const warnings = preflight?.warnings || [];
   const hasCapability = (id: string) => binding?.capabilities?.some(capability => capability.id === id && capability.support === 'supported') ?? false;
   const sessionSummary = binding ? describeAgentRuntimeSession(binding.state, events) : null;
+  const taskExecutionState = binding?.taskExecution?.state;
+  const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', complete: 'Complete' };
   const latestTurnStartIndex = events.findLastIndex(event => event.nativeEventType === 'turn/started');
   const latestRunEvents = latestTurnStartIndex < 0 ? [] : events.slice(latestTurnStartIndex).filter(event =>
-    ['turn/started', 'turn/completed', 'item/started', 'item/completed', 'warning', 'error'].includes(event.nativeEventType || '')
+    ['turn/started', 'turn/completed', 'item/started', 'item/completed', 'warning', 'error', 'omvra/taskBatch/automatic-continuing', 'omvra/taskBatch/automatic-limit-reached'].includes(event.nativeEventType || '')
   );
   const activity = summarizeAgentRuntimeActivity(latestRunEvents);
   const visibleActivity = activity.length > 0 ? activity : binding?.state === 'interrupted'
@@ -221,6 +226,21 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       : sessionSummary?.tone === 'danger' ? 'danger' : 'muted';
   const instructionsSent = latestTurnStartIndex >= 0 || events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent');
   const latestTurnCompleted = latestRunEvents.some(event => event.nativeEventType === 'turn/completed');
+  const lastObservedAt = binding?.lastObservedAt || binding?.updatedAt;
+  const lastObservedLabel = lastObservedAt
+    ? new Date(lastObservedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : null;
+  const executionNotice = binding?.state === 'closed'
+    ? { tone: 'warning' as const, title: 'No agent is working right now', body: 'This task is still in progress, but the session shown here was closed. Start a new session to continue from the saved task context.' }
+    : binding?.state === 'ready'
+      ? { tone: 'warning' as const, title: 'Work batch finished', body: 'The agent finished its latest batch. This does not mean the task is complete; continue work to run the next batch.' }
+      : binding?.state === 'active'
+        ? { tone: 'info' as const, title: 'Agent is working now', body: lastObservedLabel ? `The runtime last reported activity at ${lastObservedLabel}.` : 'The runtime is actively reporting work.' }
+        : binding?.state === 'starting'
+          ? { tone: 'info' as const, title: 'Connecting to the agent', body: 'The session is being created. Activity will appear here as soon as the runtime reports it.' }
+          : binding?.state === 'needs-input'
+            ? { tone: 'warning' as const, title: 'Agent is waiting', body: 'The agent cannot continue until the pending request above is answered.' }
+            : null;
   const executionTitle = binding
     ? 'Open supervision'
     : loading
@@ -522,8 +542,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Agent status <StateBadge label={sessionSummary?.label || 'Unavailable'} value="" tone={agentStatusTone} title={sessionSummary?.detail} /></div>
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Execution status <StateBadge label={taskExecutionLabel[taskExecutionState || ''] || 'Synchronizing'} value={binding?.taskExecution?.batchNumber ? `Batch ${binding.taskExecution.batchNumber}` : ''} tone={taskExecutionState === 'working' || taskExecutionState === 'continuing' ? 'success' : taskExecutionState === 'failed' || taskExecutionState === 'interrupted' ? 'danger' : taskExecutionState === 'waiting' || taskExecutionState === 'batch-finished' ? 'warning' : 'muted'} /></div>
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Task status <StateBadge label={taskStatusLabel(task.status)} value="" tone={task.status === 'done' ? 'success' : task.status === 'under-review' ? 'warning' : task.status === 'in-progress' ? 'success' : 'muted'} /></div>
                 </div>
+                {executionNotice && <div className="mt-3"><ExecutionNotice tone={executionNotice.tone} title={executionNotice.title}>{executionNotice.body}</ExecutionNotice></div>}
                 {!terminalBinding && pendingRequests.map(request => {
                   const missingRequired = request.fields.some(field => field.required && (requestValues[field.name] ?? field.defaultValue ?? '') === '');
                   return <div key={`${request.method}-${request.requestId}`} className="mt-3">
@@ -547,9 +569,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">
                   <div className="text-xs font-semibold text-slate-700">Work stages</div>
                   <div className="mt-3 grid gap-2 text-xs">
-                    <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${binding.state === 'starting' ? 'bg-blue-500' : 'bg-emerald-500'}`} /><span className="font-medium text-slate-700">Agent connection</span><span className="ml-auto text-slate-500">{binding.state === 'starting' ? 'Connecting' : 'Connected'}</span></div>
+                    <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${binding.state === 'starting' ? 'bg-blue-500' : ['closed', 'failed', 'interrupted'].includes(binding.state) ? 'bg-slate-300' : 'bg-emerald-500'}`} /><span className="font-medium text-slate-700">Agent connection</span><span className="ml-auto text-slate-500">{binding.state === 'starting' ? 'Connecting' : ['closed', 'failed'].includes(binding.state) ? 'Closed' : binding.state === 'interrupted' ? 'Interrupted' : 'Connected'}</span></div>
                     <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${instructionsSent ? 'bg-emerald-500' : 'bg-slate-300'}`} /><span className="font-medium text-slate-700">Task instructions</span><span className="ml-auto text-slate-500">{instructionsSent ? 'Sent and accepted' : 'Not sent yet'}</span></div>
-                    <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${isTurnActive ? 'bg-emerald-500' : latestTurnCompleted ? 'bg-slate-400' : 'bg-slate-300'}`} /><span className="font-medium text-slate-700">Agent work</span><span className="ml-auto text-slate-500">{isTurnActive ? 'In progress' : latestTurnCompleted ? 'Run finished' : 'Not started'}</span></div>
+                    <div className="flex items-center gap-2"><span className={`size-2 rounded-full ${isTurnActive ? 'bg-emerald-500' : latestTurnCompleted ? 'bg-amber-400' : 'bg-slate-300'}`} /><span className="font-medium text-slate-700">Agent work</span><span className="ml-auto text-slate-500">{isTurnActive ? 'In progress' : latestTurnCompleted ? 'Batch finished' : binding.state === 'closed' ? 'Session closed' : 'Not started'}</span></div>
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between"><div className="text-xs font-semibold text-slate-700">Agent activity</div><div className="text-[11px] text-slate-400">Task progress only</div></div>
@@ -589,7 +611,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             <div className="flex shrink-0 justify-end gap-2">
               <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={() => setOpen(false)}>{binding ? 'Minimize supervision' : 'Close'}</button>
               {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40">Open externally</button>}
-              {task.status !== 'done' && (binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume work' : binding?.state === 'interrupted' || terminalBinding ? 'Start new session' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
+              {task.status !== 'done' && binding?.state === 'ready' && <button type="button" onClick={() => void continueTaskSession()} disabled={operationBusy} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{operationBusy ? 'Continuing…' : 'Continue work'}</button>}
+              {task.status !== 'done' && (binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume task' : binding?.state === 'closed' ? 'Continue task' : binding?.state === 'failed' ? 'Reconnect and continue' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start work'}</button>}
             </div>
           </SheetFooter>
         </SheetContent>

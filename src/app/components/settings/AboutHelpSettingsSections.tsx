@@ -195,7 +195,7 @@ export function AboutSettingsSection({
   const parsedReleaseNotes = parseUpdateReleaseNotes(updateState.update?.releaseNotes, { maxItems: 4 });
 
   return (
-    <AnchoredPanelSection id="about" title="About" icon={AboutIcon}>
+    <AnchoredPanelSection id="about" title="About & updates" icon={AboutIcon}>
       <div className="min-w-0 space-y-8">
         <div className="pt-1">
           <img src={omvraLogo} alt="Omvra" className="h-8 w-auto" />

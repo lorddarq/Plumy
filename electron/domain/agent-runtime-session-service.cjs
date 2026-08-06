@@ -12,7 +12,7 @@ const STATE_TRANSITIONS = new Map([
   ['ready', new Set(['active', 'needs-input', 'cancelling', 'interrupted', 'closed', 'failed'])],
   ['active', new Set(['ready', 'needs-input', 'cancelling', 'interrupted', 'closed', 'failed'])],
   ['needs-input', new Set(['ready', 'active', 'cancelling', 'interrupted', 'closed', 'failed'])],
-  ['cancelling', new Set(['interrupted', 'closed', 'failed'])],
+  ['cancelling', new Set(['active', 'interrupted', 'closed', 'failed'])],
   ['interrupted', new Set(['starting', 'closed', 'failed'])],
   ['closed', new Set()],
   ['failed', new Set()],

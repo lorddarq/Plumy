@@ -14,7 +14,7 @@ test('runtime activity collapses noisy tool updates and preserves agent run mile
   assert.equal(activity.find(item => item.label === 'Tool connection starting')?.count, 2);
   assert.equal(activity.some(item => item.label === 'Task instructions accepted'), true);
   assert.equal(activity.some(item => item.label === 'Agent finished the latest run'), true);
-  assert.equal(describeAgentRuntimeSession('ready', events).label, 'Agent is idle');
+  assert.equal(describeAgentRuntimeSession('ready', events).label, 'Batch finished');
   assert.equal(describeAgentRuntimeSession('ready', events).isTurnActive, false);
 });
 
@@ -28,8 +28,8 @@ test('runtime session summary trusts active binding state when the bounded event
 
 test('runtime session summary distinguishes connected idle and stopping states', () => {
   const idle = describeAgentRuntimeSession('ready', []);
-  assert.equal(idle.label, 'Agent is idle');
-  assert.match(idle.detail, /no run is active/i);
+  assert.equal(idle.label, 'Session connected, no run active');
+  assert.match(idle.detail, /continue work/i);
 
   const stopping = describeAgentRuntimeSession('cancelling', []);
   assert.equal(stopping.label, 'Agent is stopping');
@@ -62,4 +62,10 @@ test('runtime activity distinguishes interrupted and failed turn outcomes', () =
   assert.equal(activity[0].label, 'Agent work was interrupted');
   assert.equal(activity[1].label, 'Agent run failed');
   assert.equal(activity[1].detail, 'Command failed.');
+});
+
+test('closed sessions and finished batches explain that more work may remain', () => {
+  assert.equal(describeAgentRuntimeSession('closed', []).label, 'No agent is working');
+  assert.match(describeAgentRuntimeSession('closed', []).detail, /closed session/i);
+  assert.equal(describeAgentRuntimeSession('ready', [{ id: '1', type: 'turn-state', nativeEventType: 'turn/completed' }]).label, 'Batch finished');
 });

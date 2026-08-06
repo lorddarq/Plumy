@@ -36,8 +36,8 @@ export function McpCommandSettingsSection({
     <div className="space-y-8">
       <CommandField
         id="mcp-test-command"
-        title="MCP Test Command"
-        description="Generated from current MCP host, port, and token settings."
+        title="Read-only connection check"
+        description="Generated from the current connection host, port, and token settings."
         command={testCommand}
         copied={copiedTestCommand}
         onCopy={onCopyTestCommand}
@@ -45,8 +45,8 @@ export function McpCommandSettingsSection({
 
       <CommandField
         id="mcp-write-command"
-        title="MCP Write Command"
-        description="Replace `<task-id>` and `<revision>` with values from `workspace.get_snapshot`."
+        title="Workspace update check"
+        description="Replace `<task-id>` and `<revision>` with values from the workspace snapshot."
         command={writeCommand}
         copied={copiedWriteCommand}
         onCopy={onCopyWriteCommand}
@@ -56,7 +56,7 @@ export function McpCommandSettingsSection({
       <CommandField
         id="mcp-tunnel-command"
         title="Local Tunnel Command"
-        description="Run this in Terminal to expose your local MCP endpoint publicly."
+        description="Run this in Terminal to expose your local connection endpoint publicly."
         command={tunnelCommand}
         copied={copiedTunnelCommand}
         onCopy={onCopyTunnelCommand}

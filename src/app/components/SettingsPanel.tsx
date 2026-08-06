@@ -24,7 +24,7 @@ import {
 
 const SETTINGS_PANEL_NAV_GROUPS = [
   {
-    label: 'Settings',
+    label: 'Workspace',
     items: [
       {
         id: 'general',
@@ -48,47 +48,52 @@ const SETTINGS_PANEL_NAV_GROUPS = [
       },
       {
         id: 'agents',
-        label: 'Agents',
+        label: 'Agent profiles',
         icon: AgentIcon,
       },
+    ],
+  },
+  {
+    label: 'Connections',
+    items: [
       {
         id: 'agent-runtimes',
-        label: 'Agent runtimes',
+        label: 'Runtime access',
         icon: AgentIcon,
       },
       {
         id: 'mcp-access',
-        label: 'MCP',
+        label: 'Agent access',
         icon: FiltersIcon,
       },
       {
         id: 'mcp-testing',
-        label: 'MCP Testing',
+        label: 'Connection diagnostics',
         icon: GaugeIcon,
       },
       {
         id: 'mcp-activity',
-        label: 'MCP Activity',
+        label: 'Activity log',
         icon: WindowPointerIcon,
       },
     ],
   },
   {
-    label: 'Storage',
+    label: 'Data & recovery',
     items: [
       {
         id: 'storage',
-        label: 'Data',
+        label: 'Local data & backup',
         icon: LayersIcon,
       },
     ],
   },
   {
-    label: 'Help',
+    label: 'About & help',
     items: [
       {
         id: 'about',
-        label: 'About',
+        label: 'About & updates',
         icon: AboutIcon,
       },
       {
@@ -149,9 +154,9 @@ export function AgentRuntimeSettingsSection({ children }: McpSettingsSectionProp
   return (
     <AnchoredPanelSection
       id="agent-runtimes"
-      title="Agent runtimes"
+      title="Runtime access"
       icon={AgentIcon}
-      description="Configure local ACP subprocesses and explicit external handoffs."
+      description="Control whether Omvra can connect to local or external agent runtimes."
     >
       {children}
     </AnchoredPanelSection>
@@ -461,7 +466,12 @@ interface McpSettingsSectionProps {
 
 export function McpSettingsSection({ children }: McpSettingsSectionProps) {
   return (
-    <AnchoredPanelSection id="mcp-access" title="MCP" icon={FiltersIcon}>
+    <AnchoredPanelSection
+      id="mcp-access"
+      title="Agent access"
+      icon={FiltersIcon}
+      description="Allow external agent clients to access this workspace. This is separate from Runtime access."
+    >
       {children}
     </AnchoredPanelSection>
   );
@@ -471,9 +481,9 @@ export function McpTestingSettingsSection({ children }: McpSettingsSectionProps)
   return (
     <AnchoredPanelSection
       id="mcp-testing"
-      title="MCP Testing"
+      title="Connection diagnostics"
       icon={GaugeIcon}
-      description="Check MCP activity and debug issues"
+      description="Check agent connections and troubleshoot access issues."
     >
       {children}
     </AnchoredPanelSection>
@@ -484,9 +494,9 @@ export function McpActivitySettingsSection({ children }: McpSettingsSectionProps
   return (
     <AnchoredPanelSection
       id="mcp-activity"
-      title="MCP Activity Log"
+      title="Activity log"
       icon={WindowPointerIcon}
-      description="MCP Activity log used for debugging agent behavior"
+      description="Review recent agent requests when troubleshooting behavior."
     >
       {children}
     </AnchoredPanelSection>
@@ -644,7 +654,7 @@ export function DataSettingsSection({
   const usagePercent = Math.min(100, Math.max(0, storageMeter.usagePercent));
 
   return (
-    <AnchoredPanelSection id="storage" title="Data" icon={LayersIcon} description="Data and backup settings">
+    <AnchoredPanelSection id="storage" title="Local data & backup" icon={LayersIcon} description="Find local workspace data, storage usage, and backup controls.">
       <div className="min-w-0 space-y-8">
         <div className="space-y-3">
           <div className="text-sm font-semibold leading-5 text-[#71717a]">Storage Usage</div>
