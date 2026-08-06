@@ -73,10 +73,10 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   const statusBar = readComponent('statuses/AppStatusBar.tsx');
   assert.match(statusBar, /useAgentSessionSupervisor/);
   assert.match(statusBar, /No active work/);
-  assert.match(statusBar, /Human input required/);
-  assert.match(statusBar, /Active execution/);
+  assert.match(statusBar, /getAttentionState\('needs-input'\)/);
+  assert.match(statusBar, /getAttentionState\('active'\)/);
   assert.match(statusBar, /Completed session/);
-  assert.match(statusBar, /Another session is active/);
+  assert.match(statusBar, /getAttentionState\('blocked'\)/);
   assert.match(statusBar, /Open supervision:/);
 });
 

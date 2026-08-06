@@ -87,18 +87,19 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       requestId: (current?.requestId || 0) + 1,
     }));
   }, []);
+  const newestFirst = useCallback((items: SessionBinding[]) => [...items].sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || '')), []);
   const openBinding = useCallback((binding: SessionBinding) => {
     const task = binding.scope?.taskId ? tasks.find(candidate => candidate.id === binding.scope?.taskId) : undefined;
     if (!task) return;
+    const currentBinding = newestFirst(bindings.filter(candidate => candidate.scope?.kind === 'task' && candidate.scope?.taskId === task.id && ACTIVE_SESSION_STATES.has(candidate.state)))[0] || binding;
     const project = projects.find(candidate => task.projectIds?.includes(candidate.id) || candidate.id === task.swimlaneId);
     setRequest(current => ({
       task,
-      repositoryFolder: binding.workspacePath || task.repositoryFolder || project?.repositoryFolder,
+      repositoryFolder: currentBinding.workspacePath || task.repositoryFolder || project?.repositoryFolder,
       startOnRequest: false,
       requestId: (current?.requestId || 0) + 1,
     }));
-  }, [projects, tasks]);
-  const newestFirst = (items: SessionBinding[]) => [...items].sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''));
+  }, [bindings, newestFirst, projects, tasks]);
   const activeBinding = newestFirst(bindings.filter(binding => ACTIVE_SESSION_STATES.has(binding.state)))[0];
   const historyBinding = [...bindings].reverse().find(binding => HISTORY_SESSION_STATES.has(binding.state));
   const dockBinding = activeBinding || historyBinding;

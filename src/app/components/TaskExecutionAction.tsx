@@ -353,7 +353,17 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         expectedContractDigest: preflight?.contractDigest,
         idempotencyKey: `renderer-start-${task.id}-${Date.now()}`,
       });
-      if (!result?.ok) throw new Error(result?.message || result?.blockers?.[0]?.message || result?.error || 'The work session could not be started.');
+      if (!result?.ok) {
+        if (result.error === 'ACP_EXECUTION_ALREADY_ACTIVE') {
+          const current = await refreshSession();
+          if (current && ACTIVE_SESSION_STATES.has(current.state)) {
+            setError(null);
+            toast.info('This task is already open', { description: 'The active runtime session is now shown in this supervision window.' });
+            return;
+          }
+        }
+        throw new Error(result?.message || result?.blockers?.[0]?.message || result?.error || 'The work session could not be started.');
+      }
       setBinding(result.binding as SessionBinding);
       await refreshSession();
       toast.success('Agent started working', { description: task.title });
