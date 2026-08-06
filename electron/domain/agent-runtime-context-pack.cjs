@@ -62,6 +62,10 @@ function createAgentRuntimeContextPack({ getEntry, maxEntries = MAX_CONTEXT_ENTR
       '- As todo items are completed and verified, check their existing Markdown boxes with tasks.update_description using the latest expected revision, while preserving every other part of the task description.',
       '- Leave incomplete, blocked, or unverified todos unchecked. If task writes are unavailable or fail, report that clearly instead of claiming the checklist was updated.',
       '- Checklist progress and task completion are separate: do not mark the task complete solely because the current agent run ended.',
+      '- Before handing work back, verify every acceptance criterion. If the task description has no concrete checklist, add a concise Markdown "Acceptance checklist" with verifiable unchecked boxes using tasks.update_description, preserving the existing instructions.',
+      '- When the verified work is ready for human inspection, write the full handoff and remaining-risk summary into the task description, then call tasks.complete_and_request_review with the latest expected revision. Do not end with only a chat response.',
+      '- If work is incomplete or blocked, leave the relevant checklist items unchecked, document the blocker and next step in the task description, and do not request review as if the task were complete.',
+      '- Your final response must tell the user whether the task is ready for review, what to inspect, and what remains unresolved.',
       'Context history:',
       ...entries.map(entry => entry.status === 'missing'
         ? `- [missing] ${entry.id}`

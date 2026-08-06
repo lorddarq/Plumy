@@ -25,3 +25,14 @@ const ATTENTION_STATES: Record<AttentionKind, AttentionState> = {
 export function getAttentionState(kind: AttentionKind): AttentionState {
   return ATTENTION_STATES[kind];
 }
+
+export function getExecutionAttentionState(state: string): AttentionState | undefined {
+  if (state === 'working') return getAttentionState('active');
+  if (state === 'blocked' || state === 'permission-denied') return getAttentionState('blocked');
+  if (state === 'failed') return getAttentionState('failed');
+  if (state === 'approval-required' || state === 'evidence-required') return getAttentionState('needs-input');
+  if (state === 'handoff-pending') return getAttentionState('review');
+  if (state === 'complete') return getAttentionState('complete');
+  if (state === 'ready') return getAttentionState('ready');
+  return undefined;
+}

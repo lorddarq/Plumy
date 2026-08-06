@@ -85,6 +85,7 @@ export function summarizeAgentRuntimeActivity(events: AgentRuntimeActivityEvent[
 
 export function describeAgentRuntimeSession(bindingState: string, events: AgentRuntimeActivityEvent[], executionState?: string) {
   if (executionState === 'complete') return { label: 'Task work complete', detail: 'The agent completed the task execution.', tone: 'positive' as const, isTurnActive: false };
+  if (executionState === 'outcome-unreconciled') return { label: 'Outcome needs review', detail: 'The agent delivered an outcome, but the task status was not updated. Review and move the task forward.', tone: 'warning' as const, isTurnActive: false };
   if (executionState === 'batch-finished' && bindingState !== 'active' && bindingState !== 'starting' && bindingState !== 'needs-input') {
     return { label: 'Last batch completed', detail: 'The agent completed its latest work batch. Continue the task if more work is needed.', tone: 'positive' as const, isTurnActive: false };
   }

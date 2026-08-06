@@ -253,6 +253,10 @@ test('automatically starts the next bounded batch after a completed turn', async
   assert.equal(prompts.length, 2);
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskBatch/automatic-continuing'), true);
   assert.equal(binding.state, 'active');
+  notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(binding.state, 'closed');
+  assert.equal(events.some(event => event.nativeEventType === 'omvra/taskExecution/finalized-for-review'), true);
 });
 
 test('closing a Codex session retires the binding when remote thread close is unsupported', async () => {

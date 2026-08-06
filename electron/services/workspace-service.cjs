@@ -1956,7 +1956,22 @@ const {
   updateBinding: updateAgentRuntimeSessionBinding,
 } = agentRuntimeSessionService;
 
-const TASK_EXECUTION_STATES = new Set(['starting', 'ready', 'working', 'continuing', 'waiting', 'stopping', 'batch-finished', 'interrupted', 'stopped', 'failed', 'ready-for-review', 'complete']);
+const TASK_EXECUTION_STATES = new Set(['starting', 'ready', 'working', 'continuing', 'waiting', 'stopping', 'batch-finished', 'interrupted', 'stopped', 'failed', 'ready-for-review', 'outcome-unreconciled', 'complete']);
+
+function finalizeAgentRuntimeAttempt(store, { taskId, attemptId, state = 'completed', reason } = {}) {
+  const normalizedTaskId = normalizeString(taskId);
+  const normalizedAttemptId = normalizeString(attemptId);
+  if (!normalizedTaskId || !normalizedAttemptId) return { ok: false, error: 'ACP_EXECUTION_ATTEMPT_REQUIRED' };
+  if (!['completed', 'failed'].includes(state)) return { ok: false, error: 'INVALID_ATTEMPT_FINAL_STATE' };
+  const attempts = readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY);
+  const attempt = attempts.find(item => item.id === normalizedAttemptId && item.taskId === normalizedTaskId);
+  if (!attempt) return { ok: false, error: 'ACP_EXECUTION_ATTEMPT_NOT_FOUND' };
+  if (['submitted', 'completed', 'stopped', 'failed'].includes(attempt.state)) return { ok: true, idempotent: true, attempt };
+  const updatedAt = new Date().toISOString();
+  const nextAttempt = { ...attempt, state, updatedAt, ...(reason ? { finalizationReason: normalizeString(reason).slice(0, 200) } : {}) };
+  store.set(TASK_CONTRIBUTION_ATTEMPTS_KEY, attempts.map(item => item.id === normalizedAttemptId ? nextAttempt : item));
+  return { ok: true, attempt: nextAttempt };
+}
 
 function updateAgentRuntimeTaskExecution(store, { taskId, attemptId, state, reason, batchNumber, lastEventAt } = {}) {
   const normalizedTaskId = normalizeString(taskId);
@@ -2061,6 +2076,7 @@ module.exports = {
   updateAgentRuntimeSessionBinding,
   appendAgentRuntimeEvent,
   updateAgentRuntimeTaskExecution,
+  finalizeAgentRuntimeAttempt,
   appendAgentRuntimeOutcome,
   evaluateAgentRuntimeGovernance,
   listAgentRuntimeSessions: listAgentRuntimeSessionsWithTaskExecution,

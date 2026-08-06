@@ -119,6 +119,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const [requestBusy, setRequestBusy] = useState(false);
   const [steerText, setSteerText] = useState('');
   const refreshSequence = useRef(0);
+  const taskAlreadyComplete = task.status === 'done';
 
   const activeContribution = task.collaboration?.contributions?.find(contribution => contribution.state === 'working');
   const startableContribution = task.collaboration?.contributions?.find(contribution =>
@@ -160,8 +161,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setPreflight(null);
     void (async () => {
       try {
-        if (task.status === 'done') {
-          setPreflight({ ok: false, blockers: [{ code: 'TASK_ALREADY_COMPLETE', message: 'This task is already complete. Reopen it before starting new work.' }] });
+        if (taskAlreadyComplete) {
+          setPreflight({ ok: false, blockers: [{ code: 'TASK_ALREADY_COMPLETE', message: 'This task is already complete. Reopen it or move it back to In progress before starting new work.' }] });
           return;
         }
         const stateResult = await window.electron.agentRuntime.getState();
@@ -198,7 +199,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       }
     })();
     return () => { cancelled = true; };
-  }, [open, repositoryFolder, startableContribution?.id, task.__mcpRevision, task.id, task.projectIds, task.repositoryFolder, task.swimlaneId]);
+  }, [open, repositoryFolder, startableContribution?.id, task.__mcpRevision, task.id, task.projectIds, task.repositoryFolder, task.swimlaneId, taskAlreadyComplete]);
 
   useEffect(() => {
     if (!open) return;
@@ -221,7 +222,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
 
   const observation = resolution?.profile ? runtimeState?.observations?.[resolution.profile.id] : undefined;
   const blockers = [...new Set([
-    ...(task.status === 'done' ? ['This task is already complete. Reopen it before starting new work.'] : []),
+    ...(taskAlreadyComplete ? ['This task is already complete. Reopen it or move it back to In progress before starting new work.'] : []),
     ...(!resolvedRepositoryFolder && !loading ? ['A working directory could not be resolved.'] : []),
     ...(resolution?.profile?.integrationMode === 'external-handoff' ? ['The selected connection opens work externally and cannot be supervised in Omvra.'] : []),
     ...(resolution && !resolution.ok ? [resolution.error || 'The selected agent connection is unavailable.'] : []),
@@ -233,7 +234,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const taskExecutionState = binding?.taskExecution?.state;
   const lastBatchCompleted = taskExecutionState === 'batch-finished' || events.some(event => event.nativeEventType === 'turn/completed' && !['failed', 'interrupted'].includes(event.state || ''));
   const sessionSummary = binding ? describeAgentRuntimeSession(binding.state, events, lastBatchCompleted ? (taskExecutionState || 'batch-finished') : taskExecutionState) : null;
-  const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', complete: 'Complete' };
+  const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', 'outcome-unreconciled': 'Outcome needs review', complete: 'Complete' };
   const latestTurnStartIndex = events.findLastIndex(event => event.nativeEventType === 'turn/started');
   const latestRunEvents = latestTurnStartIndex < 0 ? [] : events.slice(latestTurnStartIndex).filter(event =>
     ['turn/started', 'turn/completed', 'item/agentMessage/delta', 'item/started', 'item/completed', 'warning', 'error', 'omvra/taskBatch/automatic-continuing', 'omvra/taskBatch/automatic-limit-reached'].includes(event.nativeEventType || '')
@@ -254,7 +255,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const lastObservedLabel = lastObservedAt
     ? new Date(lastObservedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : null;
-  const executionNotice = binding?.state === 'closed' && lastBatchCompleted
+  const executionNotice = task.status === 'under-review' || taskExecutionState === 'ready-for-review'
+    ? { tone: 'warning' as const, title: 'Review the outcome', body: 'Inspect the completed work and acceptance checklist. Mark the task complete when the result is verified.' }
+    : (binding?.state === 'failed' || taskExecutionState === 'failed')
+    ? { tone: 'danger' as const, title: getAttentionState('failed').label, body: getAttentionState('failed').description }
+    : taskExecutionState === 'outcome-unreconciled'
+      ? { tone: 'warning' as const, title: 'Outcome needs review', body: 'The agent delivered an outcome, but the task status was not updated automatically. Review the result and move the task to Under Review when appropriate.' }
+    : binding?.state === 'closed' && lastBatchCompleted
     ? { tone: 'info' as const, title: 'Last batch completed', body: 'The agent completed its latest work batch. The session is closed, but you can continue the task from its saved context.' }
     : binding?.state === 'closed'
       ? { tone: 'warning' as const, title: 'No agent is working right now', body: 'This task is still in progress, but the session shown here was closed. Start a new session to continue from the saved task context.' }
@@ -272,7 +279,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     : loading
       ? 'Preparing work'
       : blockers.length > 0
-        ? 'Action needed before work starts'
+        ? taskAlreadyComplete ? 'Task already complete' : 'Action needed before work starts'
         : preflight
           ? 'Ready to start'
           : 'Start work';
@@ -281,7 +288,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     : loading
       ? 'Omvra is checking the assigned agent, working folder, model, and task instructions.'
       : blockers.length > 0
-        ? 'Resolve the item below before Omvra can start the assigned work.'
+        ? taskAlreadyComplete ? 'Move the task back to In progress if more agent work is needed.' : 'Resolve the item below before Omvra can start the assigned work.'
         : 'Omvra has checked the task context and will open supervision when work begins.';
 
   const refreshSession = async () => {
@@ -549,7 +556,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             {!binding && !loading && preflight && blockers.length === 0 && <ExecutionNotice tone="info" title={getAttentionState('ready').label} nextStep={getAttentionState('ready').nextStep}>The task context is prepared. Omvra will keep this supervision view available while the agent works.</ExecutionNotice>}
             {error && <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('failed').label} nextStep={getAttentionState('failed').nextStep}>{error}</ExecutionNotice></div>}
             {!error && blockers.length > 0 && (
-              <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('blocked').label} nextStep={getAttentionState('blocked').nextStep} assertive>
+              <div className="mb-3"><ExecutionNotice tone={taskAlreadyComplete ? 'warning' : 'danger'} title={taskAlreadyComplete ? 'Task already complete' : getAttentionState('blocked').label} nextStep={taskAlreadyComplete ? 'Reopen or move the task to In progress, then start work.' : getAttentionState('blocked').nextStep} assertive={!taskAlreadyComplete}>
                 <ul className="space-y-1">{blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul>
               </ExecutionNotice></div>
             )}
@@ -585,10 +592,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Agent status <StateBadge label={sessionSummary?.label || 'Unavailable'} value="" tone={agentStatusTone} title={sessionSummary?.detail} /></div>
-                  <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Execution status <StateBadge label={taskExecutionLabel[taskExecutionState || ''] || 'Synchronizing'} value={binding?.taskExecution?.batchNumber ? `Batch ${binding.taskExecution.batchNumber}` : ''} tone={taskExecutionState === 'working' || taskExecutionState === 'continuing' ? 'success' : taskExecutionState === 'failed' || taskExecutionState === 'interrupted' ? 'danger' : taskExecutionState === 'waiting' || taskExecutionState === 'batch-finished' ? 'warning' : 'muted'} /></div>
+                      <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Execution status <StateBadge label={taskExecutionLabel[taskExecutionState || ''] || 'Synchronizing'} value={binding?.taskExecution?.batchNumber ? `Batch ${binding.taskExecution.batchNumber}` : ''} tone={taskExecutionState === 'working' || taskExecutionState === 'continuing' ? 'success' : taskExecutionState === 'failed' || taskExecutionState === 'interrupted' || taskExecutionState === 'outcome-unreconciled' ? 'danger' : taskExecutionState === 'waiting' || taskExecutionState === 'batch-finished' ? 'warning' : 'muted'} /></div>
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Task status <StateBadge label={taskStatusLabel(task.status)} value="" tone={task.status === 'done' ? 'success' : task.status === 'under-review' ? 'warning' : task.status === 'in-progress' ? 'success' : 'muted'} /></div>
                 </div>
-                {executionNotice && <div className="mt-3"><ExecutionNotice tone={executionNotice.tone} title={executionNotice.title} nextStep={binding?.state === 'active' ? getAttentionState('active').nextStep : binding?.state === 'needs-input' ? getAttentionState('needs-input').nextStep : undefined}>{executionNotice.body}</ExecutionNotice></div>}
+                {executionNotice && <div className="mt-3"><ExecutionNotice tone={executionNotice.tone} title={executionNotice.title} nextStep={binding?.state === 'failed' || taskExecutionState === 'failed' ? getAttentionState('failed').nextStep : binding?.state === 'active' ? getAttentionState('active').nextStep : binding?.state === 'needs-input' ? getAttentionState('needs-input').nextStep : undefined} assertive={binding?.state === 'failed' || taskExecutionState === 'failed'}>{executionNotice.body}</ExecutionNotice></div>}
                 {!terminalBinding && pendingRequests.map(request => {
                   const missingRequired = request.fields.some(field => field.required && (requestValues[field.name] ?? field.defaultValue ?? '') === '');
                   return <div key={`${request.method}-${request.requestId}`} className="mt-3">

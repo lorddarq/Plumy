@@ -29,19 +29,14 @@ import { ARTIFACT_ITEMS, CONTROL_FLOW_ITEMS, TOOL_ITEMS } from '../goals/GoalsMe
 import { ReadyIcon, StatusIcon, compactChipClass, conditionNegativeLabel, conditionPositiveLabel, elementIcon, getElementBody, getElementTitle, isCompletionElement, isExecutionLocked, nodeClass, readinessChipClass, readinessDescription, readinessForElement, readinessLabel, runtimeStatusForElement, statusChipClass, statusDescription, statusLabel, statusNextStep } from '../goals/GoalsPresentation';
 import { GOAL_SCHEDULES_STORAGE_KEY, normalizeGoalSchedules } from '../../utils/goalSchedules.ts';
 import { useGoalsInspectorSelection } from '../../hooks/useGoalsInspectorSelection';
-import { getAttentionState } from '../../utils/attention';
+import { getAttentionState, getExecutionAttentionState } from '../../utils/attention';
 
 const STORAGE_KEY = 'omvra.goals.v1';
 const GOAL_ID = 'goal-lights-off-factory';
 const ARTIFACT_SELECT_CLASS = 'h-9 rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200';
 
 function goalExecutionAttention(state: string) {
-  if (state === 'working') return getAttentionState('active');
-  if (state === 'blocked' || state === 'permission-denied') return getAttentionState('blocked');
-  if (state === 'failed') return getAttentionState('failed');
-  if (state === 'approval-required' || state === 'evidence-required' || state === 'handoff-pending') return getAttentionState(state === 'handoff-pending' ? 'review' : 'needs-input');
-  if (state === 'complete') return getAttentionState('complete');
-  return state === 'ready' ? getAttentionState('ready') : { ...getAttentionState('needs-input'), label: state.replace(/-/g, ' ') };
+  return getExecutionAttentionState(state) ?? { ...getAttentionState('needs-input'), label: state.replace(/-/g, ' ') };
 }
 
 export function GoalsView({ people = [], tasks = [], milestones = [], projects = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; tasks?: Task[]; milestones?: ProjectMilestone[]; projects?: TimelineSwimlane[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {

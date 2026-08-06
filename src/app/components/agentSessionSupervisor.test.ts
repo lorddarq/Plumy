@@ -56,7 +56,7 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(execution, /Ready to start/);
   assert.ok(execution.indexOf('{error && <ExecutionNotice') < execution.indexOf('{binding && ('));
   assert.match(execution, /TASK_ALREADY_COMPLETE/);
-  assert.match(execution, /Reopen it before starting new work/);
+  assert.match(execution, /Reopen it or move it back to In progress before starting new work/);
   assert.match(execution, /new Set\(\[/);
   assert.match(source, /workspacePath \|\| task\.repositoryFolder \|\| project\?\.repositoryFolder/);
   assert.match(execution, /result\.error === 'ACP_SESSION_NOT_FOUND'/);

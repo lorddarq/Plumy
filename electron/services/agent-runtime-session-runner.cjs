@@ -11,6 +11,7 @@ function createAgentRuntimeSessionRunner({
   confirmStart,
   transitionContribution,
   moveTaskToStatus = null,
+  finalizeTaskAttempt = null,
   createBinding,
   updateBinding,
   appendEvent,
@@ -214,6 +215,41 @@ function createAgentRuntimeSessionRunner({
     return Boolean(task && !['done', 'under-review'].includes(task.status));
   }
 
+  async function finalizeAutomaticOutcome(binding) {
+    const task = typeof getTaskById === 'function' && binding.scope?.kind === 'task' ? getTaskById(store, binding.scope.taskId) : null;
+    if (!task) return;
+    const attemptResult = typeof finalizeTaskAttempt === 'function'
+      ? finalizeTaskAttempt(store, { taskId: binding.scope.taskId, attemptId: binding.scope.executionAttemptId, state: 'completed', reason: 'automatic-batch-limit' })
+      : { ok: false, error: 'ATTEMPT_FINALIZER_UNAVAILABLE' };
+    const latestTask = typeof getTaskById === 'function' ? getTaskById(store, binding.scope.taskId) : task;
+    const moved = latestTask?.status === 'under-review' || latestTask?.status === 'done'
+      ? { ok: true, task: latestTask }
+      : typeof moveTaskToStatus === 'function'
+        ? moveTaskToStatus(store, { taskId: binding.scope.taskId, statusId: 'under-review', statusTitle: 'Under Review', expectedRevision: latestTask?.__mcpRevision, actor: 'agent-runtime-reconciliation' })
+        : { ok: false, error: 'TASK_STATUS_FINALIZER_UNAVAILABLE' };
+    const executionState = moved.ok ? (moved.task?.status === 'done' ? 'complete' : 'ready-for-review') : 'outcome-unreconciled';
+    appendRuntimeEvent({
+      bindingId: binding.id,
+      runtimeProfileId: binding.runtimeProfileId,
+      kind: 'session',
+      nativeEventType: moved.ok ? 'omvra/taskExecution/finalized-for-review' : 'omvra/taskExecution/outcome-unreconciled',
+      state: executionState,
+      outcome: moved.ok ? 'automatic-batch-limit-finalized' : `automatic-batch-limit:${moved.error || attemptResult.error || 'reconciliation-failed'}`,
+      idempotencyKey: `runtime:${binding.id}:automatic-outcome:${executionState}`,
+    });
+    const current = bindingFor(binding.id) || binding;
+    if (ACTIVE_STATES.has(current.state)) {
+      const closed = updateBinding(store, { bindingId: current.id, expectedRevision: current.revision, state: 'closed', terminalReason: 'closed' });
+      const session = clients.get(binding.id);
+      try { await session?.client?.closeSession?.(current.opaqueSessionRef); } catch (error) { log('debug', 'automatic-outcome.remote-close-failed', { bindingId: binding.id, message: error?.message || String(error) }); }
+      session?.client?.close?.();
+      if (session?.mcpGrantId && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, session.mcpGrantId);
+      clients.delete(binding.id);
+      const closedBinding = closed?.ok ? closed.binding : bindingFor(binding.id) || current;
+      syncTaskExecution(closedBinding, executionState, { reason: moved.ok ? 'automatic-outcome-finalized' : 'automatic-outcome-unreconciled' });
+    }
+  }
+
   function scheduleAutomaticContinuation(bindingId) {
     if (!Number.isInteger(maxAutomaticBatches) || maxAutomaticBatches <= 0 || automaticContinuationInFlight.has(bindingId)) return;
     const current = bindingFor(bindingId);
@@ -230,6 +266,7 @@ function createAgentRuntimeSessionRunner({
         outcome: `Automatic continuation stopped after ${maxAutomaticBatches} batches.`,
         idempotencyKey: `runtime:${bindingId}:automatic-limit:${completedBatches}`,
       });
+      void finalizeAutomaticOutcome(current);
       return;
     }
     automaticContinuationInFlight.add(bindingId);

@@ -88,7 +88,7 @@ export interface TaskContributionAttemptV1 {
   updatedAt: string;
   runtimeExecution?: {
     schemaVersion: 1;
-    state: 'starting' | 'ready' | 'working' | 'continuing' | 'waiting' | 'stopping' | 'batch-finished' | 'interrupted' | 'stopped' | 'failed' | 'ready-for-review' | 'complete';
+    state: 'starting' | 'ready' | 'working' | 'continuing' | 'waiting' | 'stopping' | 'batch-finished' | 'interrupted' | 'stopped' | 'failed' | 'ready-for-review' | 'outcome-unreconciled' | 'complete';
     batchNumber: number;
     updatedAt: string;
     reason?: string;

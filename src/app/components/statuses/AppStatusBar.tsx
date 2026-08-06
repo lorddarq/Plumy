@@ -1,21 +1,14 @@
 import type React from 'react';
 import { useState } from 'react';
 import { cn } from '../ui/utils';
-import {
-  deriveAgentStatuses,
-  getMcpStatusSummary,
-  getRecentMcpActivitySignal,
-  rollupActiveAgentProvenance,
-  rollupAgentStatuses,
-  type AgentStatusTone,
-} from '../../utils/statusBar';
+import { getMcpStatusSummary, getRecentMcpActivitySignal, type AgentStatusTone } from '../../utils/statusBar';
 import type { Person, Task } from '../../types';
 import type { AgentWatchConfig } from '../../utils/workspaceSanitizers';
 import type { AgentWatchRuntimeState } from '../../hooks/useAgentWatchRuntime';
-import { AgentIcon } from '../icons/AgentIcon';
 import { FiltersIcon } from '../SettingsPanel';
 import { useAgentSessionSupervisor } from '../AgentSessionSupervisor';
 import { getAttentionState } from '../../utils/attention';
+import { ChevronDown } from 'lucide-react';
 
 export interface AppStatusBarProps {
   tasks: Task[];
@@ -39,86 +32,16 @@ export function AppStatusBar({
   mcpRestartPending,
 }: AppStatusBarProps) {
   const { sessionDock, openSession } = useAgentSessionSupervisor();
-  const agents = rollupAgentStatuses(
-    deriveAgentStatuses({ people, tasks, agentWatchConfigs, agentWatchRuntime, mcpAuditLog })
-  );
-  const activeProvenance = rollupActiveAgentProvenance(agents.statuses);
   const mcp = getMcpStatusSummary({ mcpAgentAccessEnabled, mcpListenerStatus, mcpRestartPending });
   const recentMcpActivity = getRecentMcpActivitySignal({ mcpAuditLog, tasks });
   const mcpValue = getMcpBadgeValue(mcp.label);
 
-  const statusPills = [
-    {
-      key: 'writing',
-      label: 'Writing',
-      value: String(agents.counts.writing),
-      tone: 'warning' as const,
-      title: agents.byState.writing.map(agent => agent.name).join(', ') || 'No agents are writing to MCP',
-    },
-    {
-      key: 'working',
-      label: 'Working',
-      value: String(agents.counts.working),
-      tone: 'success' as const,
-      title: agents.byState.working.map(agent => agent.name).join(', ') || 'No agents are actively working',
-    },
-    {
-      key: 'idle',
-      label: 'Idle',
-      value: String(agents.counts.idle),
-      tone: 'muted' as const,
-      title: agents.byState.idle.map(agent => agent.name).join(', ') || 'No agents are idle',
-    },
-    {
-      key: 'unavailable',
-      label: 'Unavailable',
-      value: String(agents.counts.unavailable),
-      tone: 'unknown' as const,
-      title: agents.byState.unavailable.map(agent => agent.name).join(', ') || 'No agents are unavailable',
-    },
-  ].filter(item => agents.total > 0 ? Number(item.value) > 0 : item.key === 'unavailable');
-
   return (
     <div
       className="flex min-h-8 items-center gap-3 border-t border-black/5 bg-gray-50 px-4 py-2 text-xs text-gray-600"
-      aria-label={`Agent status: ${agents.counts.writing} writing to MCP, ${agents.counts.working} working, ${agents.counts.idle} idle, ${agents.counts.unavailable} unavailable. Work status: ${getSessionDockLabel(sessionDock)}. ${mcp.label}.`}
+      aria-label={`Work status: ${getSessionDockLabel(sessionDock)}. ${mcp.label}.`}
     >
       <SessionDockStatus sessionDock={sessionDock} onOpen={openSession} />
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 text-gray-500">
-          <AgentIcon className="size-3.5" aria-hidden="true" />
-        </span>
-        <span className="whitespace-nowrap text-center text-xs font-medium text-[#828282]">Agents:</span>
-        {agents.total === 0 ? (
-          <StateBadge label="No agents" value="0" tone="muted" title="No agentic teammates are configured" />
-        ) : (
-          statusPills.map(item => (
-            <StateBadge
-              key={item.key}
-              label={item.label}
-              value={item.value}
-              tone={item.tone}
-              title={item.title}
-            />
-          ))
-        )}
-        {activeProvenance.length > 0 ? (
-          <>
-            <span className="whitespace-nowrap text-center text-xs font-medium text-[#b0b0b7]">Via:</span>
-            {activeProvenance.map(item => (
-              <ProvenanceBadge
-                key={item.id}
-                label={item.label}
-                value={String(item.count)}
-                dotColor={item.dotColor}
-                backgroundColor={item.badgeBackground}
-                textColor={item.badgeTextColor}
-                title={item.people.join(', ')}
-              />
-            ))}
-          </>
-        ) : null}
-      </div>
       <StatusPill
         icon={<FiltersIcon className="size-3.5" aria-hidden="true" />}
         label="MCP:"
@@ -138,6 +61,16 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
     : (sessionDock.historyCount > 0 ? `${sessionDock.historyCount} session${sessionDock.historyCount === 1 ? '' : 's'} in history` : 'No session selected');
   const buttonLabel = sessionDock.binding && sessionDock.task ? `Open supervision: ${label} for ${sessionDock.task.title}` : undefined;
   const hasSessions = sessionDock.items.length > 0;
+  const attention = sessionDock.state === 'working' || sessionDock.state === 'hidden-active'
+    ? getAttentionState('active')
+    : sessionDock.state === 'needs-input'
+      ? getAttentionState('needs-input')
+      : sessionDock.state === 'failed'
+        ? getAttentionState('failed')
+        : sessionDock.state === 'blocked'
+          ? getAttentionState('blocked')
+          : null;
+  const accessibleLabel = `${buttonLabel || `Work status: ${label}`}. ${attention ? `${attention.description} Next action: ${attention.nextStep}` : 'No attention action is pending.'}`;
   const attentionClass = sessionDock.state === 'needs-input' || sessionDock.state === 'blocked'
     ? 'bg-amber-50 text-amber-900'
     : sessionDock.state === 'failed'
@@ -151,14 +84,14 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
         type="button"
         onClick={() => hasSessions && setExpanded(current => !current)}
         aria-expanded={expanded}
-        aria-label={buttonLabel || `Work status: ${label}`}
-        className={`flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 ${attentionClass}`}
+        aria-label={accessibleLabel}
+        className={`group flex min-h-8 min-w-0 max-w-[min(560px,calc(100vw-8rem))] items-center gap-2 rounded-lg border border-transparent px-2 py-1 text-left transition-colors hover:border-blue-200 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 ${attentionClass}`}
       >
         <span className={`size-2 shrink-0 rounded-full ${sessionDock.state === 'working' || sessionDock.state === 'hidden-active' || sessionDock.state === 'ready' ? 'bg-emerald-500' : sessionDock.state === 'needs-input' ? 'bg-amber-500' : sessionDock.state === 'failed' ? 'bg-red-500' : 'bg-slate-300'}`} aria-hidden="true" />
-        <span className="whitespace-nowrap text-center text-xs font-medium text-[#828282]">Work:</span>
-        <span className="whitespace-nowrap text-[11px] font-semibold text-slate-600">{label}</span>
+        <span className="whitespace-nowrap text-xs font-semibold text-slate-500">Work</span>
+        <span className="whitespace-nowrap text-[11px] font-semibold text-slate-700">{label}</span>
         <span className="max-w-44 truncate text-[11px] text-slate-400" title={detail}>{detail}</span>
-        {hasSessions && <span className={`ml-0.5 text-[10px] text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>}
+        {hasSessions && <span className="ml-auto flex size-6 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors group-hover:bg-white group-hover:text-slate-700" aria-hidden="true"><ChevronDown className={`size-4 transition-transform ${expanded ? 'rotate-180' : ''}`} strokeWidth={2.25} /></span>}
       </button>
 
       {expanded && hasSessions && (
@@ -193,6 +126,13 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
                     <button type="button" onClick={() => { setExpanded(false); onOpen(binding); }} className="mt-2 rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-slate-700">Review request</button>
                   </div>
                 )}
+                {isLatest && (binding.state === 'failed' || binding.state === 'blocked') && (
+                  <div className={`mx-3 mb-3 rounded-lg border px-2.5 py-2 ${binding.state === 'failed' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+                    <div className={`text-[11px] font-semibold ${binding.state === 'failed' ? 'text-red-900' : 'text-amber-900'}`}>{binding.state === 'failed' ? getAttentionState('failed').label : getAttentionState('blocked').label}</div>
+                    <div className={`mt-0.5 text-[11px] leading-4 ${binding.state === 'failed' ? 'text-red-800' : 'text-amber-800'}`}>{binding.state === 'failed' ? getAttentionState('failed').description : getAttentionState('blocked').description}</div>
+                    <div className={`mt-1 text-[11px] leading-4 ${binding.state === 'failed' ? 'text-red-800' : 'text-amber-800'}`}><span className="font-semibold">Next step:</span> {binding.state === 'failed' ? getAttentionState('failed').nextStep : getAttentionState('blocked').nextStep}</div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -207,6 +147,7 @@ function getSessionItemState(binding: { state: string; taskExecution?: { state?:
   if (state === 'active' || state === 'starting' || state === 'cancelling') return { label: state === 'starting' ? 'Starting work' : state === 'cancelling' ? 'Stopping work' : `${getAttentionState('active').label} · Open to monitor`, icon: getAttentionState('active').symbol, className: 'bg-blue-100 text-blue-700' };
   if (state === 'needs-input') return { label: `${getAttentionState('needs-input').label} · Review request`, icon: '!', className: 'bg-amber-100 text-amber-700' };
   if (state === 'failed') return { label: `${getAttentionState('failed').label} · Review needed`, icon: '×', className: 'bg-red-100 text-red-700' };
+  if (binding.taskExecution?.state === 'outcome-unreconciled') return { label: 'Outcome delivered · Review task status', icon: '!', className: 'bg-amber-100 text-amber-700' };
   if (state === 'interrupted') return { label: 'Interrupted · Resume available', icon: '↻', className: 'bg-amber-100 text-amber-700' };
   if (state === 'ready' || binding.taskExecution?.state === 'batch-finished') return { label: 'Last batch completed · Continue available', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };
   return { label: 'Completed session · No action pending', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };

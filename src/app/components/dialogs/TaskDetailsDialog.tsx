@@ -29,6 +29,8 @@ import { LoadIcon } from '../icons/LoadIcon';
 import { AttachmentIcon } from '../icons/AttachmentIcon';
 import { BasicInfoIcon } from '../icons/BasicInfoIcon';
 import { DescriptionIcon } from '../icons/DescriptionIcon';
+import { ExecutionNotice } from '../ExecutionNotice';
+import { getAttentionState, type AttentionKind } from '../../utils/attention';
 
 interface TaskDetailsDialogProps {
   isOpen: boolean;
@@ -68,7 +70,7 @@ export function TaskDetailsDialog({
   milestones = [],
   readModel,
 }: TaskDetailsDialogProps) {
-  const { requestTask } = useAgentSessionSupervisor();
+  const { requestTask, sessionDock } = useAgentSessionSupervisor();
   const [newComment, setNewComment] = useState('');
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -123,6 +125,17 @@ export function TaskDetailsDialog({
     assignee.kind === 'agentic' &&
     task.status === 'in-progress'
   );
+  const sessionAttentionKind: AttentionKind | undefined = sessionDock.task?.id === task?.id
+    ? sessionDock.state === 'working' || sessionDock.state === 'hidden-active'
+      ? 'active'
+      : sessionDock.state === 'failed'
+        ? 'failed'
+        : sessionDock.state === 'needs-input'
+          ? 'needs-input'
+          : sessionDock.state === 'blocked'
+            ? 'blocked'
+            : undefined
+    : undefined;
   const sortedComments = useMemo(
     () => [...(task?.comments || [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     [task?.comments]
@@ -341,9 +354,22 @@ export function TaskDetailsDialog({
                 priority={task.priority || 'normal'}
                 blockedLabel={task.blocked ? 'Yes' : 'No'}
                 blocked={Boolean(task.blocked)}
+                blockedNextStep={dependencyTasks.length > 0 ? 'Review the Dependencies section below and resolve the blocking reason.' : undefined}
                 assigneeKind={assignee?.kind}
                 milestoneLabel={milestoneLabel}
               />
+            )}
+            {sessionAttentionKind && (
+              <div className="mt-4">
+                <ExecutionNotice
+                  tone={getAttentionState(sessionAttentionKind).tone === 'danger' ? 'danger' : getAttentionState(sessionAttentionKind).tone === 'warning' ? 'warning' : 'info'}
+                  title={getAttentionState(sessionAttentionKind).label}
+                  nextStep={getAttentionState(sessionAttentionKind).nextStep}
+                  assertive={sessionAttentionKind === 'failed' || sessionAttentionKind === 'blocked'}
+                >
+                  {getAttentionState(sessionAttentionKind).description}
+                </ExecutionNotice>
+              </div>
             )}
           </AnchoredPanelSection>
 

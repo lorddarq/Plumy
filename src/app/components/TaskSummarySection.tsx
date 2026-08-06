@@ -25,6 +25,7 @@ interface TaskSummarySectionProps {
   blocked: boolean;
   assigneeKind?: Person['kind'];
   milestoneLabel: string;
+  blockedNextStep?: string;
 }
 
 interface TaskLoadDetailsSectionProps {
@@ -45,6 +46,7 @@ export function TaskSummarySection({
   blocked,
   assigneeKind,
   milestoneLabel,
+  blockedNextStep = 'Review the blocking reason and resolve it before starting work.',
 }: TaskSummarySectionProps) {
   const priorityIcon = TASK_PRIORITY_ICONS[priority];
   const AssigneeIcon = assigneeKind === 'agentic' ? AgentIcon : UserIcon;
@@ -69,7 +71,7 @@ export function TaskSummarySection({
       </div>
 
       {blocked && (
-        <ExecutionNotice tone="danger" title={getAttentionState('blocked').label} nextStep="Review the Dependencies section below and resolve the blocking reason.">
+        <ExecutionNotice tone="danger" title={getAttentionState('blocked').label} nextStep={blockedNextStep}>
           {getAttentionState('blocked').description}
         </ExecutionNotice>
       )}
