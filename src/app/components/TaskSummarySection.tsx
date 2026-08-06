@@ -10,6 +10,7 @@ import { AgentIcon } from './icons/AgentIcon';
 import { UserIcon } from './icons/UserIcon';
 import { NodesIcon } from './icons/NodesIcon';
 import { ExecutionNotice } from './ExecutionNotice';
+import { getAttentionState } from '../utils/attention';
 
 interface TaskSummarySectionProps {
   statusLabel: string;
@@ -68,13 +69,13 @@ export function TaskSummarySection({
       </div>
 
       {blocked && (
-        <ExecutionNotice tone="danger" title="Blocked work">
-          Resolve the blocking dependency or reason before starting work. No action is available from this summary; review the Dependencies section below.
+        <ExecutionNotice tone="danger" title={getAttentionState('blocked').label} nextStep="Review the Dependencies section below and resolve the blocking reason.">
+          {getAttentionState('blocked').description}
         </ExecutionNotice>
       )}
       {!blocked && /review/i.test(statusLabel) && (
-        <ExecutionNotice tone="warning" title="Pending review">
-          Review the task outcome and use the available review action when it is ready. This task is waiting for human attention.
+        <ExecutionNotice tone="warning" title={getAttentionState('review').label} nextStep={getAttentionState('review').nextStep}>
+          {getAttentionState('review').description}
         </ExecutionNotice>
       )}
 

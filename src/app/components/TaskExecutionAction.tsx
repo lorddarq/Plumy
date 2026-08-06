@@ -14,6 +14,7 @@ import {
 import { TaskSessionComposer } from './TaskSessionComposer';
 import { ExecutionNotice } from './ExecutionNotice';
 import { StateBadge } from './statuses/AppStatusBar';
+import { getAttentionState } from '../utils/attention';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from './ui/sheet';
 
 interface RuntimeState {
@@ -535,10 +536,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
           <div className={`min-h-0 flex-1 overflow-y-auto px-6 py-5 text-sm ${binding ? 'flex flex-col' : 'space-y-3'}`}>
             {mcpReadOnly && <ExecutionNotice tone="warning" title="Task access is read-only">The agent can inspect this task but cannot change its description or status. Select Task Write under Settings → MCP Access, then restart the listener.</ExecutionNotice>}
             {!binding && loading && <ExecutionNotice tone="info" title="Preparing your work session">Omvra is verifying the task instructions, assigned agent, runtime connection, and working directory.</ExecutionNotice>}
-            {!binding && !loading && preflight && blockers.length === 0 && <ExecutionNotice tone="info" title="Ready to start">The task context is prepared. Omvra will keep this supervision view available while the agent works.</ExecutionNotice>}
-            {error && <div className="mb-3"><ExecutionNotice tone="danger" title="Work could not continue">{error}</ExecutionNotice></div>}
+            {!binding && !loading && preflight && blockers.length === 0 && <ExecutionNotice tone="info" title={getAttentionState('ready').label} nextStep={getAttentionState('ready').nextStep}>The task context is prepared. Omvra will keep this supervision view available while the agent works.</ExecutionNotice>}
+            {error && <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('failed').label} nextStep={getAttentionState('failed').nextStep}>{error}</ExecutionNotice></div>}
             {!error && blockers.length > 0 && (
-              <div className="mb-3"><ExecutionNotice tone="warning" title="Needs attention before work can start" assertive>
+              <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('blocked').label} nextStep={getAttentionState('blocked').nextStep} assertive>
                 <ul className="space-y-1">{blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul>
               </ExecutionNotice></div>
             )}
@@ -577,11 +578,11 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Execution status <StateBadge label={taskExecutionLabel[taskExecutionState || ''] || 'Synchronizing'} value={binding?.taskExecution?.batchNumber ? `Batch ${binding.taskExecution.batchNumber}` : ''} tone={taskExecutionState === 'working' || taskExecutionState === 'continuing' ? 'success' : taskExecutionState === 'failed' || taskExecutionState === 'interrupted' ? 'danger' : taskExecutionState === 'waiting' || taskExecutionState === 'batch-finished' ? 'warning' : 'muted'} /></div>
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Task status <StateBadge label={taskStatusLabel(task.status)} value="" tone={task.status === 'done' ? 'success' : task.status === 'under-review' ? 'warning' : task.status === 'in-progress' ? 'success' : 'muted'} /></div>
                 </div>
-                {executionNotice && <div className="mt-3"><ExecutionNotice tone={executionNotice.tone} title={executionNotice.title}>{executionNotice.body}</ExecutionNotice></div>}
+                {executionNotice && <div className="mt-3"><ExecutionNotice tone={executionNotice.tone} title={executionNotice.title} nextStep={binding?.state === 'active' ? getAttentionState('active').nextStep : binding?.state === 'needs-input' ? getAttentionState('needs-input').nextStep : undefined}>{executionNotice.body}</ExecutionNotice></div>}
                 {!terminalBinding && pendingRequests.map(request => {
                   const missingRequired = request.fields.some(field => field.required && (requestValues[field.name] ?? field.defaultValue ?? '') === '');
                   return <div key={`${request.method}-${request.requestId}`} className="mt-3">
-                    <ExecutionNotice tone="warning" title="The agent needs your input" assertive>
+                    <ExecutionNotice tone="warning" title={getAttentionState('needs-input').label} nextStep={getAttentionState('needs-input').nextStep} assertive>
                       <div>{request.message}</div>
                       {request.serverName && <div className="mt-1 text-[11px] text-amber-700">Requested by {request.serverName}</div>}
                     {request.fields.length > 0 && <div className="mt-3 space-y-2">{request.fields.map(field => {

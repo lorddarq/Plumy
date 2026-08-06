@@ -15,6 +15,7 @@ import type { AgentWatchRuntimeState } from '../../hooks/useAgentWatchRuntime';
 import { AgentIcon } from '../icons/AgentIcon';
 import { FiltersIcon } from '../SettingsPanel';
 import { useAgentSessionSupervisor } from '../AgentSessionSupervisor';
+import { getAttentionState } from '../../utils/attention';
 
 export interface AppStatusBarProps {
   tasks: Task[];
@@ -82,6 +83,7 @@ export function AppStatusBar({
       className="flex min-h-8 items-center gap-3 border-t border-black/5 bg-gray-50 px-4 py-2 text-xs text-gray-600"
       aria-label={`Agent status: ${agents.counts.writing} writing to MCP, ${agents.counts.working} working, ${agents.counts.idle} idle, ${agents.counts.unavailable} unavailable. Work status: ${getSessionDockLabel(sessionDock)}. ${mcp.label}.`}
     >
+      <SessionDockStatus sessionDock={sessionDock} onOpen={openSession} />
       <div className="flex min-w-0 items-center gap-2">
         <span className="shrink-0 text-gray-500">
           <AgentIcon className="size-3.5" aria-hidden="true" />
@@ -117,7 +119,6 @@ export function AppStatusBar({
           </>
         ) : null}
       </div>
-      <SessionDockStatus sessionDock={sessionDock} onOpen={openSession} />
       <StatusPill
         icon={<FiltersIcon className="size-3.5" aria-hidden="true" />}
         label="MCP:"
@@ -137,6 +138,13 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
     : (sessionDock.historyCount > 0 ? `${sessionDock.historyCount} session${sessionDock.historyCount === 1 ? '' : 's'} in history` : 'No session selected');
   const buttonLabel = sessionDock.binding && sessionDock.task ? `Open supervision: ${label} for ${sessionDock.task.title}` : undefined;
   const hasSessions = sessionDock.items.length > 0;
+  const attentionClass = sessionDock.state === 'needs-input' || sessionDock.state === 'blocked'
+    ? 'bg-amber-50 text-amber-900'
+    : sessionDock.state === 'failed'
+      ? 'bg-red-50 text-red-900'
+      : sessionDock.state === 'working' || sessionDock.state === 'hidden-active'
+        ? 'bg-blue-50 text-blue-900'
+        : '';
   return (
     <div className="relative min-w-0 shrink">
       <button
@@ -144,7 +152,7 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
         onClick={() => hasSessions && setExpanded(current => !current)}
         aria-expanded={expanded}
         aria-label={buttonLabel || `Work status: ${label}`}
-        className="flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+        className={`flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 ${attentionClass}`}
       >
         <span className={`size-2 shrink-0 rounded-full ${sessionDock.state === 'working' || sessionDock.state === 'hidden-active' || sessionDock.state === 'ready' ? 'bg-emerald-500' : sessionDock.state === 'needs-input' ? 'bg-amber-500' : sessionDock.state === 'failed' ? 'bg-red-500' : 'bg-slate-300'}`} aria-hidden="true" />
         <span className="whitespace-nowrap text-center text-xs font-medium text-[#828282]">Work:</span>
@@ -196,9 +204,9 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
 
 function getSessionItemState(binding: { state: string; taskExecution?: { state?: string } }) {
   const state = binding.state;
-  if (state === 'active' || state === 'starting' || state === 'cancelling') return { label: state === 'starting' ? 'Starting work' : state === 'cancelling' ? 'Stopping work' : 'Active execution · Open to monitor', icon: '2', className: 'bg-blue-100 text-blue-700' };
-  if (state === 'needs-input') return { label: 'Human input required · Review request', icon: '!', className: 'bg-amber-100 text-amber-700' };
-  if (state === 'failed') return { label: 'Failed execution · Review needed', icon: '×', className: 'bg-red-100 text-red-700' };
+  if (state === 'active' || state === 'starting' || state === 'cancelling') return { label: state === 'starting' ? 'Starting work' : state === 'cancelling' ? 'Stopping work' : `${getAttentionState('active').label} · Open to monitor`, icon: getAttentionState('active').symbol, className: 'bg-blue-100 text-blue-700' };
+  if (state === 'needs-input') return { label: `${getAttentionState('needs-input').label} · Review request`, icon: '!', className: 'bg-amber-100 text-amber-700' };
+  if (state === 'failed') return { label: `${getAttentionState('failed').label} · Review needed`, icon: '×', className: 'bg-red-100 text-red-700' };
   if (state === 'interrupted') return { label: 'Interrupted · Resume available', icon: '↻', className: 'bg-amber-100 text-amber-700' };
   if (state === 'ready' || binding.taskExecution?.state === 'batch-finished') return { label: 'Last batch completed · Continue available', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };
   return { label: 'Completed session · No action pending', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };
@@ -207,13 +215,13 @@ function getSessionItemState(binding: { state: string; taskExecution?: { state?:
 function getSessionDockLabel(sessionDock: ReturnType<typeof useAgentSessionSupervisor>['sessionDock']): string {
   return sessionDock.state === 'none' ? 'No active work'
     : sessionDock.state === 'starting' ? 'Starting'
-    : sessionDock.state === 'working' ? 'Active execution'
-        : sessionDock.state === 'hidden-active' ? 'Active execution · Open to monitor'
+              : sessionDock.state === 'working' ? getAttentionState('active').label
+        : sessionDock.state === 'hidden-active' ? `${getAttentionState('active').label} · Open to monitor`
           : sessionDock.state === 'ready' ? 'Last batch completed · Continue available'
-          : sessionDock.state === 'needs-input' ? 'Human input required · Review request'
+              : sessionDock.state === 'needs-input' ? `${getAttentionState('needs-input').label} · Review request`
             : sessionDock.state === 'interrupted' ? 'Interrupted · Resume available'
-              : sessionDock.state === 'failed' ? 'Failed execution · Review needed'
-              : sessionDock.state === 'blocked' ? 'Blocked · Another session is active' : 'Completed session · No action pending';
+              : sessionDock.state === 'failed' ? `${getAttentionState('failed').label} · Review needed`
+              : sessionDock.state === 'blocked' ? `${getAttentionState('blocked').label} · Another session is active` : 'Completed session · No action pending';
 }
 
 function getMcpBadgeValue(label: string): string {
