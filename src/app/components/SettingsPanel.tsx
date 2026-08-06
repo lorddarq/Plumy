@@ -46,16 +46,16 @@ const SETTINGS_PANEL_NAV_GROUPS = [
         label: 'People',
         icon: UsersIcon,
       },
+    ],
+  },
+  {
+    label: 'Agents & connections',
+    items: [
       {
         id: 'agents',
         label: 'Agent profiles',
         icon: AgentIcon,
       },
-    ],
-  },
-  {
-    label: 'Connections',
-    items: [
       {
         id: 'agent-runtimes',
         label: 'Runtime access',
@@ -63,12 +63,12 @@ const SETTINGS_PANEL_NAV_GROUPS = [
       },
       {
         id: 'mcp-access',
-        label: 'Agent access',
+        label: 'Connected agents',
         icon: FiltersIcon,
       },
       {
         id: 'mcp-testing',
-        label: 'Connection diagnostics',
+        label: 'Troubleshoot connections',
         icon: GaugeIcon,
       },
       {
@@ -122,7 +122,7 @@ export function SettingsPanel({ isOpen, onClose, initialAnchor = 'general', chil
       >
         <SheetTitle className="sr-only">Preferences</SheetTitle>
         <SheetDescription className="sr-only">
-          Configure agent access, task load, and local workspace data.
+          Configure workspace preferences, agent connections, local workspace data, backups, and help.
         </SheetDescription>
         <AnchoredPanel
           title="Preferences"
@@ -468,9 +468,9 @@ export function McpSettingsSection({ children }: McpSettingsSectionProps) {
   return (
     <AnchoredPanelSection
       id="mcp-access"
-      title="Agent access"
+      title="Connected agents"
       icon={FiltersIcon}
-      description="Allow external agent clients to access this workspace. This is separate from Runtime access."
+      description="Let connected agent tools work with this workspace. This is separate from Runtime access."
     >
       {children}
     </AnchoredPanelSection>
@@ -481,7 +481,7 @@ export function McpTestingSettingsSection({ children }: McpSettingsSectionProps)
   return (
     <AnchoredPanelSection
       id="mcp-testing"
-      title="Connection diagnostics"
+      title="Troubleshoot connections"
       icon={GaugeIcon}
       description="Check agent connections and troubleshoot access issues."
     >

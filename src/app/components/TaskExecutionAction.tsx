@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Folder, Play, Server, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
@@ -93,6 +93,8 @@ function taskStatusLabel(status: Task['status']) {
   return 'Open';
 }
 
+const ACTIVE_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
+
 export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
   const [open, setOpen] = useState(false);
   const [startRequested, setStartRequested] = useState(false);
@@ -112,6 +114,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const [operationBusy, setOperationBusy] = useState(false);
   const [requestBusy, setRequestBusy] = useState(false);
   const [steerText, setSteerText] = useState('');
+  const refreshSequence = useRef(0);
 
   const activeContribution = task.collaboration?.contributions?.find(contribution => contribution.state === 'working');
   const startableContribution = task.collaboration?.contributions?.find(contribution =>
@@ -259,13 +262,18 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         : 'Omvra has checked the task context and will open supervision when work begins.';
 
   const refreshSession = async () => {
+    const sequence = ++refreshSequence.current;
     const index = await window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 });
+    if (sequence !== refreshSequence.current) return null;
     if (!index?.ok) {
       console.warn('[agent-runtime:ui] session-refresh.rejected', { taskId: task.id, error: index?.error || 'Session list unavailable.' });
       setSessionLoaded(true);
       return null;
     }
-    const nextBinding = (index.bindings || []).findLast((candidate: SessionBinding) => candidate.scope?.taskId === task.id) || null;
+    const taskBindings = (index.bindings || []).filter((candidate: SessionBinding) => candidate.scope?.taskId === task.id);
+    const nextBinding = taskBindings.findLast(candidate => ACTIVE_SESSION_STATES.has(candidate.state))
+      || taskBindings.at(-1)
+      || null;
     if (!nextBinding) {
       setBinding(null);
       setEvents([]);
@@ -276,6 +284,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     }
     const detail = await window.electron?.agentRuntime?.sessions?.list?.({ bindingId: nextBinding.id, limit: 100 });
     const requests = await window.electron?.agentRuntime?.sessions?.requests?.(nextBinding.id);
+    if (sequence !== refreshSequence.current) return null;
     setBinding((detail?.bindings || [nextBinding])[0] || nextBinding);
     setEvents((detail?.events || []) as SessionEvent[]);
     setPendingRequests(Array.isArray(requests) ? requests as PendingRuntimeRequest[] : []);

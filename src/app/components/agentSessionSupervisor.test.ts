@@ -70,3 +70,11 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(source, /startOnRequest: false/);
   assert.match(source, /'interrupted', 'failed'/);
 });
+
+test('task supervision prefers a live binding over a newer closed historical binding', () => {
+  const execution = readComponent('TaskExecutionAction.tsx');
+  assert.match(execution, /const ACTIVE_SESSION_STATES = new Set\(\['starting', 'ready', 'active', 'needs-input', 'cancelling'\]\)/);
+  assert.match(execution, /taskBindings\.findLast\(candidate => ACTIVE_SESSION_STATES\.has\(candidate\.state\)\)/);
+  assert.match(execution, /const refreshSequence = useRef\(0\)/);
+  assert.match(execution, /if \(sequence !== refreshSequence\.current\) return null/);
+});
