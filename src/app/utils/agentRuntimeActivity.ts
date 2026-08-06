@@ -83,7 +83,11 @@ export function summarizeAgentRuntimeActivity(events: AgentRuntimeActivityEvent[
   return [...grouped.values()].sort((left, right) => (left.observedAt || '').localeCompare(right.observedAt || ''));
 }
 
-export function describeAgentRuntimeSession(bindingState: string, events: AgentRuntimeActivityEvent[]) {
+export function describeAgentRuntimeSession(bindingState: string, events: AgentRuntimeActivityEvent[], executionState?: string) {
+  if (executionState === 'complete') return { label: 'Task work complete', detail: 'The agent completed the task execution.', tone: 'positive' as const, isTurnActive: false };
+  if (executionState === 'batch-finished' && bindingState !== 'active' && bindingState !== 'starting' && bindingState !== 'needs-input') {
+    return { label: 'Last batch completed', detail: 'The agent completed its latest work batch. Continue the task if more work is needed.', tone: 'positive' as const, isTurnActive: false };
+  }
   if (bindingState === 'failed') return { label: 'Previous runtime unavailable', detail: 'This provider session is no longer connected to Omvra. Start a new session; the current task context is preserved.', tone: 'danger' as const, isTurnActive: false };
   if (bindingState === 'needs-input') return { label: 'Agent is waiting for you', detail: 'The agent cannot continue until you respond.', tone: 'warning' as const, isTurnActive: false };
   if (bindingState === 'interrupted') return { label: 'Work was interrupted', detail: 'The previous runtime may belong to another app process. Resume if available, or start a new session; task context is preserved.', tone: 'warning' as const, isTurnActive: false };

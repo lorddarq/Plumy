@@ -73,17 +73,18 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   const statusBar = readComponent('statuses/AppStatusBar.tsx');
   assert.match(statusBar, /useAgentSessionSupervisor/);
   assert.match(statusBar, /No active work/);
-  assert.match(statusBar, /Needs your input/);
-  assert.match(statusBar, /Hidden active session/);
-  assert.match(statusBar, /Completed \/ history/);
-  assert.match(statusBar, /Second start blocked by active session/);
+  assert.match(statusBar, /Human input required/);
+  assert.match(statusBar, /Active execution/);
+  assert.match(statusBar, /Completed session/);
+  assert.match(statusBar, /Another session is active/);
   assert.match(statusBar, /Open supervision:/);
 });
 
 test('task supervision prefers a live binding over a newer closed historical binding', () => {
   const execution = readComponent('TaskExecutionAction.tsx');
   assert.match(execution, /const ACTIVE_SESSION_STATES = new Set\(\['starting', 'ready', 'active', 'needs-input', 'cancelling'\]\)/);
-  assert.match(execution, /taskBindings\.findLast\(candidate => ACTIVE_SESSION_STATES\.has\(candidate\.state\)\)/);
+  assert.match(execution, /taskBindings\.filter\(candidate => ACTIVE_SESSION_STATES\.has\(candidate\.state\)\)/);
+  assert.match(execution, /newestFirst\(taskBindings\.filter/);
   assert.match(execution, /const refreshSequence = useRef\(0\)/);
   assert.match(execution, /if \(sequence !== refreshSequence\.current\) return null/);
 });

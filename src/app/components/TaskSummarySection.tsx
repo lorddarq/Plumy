@@ -9,6 +9,7 @@ import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
 import { AgentIcon } from './icons/AgentIcon';
 import { UserIcon } from './icons/UserIcon';
 import { NodesIcon } from './icons/NodesIcon';
+import { ExecutionNotice } from './ExecutionNotice';
 
 interface TaskSummarySectionProps {
   statusLabel: string;
@@ -65,6 +66,17 @@ export function TaskSummarySection({
           icon={blocked ? <Ban className="size-3.5 text-[#71717a]" /> : <Ban className="size-3.5 text-[#71717a]/70" />}
         />
       </div>
+
+      {blocked && (
+        <ExecutionNotice tone="danger" title="Blocked work">
+          Resolve the blocking dependency or reason before starting work. No action is available from this summary; review the Dependencies section below.
+        </ExecutionNotice>
+      )}
+      {!blocked && /review/i.test(statusLabel) && (
+        <ExecutionNotice tone="warning" title="Pending review">
+          Review the task outcome and use the available review action when it is ready. This task is waiting for human attention.
+        </ExecutionNotice>
+      )}
 
       <div className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
         <SummaryStack label="Projects" value={primaryTimelineProject} />

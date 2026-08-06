@@ -10,6 +10,7 @@ export interface SessionBinding {
   state: string;
   workspacePath?: string;
   scope?: { kind?: string; taskId?: string; goalId?: string; goalElementId?: string };
+  taskExecution?: { state?: string; batchNumber?: number; reason?: string; updatedAt?: string };
 }
 
 export interface SessionDockItem {
@@ -31,7 +32,7 @@ interface AgentSessionSupervisorContextValue {
 }
 
 export interface SessionDockProjection {
-  state: 'none' | 'starting' | 'working' | 'hidden-active' | 'needs-input' | 'interrupted' | 'failed' | 'history' | 'blocked';
+  state: 'none' | 'starting' | 'working' | 'hidden-active' | 'ready' | 'needs-input' | 'interrupted' | 'failed' | 'history' | 'blocked';
   binding?: SessionBinding;
   task?: Task;
   historyCount: number;
@@ -97,7 +98,8 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       requestId: (current?.requestId || 0) + 1,
     }));
   }, [projects, tasks]);
-  const activeBinding = [...bindings].reverse().find(binding => ACTIVE_SESSION_STATES.has(binding.state));
+  const newestFirst = (items: SessionBinding[]) => [...items].sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''));
+  const activeBinding = newestFirst(bindings.filter(binding => ACTIVE_SESSION_STATES.has(binding.state)))[0];
   const historyBinding = [...bindings].reverse().find(binding => HISTORY_SESSION_STATES.has(binding.state));
   const dockBinding = activeBinding || historyBinding;
   const dockTask = dockBinding?.scope?.taskId ? tasks.find(task => task.id === dockBinding.scope?.taskId) : undefined;
@@ -109,7 +111,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
   const blockedByActiveSession = Boolean(activeBinding && request && activeBinding.scope?.taskId !== request.task.id);
   const sessionDock = useMemo<SessionDockProjection>(() => ({
     state: blockedByActiveSession ? 'blocked' : activeBinding
-      ? activeBinding.state === 'starting' ? 'starting' : activeBinding.state === 'needs-input' ? 'needs-input' : supervisionVisible ? 'working' : 'hidden-active'
+      ? activeBinding.state === 'starting' ? 'starting' : activeBinding.state === 'needs-input' ? 'needs-input' : activeBinding.state === 'ready' && activeBinding.taskExecution?.state === 'batch-finished' ? 'ready' : supervisionVisible ? 'working' : 'hidden-active'
       : historyBinding?.state === 'interrupted' ? 'interrupted'
         : historyBinding?.state === 'failed' ? 'failed'
           : historyBinding ? 'history' : 'none',

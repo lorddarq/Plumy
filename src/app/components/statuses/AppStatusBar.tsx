@@ -146,7 +146,7 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
         aria-label={buttonLabel || `Work status: ${label}`}
         className="flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
       >
-        <span className={`size-2 shrink-0 rounded-full ${sessionDock.state === 'working' || sessionDock.state === 'hidden-active' ? 'bg-emerald-500' : sessionDock.state === 'needs-input' ? 'bg-amber-500' : sessionDock.state === 'failed' ? 'bg-red-500' : 'bg-slate-300'}`} aria-hidden="true" />
+        <span className={`size-2 shrink-0 rounded-full ${sessionDock.state === 'working' || sessionDock.state === 'hidden-active' || sessionDock.state === 'ready' ? 'bg-emerald-500' : sessionDock.state === 'needs-input' ? 'bg-amber-500' : sessionDock.state === 'failed' ? 'bg-red-500' : 'bg-slate-300'}`} aria-hidden="true" />
         <span className="whitespace-nowrap text-center text-xs font-medium text-[#828282]">Work:</span>
         <span className="whitespace-nowrap text-[11px] font-semibold text-slate-600">{label}</span>
         <span className="max-w-44 truncate text-[11px] text-slate-400" title={detail}>{detail}</span>
@@ -163,7 +163,7 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
             <span className="text-[11px] text-slate-400">{sessionDock.items.length} shown</span>
           </div>
           {sessionDock.items.map(({ binding, task }, index) => {
-            const state = getSessionItemState(binding.state);
+            const state = getSessionItemState(binding);
             const isLatest = index === 0;
             return (
               <div key={binding.id} className={`border-b border-slate-100 last:border-0 ${isLatest ? 'bg-slate-50/80' : 'bg-white'}`}>
@@ -194,24 +194,26 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
   );
 }
 
-function getSessionItemState(state: string) {
-  if (state === 'active' || state === 'starting' || state === 'cancelling') return { label: state === 'starting' ? 'Starting work' : state === 'cancelling' ? 'Stopping work' : 'Working now', icon: '2', className: 'bg-blue-100 text-blue-700' };
-  if (state === 'needs-input') return { label: 'Waiting for your input', icon: '!', className: 'bg-amber-100 text-amber-700' };
-  if (state === 'failed') return { label: 'Failed · Review needed', icon: '×', className: 'bg-red-100 text-red-700' };
-  if (state === 'interrupted') return { label: 'Interrupted · Can resume', icon: '↻', className: 'bg-amber-100 text-amber-700' };
-  if (state === 'ready') return { label: 'Batch finished · More work possible', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };
-  return { label: 'Completed session', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };
+function getSessionItemState(binding: { state: string; taskExecution?: { state?: string } }) {
+  const state = binding.state;
+  if (state === 'active' || state === 'starting' || state === 'cancelling') return { label: state === 'starting' ? 'Starting work' : state === 'cancelling' ? 'Stopping work' : 'Active execution · Open to monitor', icon: '2', className: 'bg-blue-100 text-blue-700' };
+  if (state === 'needs-input') return { label: 'Human input required · Review request', icon: '!', className: 'bg-amber-100 text-amber-700' };
+  if (state === 'failed') return { label: 'Failed execution · Review needed', icon: '×', className: 'bg-red-100 text-red-700' };
+  if (state === 'interrupted') return { label: 'Interrupted · Resume available', icon: '↻', className: 'bg-amber-100 text-amber-700' };
+  if (state === 'ready' || binding.taskExecution?.state === 'batch-finished') return { label: 'Last batch completed · Continue available', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };
+  return { label: 'Completed session · No action pending', icon: '✓', className: 'bg-emerald-100 text-emerald-700' };
 }
 
 function getSessionDockLabel(sessionDock: ReturnType<typeof useAgentSessionSupervisor>['sessionDock']): string {
   return sessionDock.state === 'none' ? 'No active work'
     : sessionDock.state === 'starting' ? 'Starting'
-      : sessionDock.state === 'working' ? 'Working'
-        : sessionDock.state === 'hidden-active' ? 'Hidden active session'
-          : sessionDock.state === 'needs-input' ? 'Needs your input'
-            : sessionDock.state === 'interrupted' ? 'Interrupted'
-              : sessionDock.state === 'failed' ? 'Failed'
-              : sessionDock.state === 'blocked' ? 'Second start blocked by active session' : 'Completed / history';
+    : sessionDock.state === 'working' ? 'Active execution'
+        : sessionDock.state === 'hidden-active' ? 'Active execution · Open to monitor'
+          : sessionDock.state === 'ready' ? 'Last batch completed · Continue available'
+          : sessionDock.state === 'needs-input' ? 'Human input required · Review request'
+            : sessionDock.state === 'interrupted' ? 'Interrupted · Resume available'
+              : sessionDock.state === 'failed' ? 'Failed execution · Review needed'
+              : sessionDock.state === 'blocked' ? 'Blocked · Another session is active' : 'Completed session · No action pending';
 }
 
 function getMcpBadgeValue(label: string): string {

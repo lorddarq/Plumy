@@ -46,7 +46,7 @@ interface SessionBinding {
   workspacePath?: string;
   opaqueSessionRef?: string;
   capabilities?: Array<{ id: string; support: string }>;
-  scope?: { taskId?: string };
+  scope?: { kind?: string; taskId?: string };
   updatedAt?: string;
   lastObservedAt?: string;
   taskExecution?: { state?: string; batchNumber?: number; reason?: string; updatedAt?: string };
@@ -229,8 +229,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   ])];
   const warnings = preflight?.warnings || [];
   const hasCapability = (id: string) => binding?.capabilities?.some(capability => capability.id === id && capability.support === 'supported') ?? false;
-  const sessionSummary = binding ? describeAgentRuntimeSession(binding.state, events) : null;
   const taskExecutionState = binding?.taskExecution?.state;
+  const lastBatchCompleted = taskExecutionState === 'batch-finished' || events.some(event => event.nativeEventType === 'turn/completed' && !['failed', 'interrupted'].includes(event.state || ''));
+  const sessionSummary = binding ? describeAgentRuntimeSession(binding.state, events, lastBatchCompleted ? (taskExecutionState || 'batch-finished') : taskExecutionState) : null;
   const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', complete: 'Complete' };
   const latestTurnStartIndex = events.findLastIndex(event => event.nativeEventType === 'turn/started');
   const latestRunEvents = latestTurnStartIndex < 0 ? [] : events.slice(latestTurnStartIndex).filter(event =>
@@ -252,10 +253,12 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const lastObservedLabel = lastObservedAt
     ? new Date(lastObservedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : null;
-  const executionNotice = binding?.state === 'closed'
-    ? { tone: 'warning' as const, title: 'No agent is working right now', body: 'This task is still in progress, but the session shown here was closed. Start a new session to continue from the saved task context.' }
+  const executionNotice = binding?.state === 'closed' && lastBatchCompleted
+    ? { tone: 'info' as const, title: 'Last batch completed', body: 'The agent completed its latest work batch. The session is closed, but you can continue the task from its saved context.' }
+    : binding?.state === 'closed'
+      ? { tone: 'warning' as const, title: 'No agent is working right now', body: 'This task is still in progress, but the session shown here was closed. Start a new session to continue from the saved task context.' }
     : binding?.state === 'ready'
-      ? { tone: 'warning' as const, title: 'Work batch finished', body: 'The agent finished its latest batch. This does not mean the task is complete; continue work to run the next batch.' }
+      ? { tone: 'info' as const, title: 'Last batch completed', body: 'The agent completed its latest work batch. Continue the task if more work is needed.' }
       : binding?.state === 'active'
         ? { tone: 'info' as const, title: 'Agent is working now', body: lastObservedLabel ? `The runtime last reported activity at ${lastObservedLabel}.` : 'The runtime is actively reporting work.' }
         : binding?.state === 'starting'
@@ -289,9 +292,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       setSessionLoaded(true);
       return null;
     }
-    const taskBindings = (index.bindings || []).filter((candidate: SessionBinding) => candidate.scope?.taskId === task.id);
-    const nextBinding = taskBindings.findLast(candidate => ACTIVE_SESSION_STATES.has(candidate.state))
-      || taskBindings.at(-1)
+    const taskBindings = (index.bindings || []).filter((candidate: SessionBinding) => candidate.scope?.kind === 'task' && candidate.scope?.taskId === task.id);
+    const newestFirst = (items: SessionBinding[]) => [...items].sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''));
+    const nextBinding = newestFirst(taskBindings.filter(candidate => ACTIVE_SESSION_STATES.has(candidate.state)))[0]
+      || newestFirst(taskBindings)[0]
       || null;
     if (!nextBinding) {
       setBinding(null);

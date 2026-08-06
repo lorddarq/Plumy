@@ -524,6 +524,20 @@ export function RoadmapView({
                           const isLate = lateTaskIds.has(task.id);
                           const statusVisual = getStatusVisual(statusColumns, task.status);
                           const roadmapProgress = getRoadmapStageProgress(getRoadmapStage(statusColumns, task.status));
+                          const attentionLabel = task.blocked
+                            ? 'Blocked'
+                            : task.status === 'under-review'
+                              ? 'Pending review'
+                              : isLate
+                                ? 'Overdue'
+                                : task.status === 'in-progress' ? 'Active execution' : undefined;
+                          const attentionNextStep = task.blocked
+                            ? 'Review dependencies before starting work.'
+                            : task.status === 'under-review'
+                              ? 'Review the task outcome.'
+                              : isLate
+                                ? 'Review schedule and remaining work.'
+                                : task.status === 'in-progress' ? 'Open task details to monitor work.' : undefined;
                           return (
                             <button
                                   key={task.id}
@@ -537,7 +551,8 @@ export function RoadmapView({
                                     top: MILESTONE_ROW_HEIGHT + index * TASK_ROW_HEIGHT + 9,
                                     width,
                                   }}
-                                  title={`${task.title} - ${statusVisual.label}`}
+                                  title={`${task.title} - ${attentionLabel || statusVisual.label}${attentionNextStep ? ` · ${attentionNextStep}` : ''}`}
+                                  aria-label={`${task.title}. Status: ${attentionLabel || statusVisual.label}.${attentionNextStep ? ` Next action: ${attentionNextStep}` : ' No attention action is pending.'}`}
                                 >
                               <span
                                 className={`absolute inset-y-0 left-0 opacity-45 ${statusVisual.backgroundClassName || ''}`}
@@ -548,6 +563,11 @@ export function RoadmapView({
                                 aria-hidden="true"
                               />
                               <span className="relative z-10 truncate px-3 text-gray-900">{task.title}</span>
+                              {attentionLabel && (
+                                <span className={`relative z-10 ml-auto mr-2 shrink-0 rounded border bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold ${task.blocked || isLate ? 'border-red-200 text-red-700' : task.status === 'under-review' ? 'border-amber-200 text-amber-800' : 'border-blue-200 text-blue-700'}`}>
+                                  {attentionLabel}
+                                </span>
+                              )}
                               {isLate && (
                                 <span className="relative z-10 ml-auto pr-2 text-red-700">
                                   <TriangleAlert className="size-3.5" />
