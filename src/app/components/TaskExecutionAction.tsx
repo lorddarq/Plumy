@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Copy, Folder, MessageSquarePlus, Play, Server, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, Folder, Info, MessageSquarePlus, Play, Server, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
 import { describeAgentRuntimeSession, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent } from '../utils/agentRuntimeActivity';
@@ -17,6 +17,7 @@ import { AgentLoadingState } from './AgentLoadingState';
 import { StateBadge } from './statuses/AppStatusBar';
 import { getAttentionState } from '../utils/attention';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from './ui/sheet';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface RuntimeState {
   profiles?: Array<{ id: string; name: string; integrationMode: string; enabled: boolean }>;
@@ -99,6 +100,23 @@ function taskStatusLabel(status: Task['status']) {
 }
 
 const ACTIVE_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
+
+function ExecutionHint({ tone, title, body }: { tone: 'info' | 'warning' | 'danger'; title: string; body: string }) {
+  const Icon = tone === 'info' ? Info : AlertTriangle;
+  const colorClass = tone === 'danger' ? 'text-red-700 hover:bg-red-50 focus-visible:ring-red-500' : tone === 'warning' ? 'text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-500' : 'text-blue-700 hover:bg-blue-50 focus-visible:ring-blue-500';
+  return <Tooltip>
+    <TooltipTrigger asChild>
+      <button type="button" aria-label={`${title}: ${body}`} className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${colorClass}`}>
+        <Icon className="size-3.5" aria-hidden="true" />
+        <span>{title}</span>
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="bottom" align="start" className="w-[min(360px,calc(100vw-2rem))] flex-col items-start whitespace-normal text-left">
+      <div className="font-semibold">{title}</div>
+      <div className="mt-1 font-normal text-white/85">{body}</div>
+    </TooltipContent>
+  </Tooltip>;
+}
 
 export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, onVisibilityChange, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
   const [open, setOpen] = useState(false);
@@ -571,11 +589,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             {!binding && loading && <ExecutionNotice tone="info" title="Preparing your work session"><AgentLoadingState label="Checking the work session" variant="Drive" /><span className="mt-2 block">Omvra is verifying the task instructions, assigned agent, runtime connection, and working directory.</span></ExecutionNotice>}
             {!binding && !loading && preflight && blockers.length === 0 && <ExecutionNotice tone="info" title={getAttentionState('ready').label} nextStep={getAttentionState('ready').nextStep}>The task context is prepared. Omvra will keep this supervision view available while the agent works.</ExecutionNotice>}
             {error && <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('failed').label} nextStep={getAttentionState('failed').nextStep}>{error}</ExecutionNotice></div>}
-            {!error && blockers.length > 0 && (
-              <div className="mb-3"><ExecutionNotice tone={taskAlreadyComplete ? 'warning' : 'danger'} title={taskAlreadyComplete ? 'Task already complete' : getAttentionState('blocked').label} nextStep={taskAlreadyComplete ? 'Reopen or move the task to In progress, then start work.' : getAttentionState('blocked').nextStep} assertive={!taskAlreadyComplete}>
-                <ul className="space-y-1">{blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul>
-              </ExecutionNotice></div>
-            )}
+            {!error && blockers.length > 0 && <div className="mb-3"><ExecutionHint tone={taskAlreadyComplete ? 'warning' : 'danger'} title={taskAlreadyComplete ? 'Task already complete' : 'Action needed before work starts'} body={`${blockers.join(' ')} ${taskAlreadyComplete ? 'Reopen or move the task to In progress, then start work.' : getAttentionState('blocked').nextStep}`} /></div>}
             {!binding && <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-md border border-slate-200 p-3">
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Server className="size-3.5" />Agent connection</div>
@@ -611,7 +625,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                       <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Execution status <StateBadge label={taskExecutionLabel[taskExecutionState || ''] || 'Synchronizing'} value={binding?.taskExecution?.batchNumber ? `Batch ${binding.taskExecution.batchNumber}` : ''} tone={taskExecutionState === 'working' || taskExecutionState === 'continuing' ? 'success' : taskExecutionState === 'failed' || taskExecutionState === 'interrupted' || taskExecutionState === 'outcome-unreconciled' ? 'danger' : taskExecutionState === 'waiting' || taskExecutionState === 'batch-finished' ? 'warning' : 'muted'} /></div>
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Task status <StateBadge label={taskStatusLabel(task.status)} value="" tone={task.status === 'done' ? 'success' : task.status === 'under-review' ? 'warning' : task.status === 'in-progress' ? 'success' : 'muted'} /></div>
                 </div>
-                {executionNotice && <div className="mt-3"><ExecutionNotice tone={executionNotice.tone} title={executionNotice.title} nextStep={binding?.state === 'failed' || taskExecutionState === 'failed' ? getAttentionState('failed').nextStep : binding?.state === 'active' ? getAttentionState('active').nextStep : binding?.state === 'needs-input' ? getAttentionState('needs-input').nextStep : undefined} assertive={binding?.state === 'failed' || taskExecutionState === 'failed'}>{executionNotice.body}</ExecutionNotice></div>}
+                {executionNotice && <div className="mt-2"><ExecutionHint tone={executionNotice.tone} title={executionNotice.title} body={executionNotice.body} /></div>}
                 {!terminalBinding && pendingRequests.map(request => {
                   const missingRequired = request.fields.some(field => field.required && (requestValues[field.name] ?? field.defaultValue ?? '') === '');
                   return <div key={`${request.method}-${request.requestId}`} className="mt-3">
