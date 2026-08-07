@@ -19,6 +19,21 @@ export interface AgentRuntimeActivityItem {
   tone: 'neutral' | 'positive' | 'warning' | 'danger';
 }
 
+export function joinAgentMessageDeltas(deltas: string[]): string {
+  const cleaned = deltas.filter(delta => delta.length > 0);
+  if (cleaned.length < 2) return cleaned.join('').trim();
+
+  const hasPreservedBoundary = cleaned.slice(1).some((delta, index) => /\s$/.test(cleaned[index]) || /^\s/.test(delta));
+  if (hasPreservedBoundary) return cleaned.join('').trim();
+
+  return cleaned
+    .join(' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/([([{])\s+/g, '$1')
+    .replace(/\s+([)\]}])/g, '$1')
+    .trim();
+}
+
 function describeEvent(event: AgentRuntimeActivityEvent): Omit<AgentRuntimeActivityItem, 'id' | 'observedAt' | 'count'> {
   const native = event.nativeEventType || '';
   const state = event.state || event.outcome || '';

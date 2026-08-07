@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { describeAgentRuntimeSession, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
+import { describeAgentRuntimeSession, joinAgentMessageDeltas, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
+
+test('agent message delta joining preserves normal boundaries and repairs compact legacy chunks', () => {
+  assert.equal(joinAgentMessageDeltas(['Current ', 'implementation ', 'passes.']), 'Current implementation passes.');
+  assert.equal(joinAgentMessageDeltas(['Current', 'implementation', 'passes', '.']), 'Current implementation passes.');
+});
 
 test('runtime activity collapses noisy tool updates and preserves agent run milestones', () => {
   const events = [

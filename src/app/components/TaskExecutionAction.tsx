@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Copy, Folder, Info, MessageSquarePlus, Play, Server, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
-import { describeAgentRuntimeSession, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent } from '../utils/agentRuntimeActivity';
+import { describeAgentRuntimeSession, joinAgentMessageDeltas, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent } from '../utils/agentRuntimeActivity';
 import {
   agentRuntimeWorkspaceSourceLabel,
   resolveAgentRuntimeWorkspace,
@@ -259,11 +259,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     ['turn/started', 'turn/completed', 'item/agentMessage/delta', 'item/started', 'item/completed', 'warning', 'error', 'omvra/taskBatch/automatic-continuing', 'omvra/taskBatch/automatic-limit-reached'].includes(event.nativeEventType || '')
   );
   const activity = summarizeAgentRuntimeActivity(latestRunEvents);
-  const agentOutput = latestRunEvents
+  const agentOutput = joinAgentMessageDeltas(latestRunEvents
     .filter(event => event.nativeEventType === 'item/agentMessage/delta' && event.messagePreview)
-    .map(event => event.messagePreview)
-    .join('')
-    .trim();
+    .map(event => event.messagePreview || ''));
   const activityWithoutOutput = activity.filter(item => item.label !== 'Agent shared an update');
   const visibleActivity = activityWithoutOutput.length > 0 ? activityWithoutOutput : binding?.state === 'interrupted'
     ? [{ id: `${binding.id}-interrupted`, label: 'Work was interrupted', detail: 'Start work again to reconnect and continue with the task instructions.', count: 1, tone: 'warning' as const }]
