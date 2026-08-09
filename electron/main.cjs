@@ -24,7 +24,7 @@ const { createAgentRuntimeSessionRunner } = require('./services/agent-runtime-se
 const { resolveProfile: resolveAgentRuntimeProfile } = require('./domain/agent-runtime-profile-service.cjs');
 const { registerTaskContextIpcHandlers } = require('./ipc/task-context.cjs');
 const { captureMeaningfulTaskCheckpoints } = require('./domain/task-context-checkpoint-service.cjs');
-const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
+const { startMcpHttpServer, waitForMcpHttpServerReady } = require('./services/mcp-http-server.cjs');
 const { getMcpServerConfig, getMcpCapabilityProfile } = require('./services/workspace-service.cjs');
 const { issueScopedMcpGrant, revokeScopedMcpGrant } = require('./services/agent-runtime-mcp-grant.cjs');
 const {
@@ -97,6 +97,7 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
     return issueScopedMcpGrant({ endpoint: config.publicUrl, scope: payload.scope, capabilityProfile: getMcpCapabilityProfile(runtimeStore) });
   },
   revokeMcpGrant: (_runtimeStore, grantId) => revokeScopedMcpGrant(grantId),
+  ensureMcpReady: () => ensureMcpServerReady(),
   logger: console,
 });
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
@@ -173,6 +174,19 @@ function restartMcpServer() {
     userSkillsRoot: app.getPath('userData'),
     emitRuntimeChange: goalRuntime.emit,
   });
+}
+
+async function ensureMcpServerReady() {
+  if (!shouldStartMcpServer()) {
+    return { ok: false, error: 'ACP_MCP_UNAVAILABLE', message: 'MCP agent access is disabled. Enable it before starting ACP work.' };
+  }
+  if (mcpRuntimeState.status === 'error') {
+    return { ok: false, error: 'ACP_MCP_UNAVAILABLE', message: mcpRuntimeState.error || 'The Omvra MCP server failed to start.' };
+  }
+  if (!mcpHttpServer) restartMcpServer();
+  const readiness = await waitForMcpHttpServerReady(mcpHttpServer);
+  if (!readiness.ok) return { ...readiness, error: 'ACP_MCP_UNAVAILABLE' };
+  return { ok: true, listenerStatus: buildMcpListenerStatus(store, mcpRuntimeState) };
 }
 
 function startGoalScheduleRuntime() {

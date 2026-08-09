@@ -417,6 +417,7 @@ export function MilestoneDialog({
             {milestone && onDelete && (
               <Button
                 type="button"
+                variant="destructive"
                 onClick={() => setDeleteConfirmOpen(true)}
                 className="mr-auto h-8 rounded-[12px] border border-[#f0c8c8] bg-[#fbeaea] px-4 text-[14px] font-normal text-[#ff0000] shadow-none hover:bg-[#f7dddd] hover:text-[#ff0000]"
               >
@@ -426,15 +427,15 @@ export function MilestoneDialog({
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={onClose}
-              className="h-8 rounded-[12px] border-black/10 bg-white px-4 text-[14px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f]"
             >
               Cancel
             </Button>
             <Button
               type="submit"
+              size="sm"
               disabled={!title.trim() || projectIds.length === 0 || !endDate}
-              className="h-8 rounded-[12px] border border-black/10 bg-white px-4 text-[14px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f] disabled:opacity-50"
             >
               {milestone ? 'Update' : 'Create'}
             </Button>

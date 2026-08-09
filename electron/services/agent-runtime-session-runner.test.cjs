@@ -47,6 +47,54 @@ test('does not create a session when ACP runtime access is disabled', async () =
   assert.equal(bindingsCreated, false);
 });
 
+test('fails before task mutation when a scoped MCP configuration cannot be built', async () => {
+  let statusMoved = false;
+  let bindingCreated = false;
+  let revokedGrantId = null;
+  const runner = createAgentRuntimeSessionRunner({
+    store: { get: () => [], set: () => {} },
+    resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'future-local-stdio', executablePath: '/tmp/runtime' } }),
+    confirmStart: () => ({ canStart: true, task: { __mcpRevision: 0 }, contractSnapshot: { taskId: 'task-1', taskRevision: 0 } }),
+    transitionContribution: () => ({ ok: true }),
+    moveTaskToStatus: () => { statusMoved = true; return { ok: true }; },
+    createBinding: () => { bindingCreated = true; return { ok: true, binding: {} }; },
+    updateBinding: () => ({ ok: true }),
+    appendEvent: () => ({ ok: true }),
+    listSessions: () => ({ bindings: [], events: [] }),
+    issueMcpGrant: () => ({ ok: true, grantId: 'grant-1', endpoint: 'http://127.0.0.1:3456/mcp', token: 'scoped-token' }),
+    revokeMcpGrant: (_store, grantId) => { revokedGrantId = grantId; },
+  });
+
+  const result = await runner.start({ confirmed: true, taskId: 'task-1', workspacePath: '/tmp/workspace' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'ACP_MCP_GRANT_FAILED');
+  assert.equal(statusMoved, false);
+  assert.equal(bindingCreated, false);
+  assert.equal(revokedGrantId, 'grant-1');
+});
+
+test('waits for Omvra MCP readiness before issuing a grant or mutating the task', async () => {
+  const calls = [];
+  const runner = createAgentRuntimeSessionRunner({
+    store: { get: () => [], set: () => {} },
+    resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'acp-local-stdio', executablePath: '/tmp/runtime' } }),
+    confirmStart: () => ({ canStart: true, task: { __mcpRevision: 0 }, contractSnapshot: { taskId: 'task-1', taskRevision: 0 } }),
+    transitionContribution: () => ({ ok: true }),
+    moveTaskToStatus: () => { calls.push('move-task'); return { ok: true }; },
+    createBinding: () => { calls.push('create-binding'); return { ok: true, binding: {} }; },
+    updateBinding: () => ({ ok: true }),
+    appendEvent: () => ({ ok: true }),
+    listSessions: () => ({ bindings: [], events: [] }),
+    ensureMcpReady: async () => { calls.push('ensure-mcp'); return { ok: false, error: 'ACP_MCP_UNAVAILABLE', message: 'MCP failed to start.' }; },
+    issueMcpGrant: () => { calls.push('issue-grant'); return { ok: false }; },
+  });
+
+  const result = await runner.start({ confirmed: true, taskId: 'task-1', workspacePath: '/tmp/workspace' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'ACP_MCP_UNAVAILABLE');
+  assert.deepEqual(calls, ['ensure-mcp']);
+});
+
 test('explains that a persisted session needs a new app-process session when its client is gone', async () => {
   const runner = createAgentRuntimeSessionRunner({
     store: {},
@@ -73,13 +121,15 @@ test('injects the bounded Omvra context pack into a new native session', async (
   const events = [];
   const logs = [];
   const responses = [];
+  let mcpConfiguration;
   let storedBinding = null;
   let notify;
   let lifecycle;
   const statusMoves = [];
   const client = {
     initialize: async () => ({ capabilities: { prompt: true } }),
-    startSession: async () => {
+    startSession: async (configuration) => {
+      mcpConfiguration = configuration;
       assert.equal(typeof notify, 'function');
       notify({ method: 'mcpServer/startupStatus/updated', params: { name: 'figma', status: 'failed', failureReason: 'reauthenticationRequired', error: 'Login required' } });
       return { sessionId: 'native-session-1' };
@@ -120,6 +170,7 @@ test('injects the bounded Omvra context pack into a new native session', async (
     },
     appendEvent: (_store, event) => { events.push(event); return { ok: true }; },
     listSessions: () => ({ bindings: storedBinding ? [storedBinding] : [], events: [] }),
+    issueMcpGrant: () => ({ ok: true, grantId: 'grant-1', endpoint: 'http://127.0.0.1:3456/mcp', token: 'scoped-token' }),
     getTaskContextEntry: (_store, { entryId }) => ({ ok: true, entry: { id: entryId, kind: 'context-checkpoint', fromRevision: 4, toRevision: 4, summary: 'Continue from accepted checkpoint', markers: [], provenance: 'human-authored', createdAt: '2026-08-02T00:00:00.000Z', sourceRefs: [{ type: 'activity', id: 'activity-1' }] } }),
     createClient: () => client,
     logger: { info: (message, details) => logs.push({ message, details }), debug: (message, details) => logs.push({ message, details }), warn: (message, details) => logs.push({ message, details }), error: (message, details) => logs.push({ message, details }) },
@@ -135,6 +186,9 @@ test('injects the bounded Omvra context pack into a new native session', async (
     actor: 'agent-runtime',
   });
   assert.equal(bindingInputs[0].extensions.workspacePath, '/tmp/workspace');
+  assert.deepEqual(mcpConfiguration, {
+    mcpServers: [{ name: 'omvra', url: 'http://127.0.0.1:3456/mcp', headers: { Authorization: 'Bearer scoped-token' } }],
+  });
   assert.equal(prompts.length, 1);
   assert.match(prompts[0], /Continue from accepted checkpoint/);
   assert.equal(result.binding.state, 'active');

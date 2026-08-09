@@ -15,8 +15,13 @@ test('issues an in-memory task-scoped grant and provider configuration without p
   const grant = issueScopedMcpGrant({ endpoint: 'http://127.0.0.1:3456/mcp', scope: { kind: 'task', taskId: 'task-1' } });
   assert.equal(grant.ok, true);
   assert.equal(findScopedMcpGrant(grant.token).scope.taskId, 'task-1');
-  assert.deepEqual(buildProviderMcpConfiguration(grant, 'acp'), {
+  const arrayConfiguration = {
     mcpServers: [{ name: 'omvra', url: 'http://127.0.0.1:3456/mcp', headers: { Authorization: `Bearer ${grant.token}` } }],
+  };
+  assert.deepEqual(buildProviderMcpConfiguration(grant, 'acp-local-stdio'), arrayConfiguration);
+  assert.deepEqual(buildProviderMcpConfiguration(grant, 'codex-app-server-stdio'), arrayConfiguration);
+  assert.deepEqual(buildProviderMcpConfiguration(grant, 'claude-stream-json-stdio'), {
+    mcpServers: { omvra: arrayConfiguration.mcpServers[0] },
   });
   assert.equal(JSON.stringify(grant.scope).includes(grant.token), false);
 });

@@ -427,7 +427,7 @@ export function TaskDialog({
                 {task && onDelete && (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="destructive"
                     onClick={handleDelete}
                     className="h-8 gap-1 rounded-xl border-[#b50000]/10 bg-[#c40000]/10 px-3 text-sm font-medium text-[#cd0000] hover:bg-[#c40000]/15 hover:text-[#cd0000]"
                   >
@@ -440,16 +440,16 @@ export function TaskDialog({
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={onClose}
-                  className="h-8 rounded-xl border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] hover:bg-[#71717a]/5 hover:text-[#67676f]"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="button"
+                  size="sm"
                   onClick={handleSave}
                   disabled={!title.trim() || hasInvalidDateRange || hasAssignmentConflict}
-                  className="h-8 gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] shadow-none hover:bg-[#71717a]/5 hover:text-[#67676f] disabled:opacity-50"
                 >
                   <RefreshCw className="size-4" />
                   {task ? 'Update' : 'Create'}
@@ -848,9 +848,10 @@ export function TaskDialog({
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={handleAddAttachments}
                   disabled={!window.electron?.attachments?.pick}
-                  className="h-8 gap-2 rounded-full px-3 text-xs"
+                  className="text-xs"
                 >
                   <AttachmentIcon className="size-4" />
                   Add files

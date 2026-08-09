@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { TodayButton } from './TodayButton';
 import { UsersIcon } from './icons/UsersIcon';
+import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface TimelineToolbarProps {
@@ -27,17 +28,17 @@ export function TimelineToolbar({
       <div className="timeline-mode-toggle" role="tablist" aria-label="Timeline mode">
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" onClick={() => onModeChange('projects')} className={`timeline-mode-button ${mode === 'projects' ? 'active' : 'inactive'}`} role="tab" aria-selected={mode === 'projects'} aria-label="Projects">
+            <Button type="button" variant="ghost" size="icon" onClick={() => onModeChange('projects')} className={`timeline-mode-button ${mode === 'projects' ? 'active' : 'inactive'}`} role="tab" aria-selected={mode === 'projects'} aria-label="Projects">
               <CalendarDaysIcon />
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Show projects</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" onClick={() => onModeChange('people')} className={`timeline-mode-button ${mode === 'people' ? 'active' : 'inactive'}`} role="tab" aria-selected={mode === 'people'} aria-label="People">
+            <Button type="button" variant="ghost" size="icon" onClick={() => onModeChange('people')} className={`timeline-mode-button ${mode === 'people' ? 'active' : 'inactive'}`} role="tab" aria-selected={mode === 'people'} aria-label="People">
               <UsersIcon className="h-4 w-4" />
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Show people</TooltipContent>
         </Tooltip>
@@ -49,18 +50,18 @@ export function TimelineToolbar({
         <div className="timeline-toolbar-controls" aria-label="Timeline navigation">
           <Tooltip>
             <TooltipTrigger asChild>
-              <button type="button" onClick={onScrollLeft} className="timeline-icon-button timeline-icon-button-left" aria-label="Scroll timeline left">
+              <Button type="button" variant="ghost" size="icon" onClick={onScrollLeft} className="timeline-icon-button timeline-icon-button-left" aria-label="Scroll timeline left">
                 <ChevronLeft className="h-4 w-4" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Scroll timeline left</TooltipContent>
           </Tooltip>
           <TodayButton onClick={onScrollToToday} />
           <Tooltip>
             <TooltipTrigger asChild>
-              <button type="button" onClick={onScrollRight} className="timeline-icon-button timeline-icon-button-right" aria-label="Scroll timeline right">
+              <Button type="button" variant="ghost" size="icon" onClick={onScrollRight} className="timeline-icon-button timeline-icon-button-right" aria-label="Scroll timeline right">
                 <ChevronRight className="h-4 w-4" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Scroll timeline right</TooltipContent>
           </Tooltip>
@@ -68,9 +69,9 @@ export function TimelineToolbar({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" onClick={() => onShowWeekendsChange(!showWeekends)} className={`timeline-week-toggle ${showWeekends ? 'is-seven-day' : 'is-five-day'}`} aria-pressed={!showWeekends}>
+            <Button type="button" variant="ghost" onClick={() => onShowWeekendsChange(!showWeekends)} className={`timeline-week-toggle ${showWeekends ? 'is-seven-day' : 'is-five-day'}`} aria-pressed={!showWeekends}>
               {showWeekends ? '7 days' : '5 days'}
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">{showWeekends ? 'Hide weekends' : 'Show weekends'}</TooltipContent>
         </Tooltip>

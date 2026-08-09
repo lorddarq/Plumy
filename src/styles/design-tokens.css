@@ -1,0 +1,116 @@
+/* Omvra design-language foundation. Keep semantic names stable; components consume these tokens. */
+:root {
+  --omvra-font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --omvra-font-size-body: 0.875rem;
+  --omvra-font-size-label: 0.75rem;
+  --omvra-font-size-title: 1rem;
+  --omvra-font-weight-regular: 400;
+  --omvra-font-weight-medium: 500;
+  --omvra-font-weight-semibold: 600;
+  --omvra-line-height-body: 1.5;
+  --omvra-color-surface-canvas: #f7f8fa;
+  --omvra-color-surface-default: #ffffff;
+  --omvra-color-surface-subtle: #fafafa;
+  --omvra-color-surface-muted: #f3f4f6;
+  --omvra-color-text-primary: #1f2937;
+  --omvra-color-text-secondary: #71717a;
+  --omvra-color-text-muted: #9ca3af;
+  --omvra-color-text-disabled: #b8b8bd;
+  --omvra-color-text-inverse: #ffffff;
+  --omvra-color-border-subtle: rgba(0, 0, 0, 0.06);
+  --omvra-color-border-default: rgba(0, 0, 0, 0.1);
+  --omvra-color-focus: #4a92ff;
+  --omvra-color-focus-surface: rgba(26, 96, 203, 0.1);
+  --omvra-color-action-primary: #1a60cb;
+  --omvra-color-action-primary-hover: #397ade;
+  --omvra-color-action-primary-pressed: #1756b5;
+  --omvra-color-action-disabled: rgba(113, 113, 122, 0.15);
+  --omvra-color-feedback-positive: #16803c;
+  --omvra-color-feedback-positive-surface: #ecfdf3;
+  --omvra-color-feedback-warning: #9a6700;
+  --omvra-color-feedback-warning-surface: #fffaeb;
+  --omvra-color-feedback-danger: #b42318;
+  --omvra-color-feedback-danger-surface: #fef3f2;
+  --omvra-color-feedback-info: #1459b3;
+  --omvra-color-feedback-info-surface: #eff6ff;
+  --omvra-radius-control: 0.75rem;
+  --omvra-radius-surface: 1rem;
+  --omvra-radius-pill: 9999px;
+  --omvra-elevation-surface: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --omvra-elevation-floating: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --omvra-focus-ring: 0 0 0 1px var(--omvra-color-focus), 0 0 0 4px var(--omvra-color-focus-surface);
+  --omvra-button-shadow: 0 2px 4px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.06);
+  --omvra-button-hover-shadow: 0 0 1px rgba(0, 0, 0, 0.15), 0 2px 2px rgba(0, 0, 0, 0.1), 0 1px 1px rgba(0, 0, 0, 0.1), 0 0 0.5px rgba(0, 0, 0, 0.1);
+  --omvra-button-focus-ring: 0 0 0 1px rgba(74, 146, 255, 0.8), 0 0 0 2px rgba(26, 96, 203, 0.1);
+  --omvra-button-focus-shadow: var(--omvra-button-focus-ring), var(--omvra-button-shadow);
+  --omvra-button-primary-shadow: inset 0 1px 3px 1px rgba(41, 248, 255, 0.25), var(--omvra-button-shadow);
+  --omvra-button-primary-pressed-shadow: inset 0 -1px 3px 1px rgba(41, 248, 255, 0.25), var(--omvra-button-shadow);
+  --omvra-button-primary-focus-shadow: var(--omvra-button-focus-ring), inset 0 -1px 3px 1px rgba(41, 248, 255, 0.25), var(--omvra-button-shadow);
+  --omvra-space-1: 0.25rem;
+  --omvra-space-2: 0.5rem;
+  --omvra-space-3: 0.75rem;
+  --omvra-space-4: 1rem;
+  --omvra-space-6: 1.5rem;
+  --omvra-space-8: 2rem;
+}
+
+body {
+  font-family: var(--omvra-font-family);
+  font-size: var(--omvra-font-size-body);
+  line-height: var(--omvra-line-height-body);
+}
+
+.dark {
+  --omvra-color-surface-canvas: #18181b;
+  --omvra-color-surface-default: #27272a;
+  --omvra-color-surface-subtle: #222225;
+  --omvra-color-surface-muted: #3f3f46;
+  --omvra-color-text-primary: #f4f4f5;
+  --omvra-color-text-secondary: #d4d4d8;
+  --omvra-color-text-muted: #a1a1aa;
+  --omvra-color-border-subtle: rgba(255, 255, 255, 0.08);
+  --omvra-color-border-default: rgba(255, 255, 255, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+[data-slot='card'], [data-slot='dialog-content'], [data-slot='sheet-content'] {
+  border-color: var(--omvra-color-border-subtle);
+  background-color: var(--omvra-color-surface-default);
+  color: var(--omvra-color-text-primary);
+}
+
+[data-slot='button']:focus-visible,
+[data-slot='input']:focus-visible,
+[data-slot='select-trigger']:focus-visible,
+[data-slot='badge']:focus-visible {
+  outline: none;
+  box-shadow: var(--omvra-focus-ring);
+}
+
+.omvra-panel-section {
+  border: 1px solid var(--omvra-color-border-subtle);
+  border-radius: var(--omvra-radius-surface);
+  background: var(--omvra-color-surface-default);
+  box-shadow: var(--omvra-elevation-surface);
+  padding: var(--omvra-space-4);
+}
+
+.omvra-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--omvra-space-2);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 40rem) {
+  .omvra-action-bar > [data-slot='button'] { flex: 1 1 auto; }
+}

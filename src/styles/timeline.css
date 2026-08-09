@@ -116,14 +116,13 @@
 }
 
 .timeline-icon-button:disabled,
-.timeline-toolbar-button-primary:disabled,
+.timeline-toolbar-button-secondary:disabled,
 .timeline-week-toggle:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
 
 .timeline-icon-button:focus-visible,
-.timeline-toolbar-button-primary:focus-visible,
 .timeline-week-toggle:focus-visible,
 .timeline-mode-button:focus-visible,
 .timeline-left-header-button:focus-visible,
@@ -149,7 +148,7 @@
   }
 }
 
-.timeline-toolbar-button-primary {
+.timeline-toolbar-button-secondary {
   height: 1.75rem;
   width: 3.75rem;
   min-width: 3.75rem;
@@ -168,11 +167,22 @@
   transition-timing-function: ease;
 }
 
+.timeline-toolbar-button-secondary:active {
+  background-color: #ffffff;
+  box-shadow: var(--omvra-button-hover-shadow);
+}
+
 @media (hover: hover) and (pointer: fine) {
-  .timeline-toolbar-button-primary:hover {
-    background-color: #f8fafc;
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
+  .timeline-toolbar-button-secondary:hover {
+    background-color: #ffffff;
+    box-shadow: var(--omvra-button-hover-shadow);
   }
+}
+
+.timeline-toolbar-button-secondary:focus-visible {
+  outline: 0;
+  background-color: #ffffff;
+  box-shadow: var(--omvra-button-focus-shadow);
 }
 
 .timeline-week-toggle {

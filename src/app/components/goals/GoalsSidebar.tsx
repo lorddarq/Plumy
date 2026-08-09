@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import type { GoalElement, GoalRecord } from '../../types.ts';
+import { Button } from '../ui/button';
 
 type GoalsSidebarProps = {
   goals: GoalRecord[];
@@ -41,7 +42,7 @@ export function GoalsSidebar({ goals, selectedGoalId, collapsed, onSelectGoal, o
       <div className={`flex-1 flex-col items-center gap-2 overflow-auto p-2 ${collapsed ? 'flex' : 'hidden'}`}>
         {goals.map(goal => <button type="button" key={goal.id} onClick={() => onSelectGoal(goal)} className={`rounded-lg p-2 ${goal.id === selectedGoalId ? 'bg-slate-100' : 'hover:bg-slate-50'}`} aria-label={goal.title} title={goal.title}><Sparkles className="size-4" style={{ color: goal.color ?? '#2563eb' }} /></button>)}
       </div>
-      <div className={`border-t p-3 ${collapsed ? 'hidden' : ''}`}><button type="button" onClick={onNewGoal} className="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div>
+      <div className={`border-t p-3 ${collapsed ? 'hidden' : ''}`}><Button type="button" onClick={onNewGoal} className="w-full text-xs"><Plus className="size-3.5" /> New goal</Button></div>
     </aside>
   );
 }

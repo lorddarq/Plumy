@@ -164,7 +164,7 @@ export function AnchoredPanel({
           {onClose && (
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={onClose}
               aria-label="Close panel"

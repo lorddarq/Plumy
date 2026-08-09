@@ -57,7 +57,7 @@ export function RoadmapMilestoneSidebar({
           </div>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" size="sm" onClick={onAddMilestone} className="h-auto rounded-full px-2 py-1 text-xs font-semibold text-[#1a60cb] hover:bg-[#1a60cb]/6 hover:text-[#1a60cb]">
+              <Button type="button" variant="link" onClick={onAddMilestone}>
                 Add
               </Button>
             </TooltipTrigger>

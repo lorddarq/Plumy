@@ -229,7 +229,7 @@ export function ColumnDialog({
               {column && onDelete && (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="destructive"
                   onClick={handleDelete}
                   className="h-8 rounded-[13px] border-[#f0c8c8] bg-[#fbeaea] px-4 text-[15px] font-normal text-[#ff0000] shadow-none hover:bg-[#f7dddd] hover:text-[#ff0000]"
                 >
@@ -241,16 +241,16 @@ export function ColumnDialog({
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={onClose}
-                className="h-8 rounded-[13px] border-[#d9d9df] bg-white px-4 text-[15px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f]"
               >
                 Cancel
               </Button>
               <Button
                 type="button"
+                size="sm"
                 onClick={handleSave}
                 disabled={!title.trim()}
-                className="h-8 rounded-[13px] border border-[#d9d9df] bg-white px-4 text-[15px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f]"
               >
                 {column ? 'Update' : 'Create'}
               </Button>

@@ -77,9 +77,9 @@ function buildProviderMcpConfiguration(grant, provider) {
     url: grant.endpoint,
     headers: { Authorization: `Bearer ${grant.token}` },
   };
-  if (provider === 'acp') return { mcpServers: [server] };
-  if (provider === 'codex-app-server') return { mcpServers: [server] };
-  if (provider === 'claude-stream-json') return { mcpServers: { omvra: server } };
+  if (provider === 'acp' || provider === 'acp-local-stdio') return { mcpServers: [server] };
+  if (provider === 'codex-app-server' || provider === 'codex-app-server-stdio') return { mcpServers: [server] };
+  if (provider === 'claude-stream-json' || provider === 'claude-stream-json-stdio') return { mcpServers: { omvra: server } };
   return {};
 }
 

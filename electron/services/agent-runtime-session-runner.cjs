@@ -21,6 +21,7 @@ function createAgentRuntimeSessionRunner({
   getTaskContextEntry = null,
   issueMcpGrant = null,
   revokeMcpGrant = null,
+  ensureMcpReady = null,
   updateTaskExecutionState = null,
   emitRuntimeEvent = null,
   createClient = createNativeRuntimeClient,
@@ -71,14 +72,23 @@ function createAgentRuntimeSessionRunner({
     { bindingId: binding.id, binding: safeBinding(binding) },
   );
 
-  function prepareMcp(profile, scope) {
+  async function prepareMcp(profile, scope) {
+    if (typeof ensureMcpReady === 'function') {
+      const readiness = await ensureMcpReady(store);
+      if (!readiness?.ok) return failure(readiness?.error || 'ACP_MCP_UNAVAILABLE', readiness?.message || 'The Omvra MCP server is unavailable.');
+    }
     if (typeof issueMcpGrant !== 'function') return { ok: true, grant: null, configuration: {} };
     const issued = issueMcpGrant(store, { scope });
     if (!issued?.ok) return issued || failure('ACP_MCP_GRANT_FAILED', 'A scoped MCP grant could not be issued.');
+    const configuration = require('./agent-runtime-mcp-grant.cjs').buildProviderMcpConfiguration(issued, profile.integrationMode);
+    if (!configuration.mcpServers) {
+      if (typeof revokeMcpGrant === 'function') revokeMcpGrant(store, issued.grantId);
+      return failure('ACP_MCP_GRANT_FAILED', `Scoped MCP configuration is unavailable for ${profile.integrationMode}.`);
+    }
     return {
       ok: true,
       grant: issued,
-      configuration: require('./agent-runtime-mcp-grant.cjs').buildProviderMcpConfiguration(issued, profile.integrationMode),
+      configuration,
     };
   }
 
@@ -395,7 +405,7 @@ function createAgentRuntimeSessionRunner({
       : { ok: true, pack: null, text: '' };
     if (!contextPack.ok) return failure(contextPack.error, contextPack.message, { preflight: confirmed });
     const scope = { kind: 'task', taskId: confirmed.contractSnapshot.taskId };
-    const mcp = prepareMcp(profile, scope);
+    const mcp = await prepareMcp(profile, scope);
     if (!mcp.ok) return failure(mcp.error, mcp.message, { preflight: confirmed });
     const actorPersonId = payload.actorPersonId || confirmed.task?.assigneeId || confirmed.context?.assignee?.id;
     let latestRevision = Number(confirmed.task?.__mcpRevision ?? confirmed.contractSnapshot.taskRevision);
@@ -516,7 +526,7 @@ function createAgentRuntimeSessionRunner({
       if (profileResolution.state === 'disabled') return failure('ACP_RUNTIME_ACCESS_DISABLED', profileResolution.error, { state: 'disabled' });
       return failure('ACP_RUNTIME_NOT_CONFIGURED', 'The selected runtime profile could not be resolved.');
     }
-    const mcp = prepareMcp(profileResolution.profile, {
+    const mcp = await prepareMcp(profileResolution.profile, {
       kind: 'goal-node', goalId: payload.goalId, goalElementId: payload.goalElementId, goalExecutionId: payload.goalExecutionId,
     });
     if (!mcp.ok) return mcp;
@@ -639,13 +649,13 @@ function createAgentRuntimeSessionRunner({
     }
     const workspacePath = typeof payload.workspacePath === 'string' ? payload.workspacePath.trim() : '';
     if (!workspacePath) return failure('ACP_REPOSITORY_FOLDER_REQUIRED', 'A repository folder is required before resuming work.');
+    const mcp = await prepareMcp(profileResolution.profile, current.scope);
+    if (!mcp.ok) return mcp;
     const starting = current.state === 'interrupted'
       ? updateBinding(store, { bindingId, expectedRevision: current.revision, state: 'starting' })
       : { ok: true, binding: current };
     if (!starting.ok) return starting;
     let client;
-    const mcp = prepareMcp(profileResolution.profile, current.scope);
-    if (!mcp.ok) return mcp;
     try {
       client = createClient(profileResolution.profile, { workspacePath, logger });
       const negotiated = await client.initialize();

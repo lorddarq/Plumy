@@ -73,11 +73,9 @@ export function OverflowActionMenu({
         aria-expanded={isOpen}
         title={menuLabel}
         onClick={() => {
-          setIsOpen(open => {
-            const nextOpen = !open;
-            onOpenChange?.(nextOpen);
-            return nextOpen;
-          });
+          const nextOpen = !isOpen;
+          setIsOpen(nextOpen);
+          onOpenChange?.(nextOpen);
         }}
       >
         <Ellipsis className="size-4" />

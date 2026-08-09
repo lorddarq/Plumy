@@ -512,10 +512,8 @@ function AddPersonPopover({
       <SettingsAddPopupTrigger>
         <Button
           type="button"
-          variant="ghost"
-          size="sm"
+          variant="link"
           onClick={() => onOpenChange(!open)}
-          className="h-auto px-0 py-0 text-xs font-semibold text-[#1a60cb] hover:bg-transparent hover:text-[#1a60cb]"
         >
           Add Person
         </Button>
@@ -586,10 +584,8 @@ function AddAgentPopover({
       <SettingsAddPopupTrigger>
         <Button
           type="button"
-          variant="ghost"
-          size="sm"
+          variant="link"
           onClick={() => onOpenChange(!open)}
-          className="h-auto px-0 py-0 text-xs font-semibold text-[#1a60cb] hover:bg-transparent hover:text-[#1a60cb]"
         >
           Add Agent
         </Button>
@@ -1087,7 +1083,6 @@ function SettingsPopoverActions({ addDisabled, submitLabel = 'Add', onCancel, on
         variant="outline"
         size="sm"
         onClick={onCancel}
-        className="h-7 rounded-xl border-black/10 px-3 text-sm font-medium text-[#67676f]"
       >
         Cancel
       </Button>
@@ -1096,7 +1091,6 @@ function SettingsPopoverActions({ addDisabled, submitLabel = 'Add', onCancel, on
         size="sm"
         onClick={onSubmit}
         disabled={addDisabled}
-        className="h-7 rounded-xl bg-zinc-500/15 px-3 text-sm font-medium text-[#67676f] hover:bg-zinc-500/20 disabled:opacity-50"
       >
         {submitLabel}
       </Button>

@@ -581,7 +581,33 @@ function startMcpHttpServer(store, { logger = console, onStatusChange, skillsRoo
   return server;
 }
 
+function waitForMcpHttpServerReady(server, { timeoutMs = 5_000 } = {}) {
+  if (!server) return Promise.resolve({ ok: false, error: 'MCP_SERVER_UNAVAILABLE', message: 'The Omvra MCP server has not started.' });
+  if (server.listening) return Promise.resolve({ ok: true });
+
+  return new Promise(resolve => {
+    let timer = null;
+    const finish = result => {
+      if (timer) clearTimeout(timer);
+      server.off('listening', onListening);
+      server.off('error', onError);
+      server.off('close', onClose);
+      resolve(result);
+    };
+    const onListening = () => finish({ ok: true });
+    const onError = error => finish({ ok: false, error: 'MCP_SERVER_UNAVAILABLE', message: error?.message || String(error) });
+    const onClose = () => finish({ ok: false, error: 'MCP_SERVER_UNAVAILABLE', message: 'The Omvra MCP server stopped before becoming ready.' });
+
+    server.once('listening', onListening);
+    server.once('error', onError);
+    server.once('close', onClose);
+    timer = setTimeout(() => finish({ ok: false, error: 'MCP_SERVER_START_TIMEOUT', message: 'Timed out waiting for the Omvra MCP server to start.' }), timeoutMs);
+    if (server.listening) finish({ ok: true });
+  });
+}
+
 module.exports = {
   startMcpHttpServer,
+  waitForMcpHttpServerReady,
   createRequestDispatcher,
 };

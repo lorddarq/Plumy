@@ -37,13 +37,14 @@ export function DeleteConfirmDialog({
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={onCancel}
-            className="h-8 rounded-[12px] border-black/10 bg-white px-4 text-[14px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f]"
           >
             Cancel
           </Button>
           <Button
             type="button"
+            variant="destructive"
             onClick={onConfirm}
             className="h-8 rounded-[12px] border border-[#f0c8c8] bg-[#fbeaea] px-4 text-[14px] font-normal text-[#ff0000] shadow-none hover:bg-[#f7dddd] hover:text-[#ff0000]"
           >

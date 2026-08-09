@@ -158,10 +158,10 @@ export function KanbanToolbar({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" onClick={onAddColumn} className="kanban-toolbar-add-board" disabled={!onAddColumn}>
+            <Button type="button" variant="primary" onClick={onAddColumn} className="kanban-toolbar-add-board" disabled={!onAddColumn}>
               <Plus className="size-4" />
               {condensedUI ? null : <span>Add Board</span>}
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Add board column</TooltipContent>
         </Tooltip>

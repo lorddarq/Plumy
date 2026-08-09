@@ -3,8 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { EventEmitter } = require('node:events');
 
-const { createRequestDispatcher } = require('./mcp-http-server.cjs');
+const { createRequestDispatcher, waitForMcpHttpServerReady } = require('./mcp-http-server.cjs');
 const { issueScopedMcpGrant, _resetForTests } = require('./agent-runtime-mcp-grant.cjs');
 const {
   MILESTONES_KEY,
@@ -27,6 +28,15 @@ function makeReq(headers = {}, transport = 'http') {
 }
 
 test.afterEach(() => _resetForTests());
+
+test('waits for the MCP listener before reporting readiness', async () => {
+  const server = new EventEmitter();
+  server.listening = false;
+  const readiness = waitForMcpHttpServerReady(server, { timeoutMs: 100 });
+  server.listening = true;
+  server.emit('listening');
+  assert.deepEqual(await readiness, { ok: true });
+});
 
 test('scoped runtime grants authorize only the bound task and reject workspace reads', () => {
   const store = makeStoreFromFixture('workspace-basic');

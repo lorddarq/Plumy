@@ -1,4 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Button } from './ui/button';
 
 interface TodayButtonProps {
   onClick: () => void;
@@ -10,13 +11,14 @@ export function TodayButton({ onClick, label = 'Today', tooltip = 'Scroll to tod
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={onClick}
-          className="timeline-toolbar-button-primary"
+          className="timeline-toolbar-button-secondary"
         >
           {label}
-        </button>
+        </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">{tooltip}</TooltipContent>
     </Tooltip>

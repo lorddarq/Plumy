@@ -1,6 +1,7 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+@import './design-tokens.css';
 @import './reserved-slots.css';
 @import './timeline.css';
 @import './components.css';

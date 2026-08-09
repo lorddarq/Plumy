@@ -41,15 +41,27 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 relative flex w-full items-center gap-2 rounded-md border bg-input-background px-3 py-2 text-left text-sm whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:flex *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:flex-1 *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 *:data-[slot=select-value]:overflow-hidden *:data-[slot=select-value]:truncate [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex w-full items-center gap-2 rounded-[var(--omvra-radius-control)] border border-[var(--omvra-color-border-default)] bg-[var(--omvra-color-surface-default)] px-3 py-2 text-left text-sm whitespace-nowrap text-[var(--omvra-color-text-secondary)] transition-[color,box-shadow,border-color] outline-none focus-visible:border-[var(--omvra-color-focus)] focus-visible:ring-2 focus-visible:ring-[var(--omvra-color-focus-surface)] aria-invalid:border-[var(--omvra-color-feedback-danger)] aria-invalid:ring-2 aria-invalid:ring-[var(--omvra-color-feedback-danger-surface)] disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-[var(--omvra-color-text-muted)] data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:flex *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:flex-1 *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 *:data-[slot=select-value]:overflow-hidden *:data-[slot=select-value]:truncate [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
         "pr-8",
       )}
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="absolute right-2.5 top-1/2 size-4 -translate-y-1/2 opacity-50" />
+      <SelectPrimitive.Icon className="pointer-events-none absolute right-2 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center">
+        <svg
+          aria-hidden="true"
+          className="size-4 text-[var(--omvra-color-text-muted)]"
+          fill="none"
+          viewBox="0 0 16 16"
+        >
+          <path
+            fill="currentColor"
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M7.64672 3.14665C7.74047 3.05302 7.86755 3.00043 8.00005 3.00043C8.13255 3.00043 8.25963 3.05302 8.35338 3.14665L10.8534 5.64665C10.9417 5.74144 10.9898 5.8668 10.9875 5.99634C10.9852 6.12587 10.9327 6.24946 10.8411 6.34107C10.7495 6.43268 10.6259 6.48515 10.4964 6.48744C10.3669 6.48972 10.2415 6.44164 10.1467 6.35332L8.00005 4.20665L5.85338 6.35332C5.7586 6.44164 5.63323 6.48972 5.5037 6.48744C5.37417 6.48515 5.25058 6.43268 5.15897 6.34107C5.06736 6.24946 5.01488 6.12587 5.0126 5.99634C5.01031 5.8668 5.05839 5.74144 5.14671 5.64665L7.64672 3.14665ZM5.14671 9.64666C5.24047 9.55302 5.36755 9.50043 5.50005 9.50043C5.63255 9.50043 5.75963 9.55302 5.85338 9.64666L8.00005 11.7933L10.1467 9.64666C10.1925 9.59753 10.2477 9.55813 10.309 9.5308C10.3704 9.50347 10.4366 9.48878 10.5037 9.48759C10.5708 9.48641 10.6375 9.49876 10.6998 9.52391C10.762 9.54905 10.8186 9.58648 10.8661 9.63396C10.9136 9.68144 10.951 9.738 10.9761 9.80026C11.0013 9.86252 11.0136 9.9292 11.0124 9.99634C11.0113 10.0635 10.9966 10.1297 10.9692 10.191C10.9419 10.2523 10.9025 10.3075 10.8534 10.3533L8.35338 12.8533C8.25963 12.947 8.13255 12.9995 8.00005 12.9995C7.86755 12.9995 7.74047 12.947 7.64672 12.8533L5.14671 10.3533C5.05308 10.2596 5.00049 10.1325 5.00049 9.99999C5.00049 9.86749 5.05308 9.74041 5.14671 9.64666Z"
+          />
+        </svg>
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );

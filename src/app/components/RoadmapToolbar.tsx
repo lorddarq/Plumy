@@ -153,10 +153,10 @@ export function RoadmapToolbar({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" onClick={onAddMilestone} className="kanban-toolbar-add-board">
+            <Button type="button" variant="primary" onClick={onAddMilestone} className="kanban-toolbar-add-board">
               <Plus className="size-4" />
               {condensedUI ? null : <span>Add milestone</span>}
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Add milestone</TooltipContent>
         </Tooltip>

@@ -14,6 +14,7 @@ import { EmptyStateCard } from './EmptyStateCard';
 import { Switch } from './ui/switch';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Button } from './ui/button';
 import { getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
 import {
   Sheet,
@@ -254,9 +255,11 @@ export function WorkflowSettingsSection({
             aria-label="Goal cleanup audit history location"
             className="h-9 min-w-0 flex-1 rounded-xl border-[#e5e7eb] bg-white px-3 text-sm text-[#71717a]"
           />
-          <button
+          <Button
             type="button"
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#52525b] transition hover:bg-[#fafafa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4d4d8]"
+            variant="outline"
+            size="sm"
+            className="h-9 shrink-0 text-xs"
             onClick={async () => {
               const directory = await window.electron?.goalAudit?.pickDirectory?.();
               if (directory) onGoalAuditArchiveDirectoryChange(directory);
@@ -264,7 +267,7 @@ export function WorkflowSettingsSection({
           >
             <FolderIcon className="h-3.5 w-3.5" aria-hidden="true" />
             Choose folder
-          </button>
+          </Button>
         </div>
       </div>
       <div className="mt-5 border-t border-[#ececf0] pt-5">
@@ -280,9 +283,11 @@ export function WorkflowSettingsSection({
             aria-label="External skills location"
             className="h-9 min-w-0 flex-1 rounded-xl border-[#e5e7eb] bg-white px-3 text-sm text-[#71717a]"
           />
-          <button
+          <Button
             type="button"
-            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#52525b] transition hover:bg-[#fafafa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4d4d8]"
+            variant="outline"
+            size="sm"
+            className="h-9 shrink-0 text-xs"
             onClick={async () => {
               const directory = await window.electron?.skills?.pickDirectory?.();
               if (directory) onExternalSkillsDirectoryChange(directory);
@@ -290,7 +295,7 @@ export function WorkflowSettingsSection({
           >
             <FolderIcon className="h-3.5 w-3.5" aria-hidden="true" />
             Choose folder
-          </button>
+          </Button>
         </div>
       </div>
       <div className="mt-6 border-t border-[#ececf0] pt-5">
@@ -423,23 +428,25 @@ export function WorkflowSettingsSection({
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-[#71717a]">Dynamic rollover returns unused cycle budget to the parent Goal pool.</p>
-          <button
+          <Button
             type="button"
-            className="rounded-md border border-[#d9d9df] px-3 py-2 text-xs font-medium text-[#52525b] hover:bg-[#f4f4f5]"
+            variant="outline"
+            size="sm"
             onClick={onResetGoalPolicy}
           >
             Reset to safe defaults
-          </button>
+          </Button>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button
+          <Button
             type="button"
-            className="inline-flex items-center gap-2 rounded-md border border-[#d9d9df] px-3 py-2 text-xs font-medium text-[#52525b] hover:bg-[#f4f4f5]"
+            variant="outline"
+            size="sm"
             onClick={() => { void onExportGoalPolicyBackup(); }}
           >
             <Download className="size-3.5" />
             Back up Policies
-          </button>
+          </Button>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[#d9d9df] px-3 py-2 text-xs font-medium text-[#52525b] hover:bg-[#f4f4f5]">
             <Upload className="size-3.5" />
             Restore Policies
@@ -683,24 +690,26 @@ export function DataSettingsSection({
             Export the full workspace backup, including UI preferences, people, projects, task allocation, and board metadata.
           </p>
           <div className="flex flex-wrap gap-3">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 void onExportWorkspaceBackup();
               }}
-              className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
             >
               <Download className="size-4 shrink-0" />
               Backup Data
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
             >
               <Upload className="size-4 shrink-0" />
               Restore Data
-            </button>
+            </Button>
           </div>
           {importFeedback ? (
             <EmptyStateCard
@@ -734,13 +743,14 @@ export function DataSettingsSection({
               <p>This is irreversible</p>
             </div>
           </div>
-          <button
+          <Button
             type="button"
+            variant="destructive"
+            size="sm"
             onClick={onNukeLocalData}
-            className="inline-flex h-8 items-center rounded-xl border border-[#b50000]/10 bg-[#c40000]/10 px-3 text-sm font-medium text-[#cd0000] outline-none hover:bg-[#c40000]/15 focus-visible:ring-2 focus-visible:ring-red-200"
           >
             Erase Local Storage
-          </button>
+          </Button>
         </div>
       </div>
     </AnchoredPanelSection>

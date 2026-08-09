@@ -53,11 +53,10 @@ export function TaskContextHistorySection({ taskId, expectedRevision = 0 }: Task
           </h3>
           <Button
             type="button"
-            variant="ghost"
+            variant="link"
             onClick={() => setIsComposerOpen(value => !value)}
             aria-expanded={isComposerOpen}
             aria-controls="task-context-checkpoint-composer"
-            className="h-auto rounded-sm px-0 py-0 text-xs font-semibold leading-4 text-[#1a60cb] hover:bg-transparent hover:text-[#164ea4]"
           >
             Add Checkpoint
           </Button>
@@ -78,14 +77,13 @@ export function TaskContextHistorySection({ taskId, expectedRevision = 0 }: Task
             className="min-h-[76px] resize-none rounded-none border-0 bg-white px-4 py-4 text-sm leading-5 shadow-none focus-visible:border-transparent focus-visible:ring-0"
           />
           <div className="flex min-h-[52px] items-center justify-end border-t border-[#71717a]/10 px-4 py-3">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleAppend}
-              disabled={!summary.trim() || history.isAppending}
-              className="h-7 rounded-xl bg-[#71717a]/15 px-3 text-sm font-medium text-[#67676f] shadow-none hover:bg-[#71717a]/20 disabled:opacity-100"
-            >
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={handleAppend}
+            disabled={!summary.trim() || history.isAppending}
+          >
               {history.isAppending ? 'Saving…' : 'Save checkpoint'}
             </Button>
           </div>
@@ -137,7 +135,7 @@ export function TaskContextHistorySection({ taskId, expectedRevision = 0 }: Task
           })}
         </div>
       )}
-      {history.hasMore && <Button type="button" variant="ghost" onClick={() => void history.refresh(50)} className="h-auto px-0 py-0 text-xs font-semibold text-[#1a60cb] hover:bg-transparent hover:text-[#164ea4]">Show more history</Button>}
+      {history.hasMore && <Button type="button" variant="link" onClick={() => void history.refresh(50)}>Show more history</Button>}
     </section>
   );
 }
