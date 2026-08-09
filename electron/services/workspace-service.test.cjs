@@ -406,6 +406,14 @@ test('createTask resolves projects by human-readable project name', () => {
   assert.equal(created.task.project, 'Project A');
 });
 
+test('createTask persists a validated parent link for follow-up work', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const created = createTask(store, { title: 'Follow-up', parentTaskId: 'task-1' });
+  assert.equal(created.ok, true);
+  assert.equal(created.task.parentTaskId, 'task-1');
+  assert.equal(createTask(store, { title: 'Invalid follow-up', parentTaskId: 'missing-task' }).error, 'TASK_REFERENCE_NOT_FOUND');
+});
+
 test('createTask and updateTaskDetails persist dependency, milestone, and time metadata', () => {
   const store = makeStoreFromFixture('workspace-basic', {
     [MILESTONES_KEY]: [
@@ -675,6 +683,7 @@ test('deleteTask cleans milestone links and task dependency references', () => {
     expectedRevision: 0,
   });
   assert.equal(dependentUpdate.ok, true);
+  const followUp = createTask(store, { title: 'Follow-up', parentTaskId: 'task-2' }).task;
 
   const taskToDelete = getTaskById(store, 'task-2');
   const deleted = deleteTask(store, {
@@ -685,8 +694,10 @@ test('deleteTask cleans milestone links and task dependency references', () => {
   assert.equal(deleted.ok, true);
   assert.deepEqual(deleted.cleanup.updatedMilestoneIds, [milestone.id]);
   assert.deepEqual(deleted.cleanup.removedDependencyReferences, ['task-3']);
+  assert.deepEqual(deleted.cleanup.clearedParentReferences, [followUp.id]);
   assert.deepEqual(getMilestoneById(store, milestone.id).linkedTaskIds, ['task-1']);
   assert.deepEqual(getTaskById(store, 'task-3').dependencyIds, []);
+  assert.equal(getTaskById(store, followUp.id).parentTaskId, undefined);
 });
 
 test('updateTaskDetails rejects stale revisions and invalid references', () => {

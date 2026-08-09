@@ -81,7 +81,7 @@ function createAgentRuntimeSessionRunner({
     const issued = issueMcpGrant(store, { scope });
     if (!issued?.ok) return issued || failure('ACP_MCP_GRANT_FAILED', 'A scoped MCP grant could not be issued.');
     const configuration = require('./agent-runtime-mcp-grant.cjs').buildProviderMcpConfiguration(issued, profile.integrationMode);
-    if (!configuration.mcpServers) {
+    if (!configuration.mcpServers && !configuration.config?.mcp_servers) {
       if (typeof revokeMcpGrant === 'function') revokeMcpGrant(store, issued.grantId);
       return failure('ACP_MCP_GRANT_FAILED', `Scoped MCP configuration is unavailable for ${profile.integrationMode}.`);
     }

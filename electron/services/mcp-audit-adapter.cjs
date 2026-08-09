@@ -28,6 +28,7 @@ const AUDIT_DETAIL_KEYS = [
   'command',
   'actor',
   'taskId',
+  'parentTaskId',
   'projectId',
   'entityId',
   'nextRevision',
@@ -122,7 +123,7 @@ function getAuditTarget(details = {}) {
 function getAuditTargetFromArgs(args) {
   const normalized = normalizeObject(args);
   return {
-    taskId: normalizeAuditString(normalized.taskId || normalized.id),
+    taskId: normalizeAuditString(normalized.taskId || normalized.parentTaskId || normalized.id),
     projectId: normalizeAuditString(normalized.projectId),
     entityId: normalizeAuditString(normalized.entityId || normalized.milestoneId),
   };

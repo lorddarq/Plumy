@@ -332,6 +332,7 @@ class AcpStdioClient {
 class CodexAppServerClient {
   constructor(profile, options) {
     this.profile = profile;
+    this.mcpStartupStates = new Map();
     // Do not inherit either desktop Omvra endpoint from ~/.codex/config.toml.
     // thread/start supplies the current app's scoped endpoint instead.
     this.transport = new JsonLineTransport(profile.executablePath, [
@@ -350,6 +351,10 @@ class CodexAppServerClient {
         if (threadId && turnId) this.activeTurns.set(threadId, turnId);
       }
       if (message.method === 'turn/completed' && message.params?.threadId) this.activeTurns.delete(message.params.threadId);
+      if (message.method === 'mcpServer/startupStatus/updated' && typeof message.params?.name === 'string') {
+        const key = `${message.params.threadId || '*'}:${message.params.name}`;
+        this.mcpStartupStates.set(key, message.params);
+      }
     });
   }
 
@@ -379,13 +384,40 @@ class CodexAppServerClient {
     const selectedModel = requestedModel(this.profile, configuration.model);
     assertAdvertisedModel(selectedModel, this.models || []);
     const result = await this.transport.request('thread/start', { ...configuration, ...(selectedModel ? { model: selectedModel } : {}), ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), cwd: this.workspacePath });
-    return { sessionId: validateSessionRef(result?.thread?.id), configuration: result };
+    const sessionId = validateSessionRef(result?.thread?.id);
+    await this.waitForConfiguredMcpServers(sessionId, configuration);
+    return { sessionId, configuration: result };
   }
 
   async resumeSession(sessionId, configuration = {}) {
     const id = validateSessionRef(sessionId);
     const result = await this.transport.request('thread/resume', { ...configuration, ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), threadId: id });
-    return { sessionId: validateSessionRef(result?.thread?.id || id), configuration: result };
+    const resumedSessionId = validateSessionRef(result?.thread?.id || id);
+    await this.waitForConfiguredMcpServers(resumedSessionId, configuration);
+    return { sessionId: resumedSessionId, configuration: result };
+  }
+
+  async waitForConfiguredMcpServers(threadId, configuration) {
+    const configured = configuration?.config?.mcp_servers;
+    const names = configured && typeof configured === 'object' && !Array.isArray(configured)
+      ? Object.entries(configured).filter(([, server]) => server?.enabled !== false).map(([name]) => name)
+      : [];
+    if (!names.length) return;
+
+    const deadline = Date.now() + this.transport.timeoutMs;
+    while (Date.now() <= deadline) {
+      let readyCount = 0;
+      for (const name of names) {
+        const startup = this.mcpStartupStates.get(`${threadId}:${name}`) || this.mcpStartupStates.get(`*:${name}`);
+        if (startup?.status === 'failed' || startup?.status === 'cancelled') {
+          throw runtimeError('ACP_MCP_GRANT_FAILED', `Scoped MCP server "${name}" failed to start${startup.error ? `: ${startup.error}` : '.'}`);
+        }
+        if (startup?.status === 'ready') readyCount += 1;
+      }
+      if (readyCount === names.length) return;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    throw runtimeError('ACP_MCP_GRANT_FAILED', `Timed out waiting for scoped MCP server${names.length === 1 ? '' : 's'} ${names.join(', ')}.`);
   }
 
   async prompt(sessionId, text) {

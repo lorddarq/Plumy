@@ -147,6 +147,7 @@ const ADMIN_MCP_TOOLS = [
   'tasks_context_get',
   'tasks_context_list',
   'tasks_create',
+  'tasks_create_follow_up',
   'tasks_delete',
   'tasks_get',
   'tasks_list',

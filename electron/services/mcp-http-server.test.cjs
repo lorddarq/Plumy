@@ -51,6 +51,26 @@ test('scoped runtime grants authorize only the bound task and reject workspace r
   assert.equal(request('workspace', 'workspace.get_snapshot', {}).error.code, -32003);
 });
 
+test('write-scoped runtime grants create a linked follow-up only for their bound parent task', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const grant = issueScopedMcpGrant({
+    endpoint: 'http://127.0.0.1:3456/mcp',
+    scope: { kind: 'task', taskId: 'task-1' },
+    capabilityProfile: 'task_write',
+  });
+  const dispatch = createRequestDispatcher(store);
+  const request = (id, name, argumentsValue) => dispatch({
+    jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: argumentsValue },
+  }, makeReq({ authorization: `Bearer ${grant.token}` }));
+
+  const created = request('follow-up', 'tasks.create_follow_up', { parentTaskId: 'task-1', title: 'Consolidate remaining controls', notes: '- [ ] Complete migration' });
+  assert.equal(created.error, undefined);
+  assert.equal(created.result.structuredContent.task.parentTaskId, 'task-1');
+  assert.deepEqual(created.result.structuredContent.task.projectIds, ['lane-1']);
+  assert.equal(request('cross-task', 'tasks.create_follow_up', { parentTaskId: 'task-2', title: 'Denied' }).error.code, -32003);
+  assert.equal(request('standalone', 'task_write', { title: 'Denied standalone task' }).error.code, -32003);
+});
+
 test('tools call audit events capture normalized metadata without payloads', () => {
   const store = makeStoreFromFixture('workspace-basic');
   const dispatch = createRequestDispatcher(store);

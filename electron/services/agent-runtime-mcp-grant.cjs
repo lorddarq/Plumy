@@ -59,6 +59,13 @@ function findScopedMcpGrant(token) {
 
 function isScopedToolCallAllowed(grant, toolName, args = {}) {
   if (!grant || typeof toolName !== 'string') return false;
+  const canWrite = grant.capabilityProfile === 'task_write' || grant.capabilityProfile === 'admin';
+  if (toolName === 'tasks.create_follow_up') {
+    return canWrite
+      && grant.scope.kind === 'task'
+      && typeof args?.parentTaskId === 'string'
+      && args.parentTaskId.trim() === grant.scope.taskId;
+  }
   const taskId = args && typeof args === 'object' ? (args.taskId || args.id) : null;
   if (grant.scope.kind !== 'task') return false;
   if (typeof taskId !== 'string' || taskId.trim() !== grant.scope.taskId) return false;
@@ -67,7 +74,7 @@ function isScopedToolCallAllowed(grant, toolName, args = {}) {
     || toolName === 'tasks.context.get'
     || toolName === 'tasks.collaboration_history'
     || toolName === 'agent.resolve_task_context'
-    || (grant.capabilityProfile === 'task_write' || grant.capabilityProfile === 'admin');
+    || canWrite;
 }
 
 function buildProviderMcpConfiguration(grant, provider) {
@@ -78,7 +85,19 @@ function buildProviderMcpConfiguration(grant, provider) {
     headers: { Authorization: `Bearer ${grant.token}` },
   };
   if (provider === 'acp' || provider === 'acp-local-stdio') return { mcpServers: [server] };
-  if (provider === 'codex-app-server' || provider === 'codex-app-server-stdio') return { mcpServers: [server] };
+  if (provider === 'codex-app-server' || provider === 'codex-app-server-stdio') {
+    return {
+      config: {
+        mcp_servers: {
+          omvra: {
+            url: server.url,
+            http_headers: server.headers,
+            enabled: true,
+          },
+        },
+      },
+    };
+  }
   if (provider === 'claude-stream-json' || provider === 'claude-stream-json-stdio') return { mcpServers: { omvra: server } };
   return {};
 }

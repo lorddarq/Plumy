@@ -137,6 +137,7 @@ export interface Task {
   project?: string; // Project this task belongs to
   milestoneId?: string; // Primary roadmap milestone this task contributes to
   dependencyIds?: string[]; // Roadmap-only dependencies used for milestone planning arrows
+  parentTaskId?: string; // Source task that authorized and motivated this follow-up
   timeSpentMinutes?: number; // Approximate total time spent on this task
   timeSpentNote?: string; // Latest human-readable time-spent note/source
   timeEntries?: TaskTimeEntry[]; // Optional append-only approximate time log

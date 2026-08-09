@@ -115,8 +115,11 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
     if (message.method === 'initialize') respond(currentChild, message.id, { userAgent: 'codex-cli/1.0' });
     if (message.method === 'account/read') respond(currentChild, message.id, { account: { type: 'chatgpt' }, requiresOpenaiAuth: true });
     if (message.method === 'model/list') respond(currentChild, message.id, { data: [{ id: 'gpt', isDefault: true }] });
-    if (message.method === 'thread/start') respond(currentChild, message.id, { thread: { id: 'thread-1' } });
-    if (message.method === 'thread/resume') respond(currentChild, message.id, { thread: { id: 'thread-1' } });
+    if (message.method === 'thread/start' || message.method === 'thread/resume') {
+      currentChild.stdout.write(`${JSON.stringify({ method: 'mcpServer/startupStatus/updated', params: { threadId: 'thread-1', name: 'omvra', status: 'starting' } })}\n`);
+      currentChild.stdout.write(`${JSON.stringify({ method: 'mcpServer/startupStatus/updated', params: { threadId: 'thread-1', name: 'omvra', status: 'ready' } })}\n`);
+      respond(currentChild, message.id, { thread: { id: 'thread-1' } });
+    }
     if (message.method === 'turn/start') setTimeout(() => {
       currentChild.stdout.write(`${JSON.stringify({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'inProgress' } } })}\n`);
       respond(currentChild, message.id, { turn: { id: 'turn-1', status: 'inProgress' } });
@@ -141,8 +144,9 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
   assert.equal(observation.authentication, 'authenticated');
   assert.equal(observation.models[0].id, 'gpt');
   assert.equal(observation.capabilities.close, false);
-  const session = await client.startSession({ model: 'gpt', cwd: '/tmp/untrusted' });
-  await client.resumeSession(session.sessionId, { threadId: 'untrusted' });
+  const scopedMcpConfig = { config: { mcp_servers: { omvra: { url: 'http://127.0.0.1:3456/mcp', enabled: true } } } };
+  const session = await client.startSession({ model: 'gpt', cwd: '/tmp/untrusted', ...scopedMcpConfig });
+  await client.resumeSession(session.sessionId, { threadId: 'untrusted', ...scopedMcpConfig });
   await client.prompt(session.sessionId, 'Start');
   await client.steer(session.sessionId, 'Focus on tests');
   await client.cancel(session.sessionId);
@@ -150,10 +154,34 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
   assert.equal(requests.find(message => message.method === 'thread/start').params.cwd, '/tmp/workspace');
   assert.equal(requests.find(message => message.method === 'thread/start').params.approvalPolicy, 'never');
   assert.equal(requests.find(message => message.method === 'thread/start').params.model, 'gpt');
+  assert.deepEqual(requests.find(message => message.method === 'thread/start').params.config, scopedMcpConfig.config);
+  assert.equal('mcpServers' in requests.find(message => message.method === 'thread/start').params, false);
   assert.equal(requests.find(message => message.method === 'thread/resume').params.threadId, 'thread-1');
   assert.equal(requests.find(message => message.method === 'thread/resume').params.approvalPolicy, 'never');
   assert.equal(requests.find(message => message.method === 'turn/start').params.approvalPolicy, 'never');
   assert.deepEqual(methods, ['initialize', 'initialized', 'account/read', 'model/list', 'thread/start', 'thread/resume', 'turn/start', 'turn/steer', 'turn/interrupt']);
+  client.close();
+});
+
+test('Codex client fails before prompting when the scoped MCP server reports startup failure', async () => {
+  const child = createChild((message, currentChild) => {
+    if (message.method === 'initialize') respond(currentChild, message.id, { userAgent: 'codex-cli/1.0' });
+    if (message.method === 'account/read') respond(currentChild, message.id, { account: { type: 'chatgpt' }, requiresOpenaiAuth: true });
+    if (message.method === 'model/list') respond(currentChild, message.id, { data: [] });
+    if (message.method === 'thread/start') {
+      currentChild.stdout.write(`${JSON.stringify({ method: 'mcpServer/startupStatus/updated', params: { threadId: 'thread-failed', name: 'omvra', status: 'failed', error: 'connection refused' } })}\n`);
+      respond(currentChild, message.id, { thread: { id: 'thread-failed' } });
+    }
+  });
+  const client = createNativeRuntimeClient({
+    integrationMode: 'codex-app-server-stdio', executablePath: '/usr/bin/codex', fixedArgs: [], approvalPolicy: 'never',
+  }, { workspacePath: '/tmp/workspace', spawnProcess: () => child, timeoutMs: 100 });
+
+  await client.initialize();
+  await assert.rejects(
+    () => client.startSession({ config: { mcp_servers: { omvra: { url: 'http://127.0.0.1:3456/mcp', enabled: true } } } }),
+    error => error.code === 'ACP_MCP_GRANT_FAILED' && /connection refused/.test(error.message),
+  );
   client.close();
 });
 

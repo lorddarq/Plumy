@@ -1529,7 +1529,8 @@ function buildMcpTaskExecutionSchema() {
       ],
     },
     recommendedWriteSequence: [
-      'task_write when new follow-up work must be logged',
+      'tasks.create_follow_up when new work is explicitly linked to a known parent task; scoped runtimes must pass their assigned task as parentTaskId',
+      'task_write when new standalone work must be logged',
       'tasks.update when an existing task detail or metadata field needs a targeted edit',
       'tasks.update_description when the main task description/notes field needs to be replaced or when appending a full handoff summary after preserving the current notes',
       'tasks.attach_file when a local file path or file:// URL should be referenced from a task',
@@ -1554,7 +1555,7 @@ function buildMcpTaskExecutionSchema() {
       'Use omvra://agents/{personId}/assigned to read agentic person metadata. agentInstructions shape role/persona and agentOperationalInstructions shape the preferred work method unless they conflict with higher-priority instructions, security boundaries, or tool/sandbox controls.',
       'During task execution, prefer task.assigneeId -> omvra://agents/{personId}/assigned as the deterministic assignee-context preflight.',
       'Call agent.resolve_task_context with the exact taskId before implementation work; use standard agentic operation when ok=false and canStart=true, and stop only when canStart=false.',
-      'Use task_write to log new bug-hunting or follow-up tasks with metadata.',
+      'Use tasks.create_follow_up to log parent-linked bug-hunting or follow-up work; use task_write only for standalone tasks.',
       'Use boards.watch.poll to watch a board for changes.',
       'Use cards.kanban.list for board-friendly projections.',
     ],

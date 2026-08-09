@@ -756,6 +756,9 @@ export function repairWorkspaceBackupPayload(
       dependencyIds: (task.dependencyIds || []).filter(dependencyId =>
         importedTasks.some(candidate => candidate.id === dependencyId)
       ),
+      parentTaskId: importedTasks.some(candidate => candidate.id === task.parentTaskId)
+        ? task.parentTaskId
+        : undefined,
     };
   });
 

@@ -357,6 +357,7 @@ function createTaskService({
     swimlaneOnly,
     milestoneId,
     dependencyIds,
+    parentTaskId,
     timeSpentMinutes,
     timeSpentNote,
     actor = 'agent',
@@ -443,6 +444,8 @@ function createTaskService({
       };
     }
   
+    const parentValidation = validateTaskReferences(store, parentTaskId ? [parentTaskId] : [], { fieldName: 'parentTaskId' });
+    if (!parentValidation.ok) return parentValidation;
     const dependencyValidation = validateTaskReferences(store, dependencyIds, { fieldName: 'dependencyIds' });
     if (!dependencyValidation.ok) return dependencyValidation;
     const dependencyCycleValidation = validateDependencyCycles(store, {
@@ -488,6 +491,7 @@ function createTaskService({
       assigneeId: assignee?.id,
       milestoneId: milestoneValidation.milestoneId,
       dependencyIds: dependencyValidation.taskIds,
+      parentTaskId: parentValidation.taskIds[0],
       timeSpentMinutes: normalizedTimeSpentMinutes === null ? undefined : normalizedTimeSpentMinutes,
       timeSpentNote: normalizeString(timeSpentNote).trim() || undefined,
       timeEntries: [],
@@ -1049,6 +1053,7 @@ function createTaskService({
   
     const cleanup = {
       removedDependencyReferences: [],
+      clearedParentReferences: [],
       updatedMilestoneIds: [],
     };
     const nextTasks = tasks
@@ -1058,11 +1063,14 @@ function createTaskService({
         if (!rawTask || typeof rawTask !== 'object') return rawTask;
         const task = normalizeTaskForMcp(rawTask);
         const nextDependencyIds = (task.dependencyIds || []).filter(dependencyId => dependencyId !== normalizedTaskId);
-        if (nextDependencyIds.length === (task.dependencyIds || []).length) return rawTask;
-        cleanup.removedDependencyReferences.push(task.id);
+        const clearsParent = task.parentTaskId === normalizedTaskId;
+        if (nextDependencyIds.length === (task.dependencyIds || []).length && !clearsParent) return rawTask;
+        if (nextDependencyIds.length !== (task.dependencyIds || []).length) cleanup.removedDependencyReferences.push(task.id);
+        if (clearsParent) cleanup.clearedParentReferences.push(task.id);
         return {
           ...task,
           dependencyIds: nextDependencyIds,
+          parentTaskId: clearsParent ? undefined : task.parentTaskId,
           [revisionField]: (task[revisionField] || 0) + 1,
           mcpUpdatedAt: new Date().toISOString(),
           mcpLastActor: actor,

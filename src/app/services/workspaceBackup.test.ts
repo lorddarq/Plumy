@@ -323,6 +323,7 @@ test('workspace backup preserves shared MCP and UI task relationships and agent 
         assigneeId: 'agent-1',
         milestoneId: 'milestone-1',
         dependencyIds: ['task-2'],
+        parentTaskId: 'task-2',
         timeSpentMinutes: 45,
         timeSpentNote: 'Contract pass',
         timeEntries: [{ id: 'time-1', minutes: 45, note: 'Contract pass', loggedAt: '2026-08-12T01:00:00.000Z' }],
@@ -345,6 +346,7 @@ test('workspace backup preserves shared MCP and UI task relationships and agent 
 
   assert.equal(repaired.ok, true);
   assert.deepEqual(repaired.tasks[0].dependencyIds, ['task-2']);
+  assert.equal(repaired.tasks[0].parentTaskId, 'task-2');
   assert.equal(repaired.tasks[0].milestoneId, 'milestone-1');
   assert.equal(repaired.tasks[0].timeSpentMinutes, 45);
   assert.equal(repaired.tasks[0].timeEntries?.[0].minutes, 45);

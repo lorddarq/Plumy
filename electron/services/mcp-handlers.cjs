@@ -557,6 +557,51 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
       };
     }
 
+    case 'tasks.create_follow_up': {
+      const parentTaskId = typeof args.parentTaskId === 'string' ? args.parentTaskId.trim() : '';
+      const parent = getTaskById(store, parentTaskId);
+      if (!parent) return { error: invalidParams('Invalid params: "parentTaskId" must identify an existing task.') };
+      const result = createTask(store, {
+        title: args.title,
+        notes: args.notes,
+        statusId: args.statusId,
+        statusTitle: args.statusTitle,
+        assigneeId: args.assigneeId,
+        assigneeName: args.assigneeName,
+        assigneeKind: args.assigneeKind,
+        projectIds: Array.isArray(args.projectIds) ? args.projectIds : parent.projectIds,
+        swimlaneId: args.swimlaneId || parent.swimlaneId,
+        startDate: args.startDate,
+        endDate: args.endDate,
+        size: args.size,
+        complexity: args.complexity,
+        priority: args.priority,
+        parentTaskId,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, { outcome: 'denied', reason: result.error, toolName: name, parentTaskId, title: args.title });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId: result.task?.id,
+        parentTaskId,
+        title: result.task?.title,
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          parentTaskId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
     case 'task_write':
     case 'tasks.create': {
       const result = createTask(store, {
