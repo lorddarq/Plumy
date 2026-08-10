@@ -100,6 +100,17 @@ function readArray(store, key) {
   return Array.isArray(value) ? value : [];
 }
 
+function setStoreEntries(store, entries) {
+  const storedSnapshot = store?.store;
+  const storeDescriptor = Object.getOwnPropertyDescriptor(store, 'store')
+    || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(store) || {}, 'store');
+  if (storedSnapshot && typeof storedSnapshot === 'object' && storeDescriptor?.set) {
+    store.store = { ...storedSnapshot, ...Object.fromEntries(entries) };
+    return;
+  }
+  entries.forEach(([key, value]) => store.set(key, value));
+}
+
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -962,7 +973,6 @@ function updateGoalProjectBindings(store, {
     mcpLastActor: actor,
   });
   goals[goalIndex] = nextGoal;
-  store.set(GOALS_KEY, goals);
   const audit = readArray(store, GOAL_PROJECT_BINDING_AUDIT_KEY).concat({
     id: `goal-project-binding-audit-${randomUUID()}`,
     goalId: normalizedGoalId,
@@ -974,9 +984,12 @@ function updateGoalProjectBindings(store, {
     revision: nextGoal[MCP_TASK_REV_FIELD],
     createdAt: new Date().toISOString(),
   }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES);
-  store.set(GOAL_PROJECT_BINDING_AUDIT_KEY, audit);
   const result = { ok: true, changed: true, goal: nextGoal, revision: nextGoal[MCP_TASK_REV_FIELD], audit: audit.at(-1) };
-  store.set(GOAL_MUTATION_COMMANDS_KEY, commands.concat({ idempotencyKey: normalizedKey, goalId: normalizedGoalId, projectBindingsOnly: true, result }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES));
+  setStoreEntries(store, [
+    [GOALS_KEY, goals],
+    [GOAL_PROJECT_BINDING_AUDIT_KEY, audit],
+    [GOAL_MUTATION_COMMANDS_KEY, commands.concat({ idempotencyKey: normalizedKey, goalId: normalizedGoalId, projectBindingsOnly: true, result }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES)],
+  ]);
   if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: 'graph', goalId: normalizedGoalId, revision: nextGoal[MCP_TASK_REV_FIELD], actor, changeType: 'project-bindings.updated' });
   return result;
 }
@@ -1054,16 +1067,18 @@ function updateGoalElement(store, {
     mcpLastActor: actor,
   });
   goals[goalIndex] = nextGoal;
-  store.set(GOALS_KEY, goals);
-  if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: 'graph', goalId: normalizedGoalId, revision: nextGoal[MCP_TASK_REV_FIELD], actor, changeType: connectorOnly ? 'connector.updated' : 'element.updated' });
   const result = { ok: true, changed: true, goal: nextGoal, revision: nextGoal[MCP_TASK_REV_FIELD] };
-  store.set(GOAL_MUTATION_COMMANDS_KEY, commands.concat({
-    idempotencyKey: normalizedKey,
-    goalId: normalizedGoalId,
-    elementId: normalizedElementId,
-    connectorOnly,
-    result,
-  }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES));
+  setStoreEntries(store, [
+    [GOALS_KEY, goals],
+    [GOAL_MUTATION_COMMANDS_KEY, commands.concat({
+      idempotencyKey: normalizedKey,
+      goalId: normalizedGoalId,
+      elementId: normalizedElementId,
+      connectorOnly,
+      result,
+    }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES)],
+  ]);
+  if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: 'graph', goalId: normalizedGoalId, revision: nextGoal[MCP_TASK_REV_FIELD], actor, changeType: connectorOnly ? 'connector.updated' : 'element.updated' });
   return result;
 }
 
@@ -1114,7 +1129,6 @@ function updateGoalArtifactReferences(store, {
     mcpLastActor: actor,
   });
   goals[goalIndex] = nextGoal;
-  store.set(GOALS_KEY, goals);
   const audit = readArray(store, GOAL_ARTIFACT_AUDIT_KEY).concat({
     id: `goal-artifact-audit-${randomUUID()}`,
     goalId: normalizedGoalId,
@@ -1133,9 +1147,12 @@ function updateGoalArtifactReferences(store, {
     revision: nextGoal[MCP_TASK_REV_FIELD],
     createdAt: new Date().toISOString(),
   }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES);
-  store.set(GOAL_ARTIFACT_AUDIT_KEY, audit);
   const result = { ok: true, changed: true, goal: nextGoal, revision: nextGoal[MCP_TASK_REV_FIELD], audit: audit.at(-1) };
-  store.set(GOAL_MUTATION_COMMANDS_KEY, commands.concat({ idempotencyKey: normalizedKey, goalId: normalizedGoalId, elementId: normalizedElementId, artifactOnly: true, result }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES));
+  setStoreEntries(store, [
+    [GOALS_KEY, goals],
+    [GOAL_ARTIFACT_AUDIT_KEY, audit],
+    [GOAL_MUTATION_COMMANDS_KEY, commands.concat({ idempotencyKey: normalizedKey, goalId: normalizedGoalId, elementId: normalizedElementId, artifactOnly: true, result }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES)],
+  ]);
   if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: 'graph', goalId: normalizedGoalId, revision: nextGoal[MCP_TASK_REV_FIELD], actor, changeType: 'artifact-links.updated' });
   return result;
 }
