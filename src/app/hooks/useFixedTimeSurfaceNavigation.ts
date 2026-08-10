@@ -46,6 +46,7 @@ export function useFixedTimeSurfaceNavigation({
   const autoScrolledKeyRef = useRef<string | null>(null);
   const startupAutoScrollRafRef = useRef<number | null>(null);
   const startupAutoScrollTimersRef = useRef<number[]>([]);
+  const scrollUpdateRafRef = useRef<number | null>(null);
   const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
@@ -92,11 +93,22 @@ export function useFixedTimeSurfaceNavigation({
   }, [scrollRef]);
 
   const handleScroll = useCallback(() => {
-    const nextScrollLeft = scrollRef.current?.scrollLeft || 0;
-    const nextScrollTop = scrollRef.current?.scrollTop || 0;
-    setScrollLeft(current => (current === nextScrollLeft ? current : nextScrollLeft));
-    setScrollTop(current => (current === nextScrollTop ? current : nextScrollTop));
+    if (scrollUpdateRafRef.current !== null) return;
+    scrollUpdateRafRef.current = window.requestAnimationFrame(() => {
+      scrollUpdateRafRef.current = null;
+      const nextScrollLeft = scrollRef.current?.scrollLeft || 0;
+      const nextScrollTop = scrollRef.current?.scrollTop || 0;
+      setScrollLeft(current => (current === nextScrollLeft ? current : nextScrollLeft));
+      setScrollTop(current => (current === nextScrollTop ? current : nextScrollTop));
+    });
   }, [scrollRef]);
+
+  useEffect(() => () => {
+    if (scrollUpdateRafRef.current !== null) {
+      window.cancelAnimationFrame(scrollUpdateRafRef.current);
+      scrollUpdateRafRef.current = null;
+    }
+  }, []);
 
   const scrollToDate = useCallback((date: Date, behavior: ScrollBehavior = 'smooth') => {
     if (!scrollRef.current) return null;
