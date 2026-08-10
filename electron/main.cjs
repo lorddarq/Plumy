@@ -501,6 +501,8 @@ function createWindow() {
 app.whenReady().then(() => {
   // Bind MCP endpoint to localhost only; no external interface exposure.
   store.onDidAnyChange((nextStore, previousStore) => {
+    const hintedRendererKeys = new Set(pendingRendererStoreMutationKeys);
+    pendingRendererStoreMutationKeys.clear();
     try {
       captureMeaningfulTaskCheckpoints(store, {
         previousTasks: previousStore?.[TASKS_KEY],
@@ -510,13 +512,12 @@ app.whenReady().then(() => {
     } catch (error) {
       console.error('[task-context] checkpoint capture failed:', error?.message || error);
     }
-    const changedKeys = pendingRendererStoreMutationKeys.size > 0
-      ? new Set(pendingRendererStoreMutationKeys)
+    const changedKeys = hintedRendererKeys.size > 0
+      ? hintedRendererKeys
       : new Set([...Object.keys(nextStore || {}), ...Object.keys(previousStore || {})].filter(key => {
         if (Object.is(nextStore?.[key], previousStore?.[key])) return false;
         try { return JSON.stringify(nextStore?.[key]) !== JSON.stringify(previousStore?.[key]); } catch { return true; }
       }));
-    pendingRendererStoreMutationKeys.clear();
     const runtimeOnlyChange = [...changedKeys].length > 0
       && [...changedKeys].every(key => AGENT_RUNTIME_STORE_KEYS.has(key));
     if (!runtimeOnlyChange) broadcastStoreDidChange([...changedKeys]);
