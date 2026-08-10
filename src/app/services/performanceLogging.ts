@@ -65,6 +65,7 @@ export async function flushPerformanceEvents(): Promise<void> {
 }
 
 export function recordWorkspacePublication(changedFields: string[]): string {
+  if (!enabled) return '';
   const now = performance.now();
   const correlationId = latestActivity && now - latestActivity.recordedAt <= CORRELATION_WINDOW_MS
     ? latestActivity.correlationId
@@ -84,17 +85,19 @@ export async function measurePerformanceOperation<T>(
   category: PerformanceEvent['category'],
   operation: string,
   run: () => Promise<T>,
-  correlationId = createCorrelationId(category),
+  correlationId?: string,
 ): Promise<T> {
+  if (!enabled) return run();
+  const effectiveCorrelationId = correlationId || createCorrelationId(category);
   const startedAt = performance.now();
   try {
     return await run();
   } finally {
-    latestActivity = { correlationId, recordedAt: performance.now() };
+    latestActivity = { correlationId: effectiveCorrelationId, recordedAt: performance.now() };
     recordPerformanceEvent({
       category,
       operation,
-      correlationId,
+      correlationId: effectiveCorrelationId,
       durationMs: performance.now() - startedAt,
     });
   }
