@@ -1,6 +1,6 @@
 # Omvra design-language overlap audit
 
-Scope: representative repository inventory for task `1782744396593`. The shared primitives are the intended canonical implementation; this report distinguishes updates in the current task from remaining migration owned by the follow-up.
+Scope: representative repository inventory for task `1782744396593`. The shared primitives are the intended canonical implementation; this report distinguishes updates in the current task from remaining migration owned by the follow-up task `task-4d67421c-1485-417e-baa9-47be4756c266`.
 
 | Intent | Evidence / observed variants | Recommendation | Risk | Owner / boundary | Current task / follow-up |
 | --- | --- | --- | --- | --- | --- |

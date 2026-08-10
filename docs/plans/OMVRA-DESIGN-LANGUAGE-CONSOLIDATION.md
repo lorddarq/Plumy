@@ -1,6 +1,6 @@
 # Omvra design-language consolidation follow-up
 
-Follow-up to task `1782744396593`. See the authoritative [design contract](../../design.md) and [overlap audit](../design-language-overlap-audit.md).
+Follow-up task `task-4d67421c-1485-417e-baa9-47be4756c266`, created from parent task `1782744396593`. See the authoritative [design contract](../../design.md) and [overlap audit](../design-language-overlap-audit.md).
 
 ## Scope
 

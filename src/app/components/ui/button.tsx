@@ -26,7 +26,7 @@ const buttonVariants = cva(
         secondary: secondaryButtonClasses,
         tertiary: tertiaryButtonClasses,
         ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+          "rounded-[var(--omvra-radius-control)] text-[var(--omvra-color-text-secondary)] hover:bg-[var(--omvra-color-focus-surface)] hover:text-[var(--omvra-color-text-primary)] active:bg-[var(--omvra-color-action-primary-pressed)]/[.15] focus-visible:bg-[var(--omvra-color-surface-default)] focus-visible:shadow-[var(--omvra-button-focus-ring)] disabled:bg-transparent disabled:text-[var(--omvra-color-text-disabled)] disabled:shadow-none",
         link:
           "!h-6 !rounded-[4px] !px-1.5 !py-1 !text-xs text-[var(--omvra-color-action-primary)] shadow-none hover:bg-[var(--omvra-color-focus-surface)] active:bg-[var(--omvra-color-action-primary-pressed)]/[.15] active:text-[var(--omvra-color-action-primary-pressed)] focus-visible:bg-[var(--omvra-color-surface-default)] focus-visible:shadow-[var(--omvra-button-focus-ring)] disabled:bg-transparent disabled:text-[var(--omvra-color-text-disabled)] disabled:shadow-none",
       },
@@ -34,7 +34,7 @@ const buttonVariants = cva(
         default: "h-9 px-3 py-1.5 has-[>svg]:px-3",
         sm: "h-8 gap-1.5 px-3 has-[>svg]:px-2.5",
         lg: "h-10 px-6 has-[>svg]:px-4",
-        icon: "size-9 justify-center rounded-md",
+        icon: "size-9 justify-center rounded-[var(--omvra-radius-control)]",
       },
     },
     defaultVariants: {
