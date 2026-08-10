@@ -4,8 +4,11 @@ const { isDeepStrictEqual } = require('node:util');
 const SESSION_BINDINGS_KEY = 'omvra.acpSessionBindings.v1';
 const SESSION_EVENTS_KEY = 'omvra.acpSessionEvents.v1';
 const SESSION_SCHEMA_VERSION = 1;
-const ACTIVE_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
-const SESSION_STATES = new Set([...ACTIVE_STATES, 'interrupted', 'closed', 'failed']);
+const ACTIVE_STATES = new Set(['queued', 'starting', 'active', 'waiting-input', 'cancelling']);
+const LIVE_SESSION_STATES = new Set(['starting', 'ready']);
+const TERMINAL_TURN_STATES = new Set(['completed', 'failed', 'interrupted']);
+const TURN_STATES = new Set([...ACTIVE_STATES, ...TERMINAL_TURN_STATES]);
+const SESSION_STATES = new Set(['starting', 'ready', 'interrupted', 'closed', 'failed', 'active', 'needs-input', 'cancelling']);
 const TERMINAL_REASONS = new Set(['closed', 'cancelled', 'process-exit', 'runtime-missing', 'protocol-error']);
 const STATE_TRANSITIONS = new Map([
   ['starting', new Set(['ready', 'interrupted', 'closed', 'failed'])],
@@ -16,6 +19,16 @@ const STATE_TRANSITIONS = new Map([
   ['interrupted', new Set(['starting', 'closed', 'failed'])],
   ['closed', new Set()],
   ['failed', new Set()],
+]);
+const TURN_TRANSITIONS = new Map([
+  ['queued', new Set(['starting', 'active', 'failed', 'interrupted'])],
+  ['starting', new Set(['active', 'waiting-input', 'cancelling', 'completed', 'failed', 'interrupted'])],
+  ['active', new Set(['waiting-input', 'cancelling', 'completed', 'failed', 'interrupted'])],
+  ['waiting-input', new Set(['active', 'cancelling', 'completed', 'failed', 'interrupted'])],
+  ['cancelling', new Set(['active', 'completed', 'failed', 'interrupted'])],
+  ['completed', new Set()],
+  ['failed', new Set()],
+  ['interrupted', new Set()],
 ]);
 const MAX_EVENTS = 2_000;
 const MAX_READ_LIMIT = 100;
@@ -62,8 +75,37 @@ function createAgentRuntimeSessionService({
     createdAt: binding.createdAt,
     updatedAt: binding.updatedAt,
     lastObservedAt: binding.lastObservedAt,
+    ...(binding.turn ? { turn: binding.turn } : {}),
     ...(binding.terminalReason ? { terminalReason: binding.terminalReason } : {}),
   });
+
+  function normalizeTurn(input, previous, timestamp) {
+    if (input === undefined) return { ok: true, turn: previous };
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return failure('INVALID_ACP_TURN', 'turn must be an object.');
+    const id = normalizeString(input.id || previous?.id);
+    const state = normalizeString(input.state || previous?.state);
+    if (!id || !TURN_STATES.has(state)) return failure('INVALID_ACP_TURN', 'A turn requires a stable id and supported state.');
+    if (previous && previous.id === id && state !== previous.state && !TURN_TRANSITIONS.get(previous.state)?.has(state)) {
+      return failure('INVALID_ACP_TURN_TRANSITION', `Turn state cannot move from ${previous.state} to ${state}.`);
+    }
+    if (previous && previous.id !== id && !TERMINAL_TURN_STATES.has(previous.state)) {
+      return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'The current task turn must reach a terminal state before another turn starts.');
+    }
+    const startedAt = validTimestamp(input.startedAt || previous?.startedAt) || (state === 'queued' ? '' : timestamp);
+    const terminalReason = normalizeString(input.terminalReason || (previous?.id === id ? previous?.terminalReason : '')).slice(0, 160);
+    const turn = {
+      schemaVersion: 1,
+      id,
+      state,
+      createdAt: validTimestamp(input.createdAt || (previous?.id === id ? previous?.createdAt : '')) || timestamp,
+      updatedAt: timestamp,
+      ...(startedAt ? { startedAt } : {}),
+      ...(TERMINAL_TURN_STATES.has(state) ? { finishedAt: validTimestamp(input.finishedAt) || timestamp } : {}),
+      ...(terminalReason ? { terminalReason } : {}),
+      ...(input.requestId !== undefined && input.requestId !== null ? { requestId: String(input.requestId).slice(0, 160) } : {}),
+    };
+    return { ok: true, turn };
+  }
 
   function safeIdentifier(value, maxLength = 160) {
     const normalized = normalizeString(value);
@@ -144,9 +186,11 @@ function createAgentRuntimeSessionService({
       if (!attached.ok) return { ...attached, binding: clone(existing), reconciliationRequired: true };
       return { ok: true, idempotent: true, binding: clone(existing) };
     }
-    const active = bindings.find(item => ACTIVE_STATES.has(item.state));
+    const active = bindings.find(item => ACTIVE_STATES.has(item.turn?.state));
     if (active) return failure('ACP_EXECUTION_ALREADY_ACTIVE', 'Another runtime session is already active. Open its supervision before starting new work.', { bindingId: active.id, binding: safeBinding(active) });
     const timestamp = now();
+    const normalizedTurn = normalizeTurn(input.turn, null, timestamp);
+    if (!normalizedTurn.ok) return normalizedTurn;
     const binding = {
       schemaVersion: SESSION_SCHEMA_VERSION,
       id: createId('acp-binding'),
@@ -159,10 +203,11 @@ function createAgentRuntimeSessionService({
       createdAt: timestamp,
       updatedAt: timestamp,
       lastObservedAt: timestamp,
+      ...(normalizedTurn.turn ? { turn: normalizedTurn.turn } : {}),
       ...(normalizeString(input.mcpGrantId) ? { mcpGrantId: normalizeString(input.mcpGrantId) } : {}),
       ...Object.fromEntries(Object.entries(input.extensions || {}).filter(([key]) => ![
         'schemaVersion', 'id', 'idempotencyKey', 'revision', 'runtimeProfileId', 'scope', 'state', 'capabilities',
-        'createdAt', 'updatedAt', 'lastObservedAt', 'mcpGrantId', 'opaqueSessionRef', 'terminalReason', 'closedAt',
+        'createdAt', 'updatedAt', 'lastObservedAt', 'mcpGrantId', 'opaqueSessionRef', 'terminalReason', 'closedAt', 'turn',
       ].includes(key))),
     };
     writeBindings(store, bindings.concat(binding));
@@ -185,11 +230,13 @@ function createAgentRuntimeSessionService({
       return failure('INVALID_ACP_SESSION_TRANSITION', `Session state cannot move from ${binding.state} to ${state}.`);
     }
     const opaqueSessionRef = input.opaqueSessionRef === undefined ? binding.opaqueSessionRef : normalizeString(input.opaqueSessionRef);
-    if (ACTIVE_STATES.has(state) && state !== 'starting' && !opaqueSessionRef) return failure('ACP_SESSION_NOT_FOUND', 'Active and resumable bindings require an opaque session reference.');
+    if (LIVE_SESSION_STATES.has(state) && state !== 'starting' && !opaqueSessionRef) return failure('ACP_SESSION_NOT_FOUND', 'Connected session bindings require an opaque session reference.');
     const terminalReason = input.terminalReason === undefined ? binding.terminalReason : normalizeString(input.terminalReason);
     if (terminalReason && !TERMINAL_REASONS.has(terminalReason)) return failure('INVALID_ACP_TERMINAL_REASON', 'terminalReason is invalid.');
     const terminal = ['closed', 'failed'].includes(state);
     const timestamp = now();
+    const normalizedTurn = normalizeTurn(input.turn, binding.turn, timestamp);
+    if (!normalizedTurn.ok) return normalizedTurn;
     const next = {
       ...binding,
       revision: binding.revision + 1,
@@ -197,10 +244,11 @@ function createAgentRuntimeSessionService({
       capabilities: input.capabilities === undefined ? binding.capabilities : normalizeCapabilities(input.capabilities),
       updatedAt: timestamp,
       lastObservedAt: timestamp,
+      ...(normalizedTurn.turn ? { turn: normalizedTurn.turn } : {}),
       ...(terminalReason ? { terminalReason } : {}),
       ...(terminal ? { closedAt: timestamp } : {}),
     };
-    if (ACTIVE_STATES.has(state)) {
+    if (LIVE_SESSION_STATES.has(state)) {
       delete next.terminalReason;
       delete next.closedAt;
     }
@@ -252,6 +300,7 @@ function createAgentRuntimeSessionService({
       ...(safeIdentifier(input.outcome, 80) ? { outcome: safeIdentifier(input.outcome, 80) } : {}),
       ...(typeof input.messagePreview === 'string' && input.messagePreview.trim() ? { messagePreview: input.messagePreview.slice(0, 500) } : {}),
       ...(safeIdentifier(input.requestId === undefined || input.requestId === null ? '' : String(input.requestId)) ? { requestId: safeIdentifier(String(input.requestId)) } : {}),
+      ...(safeIdentifier(input.turnId, 160) ? { turnId: safeIdentifier(input.turnId, 160) } : {}),
       ...(safeIdentifier(input.toolName) ? { toolName: safeIdentifier(input.toolName) } : {}),
       ...(capabilityId ? { capabilityId } : {}),
     };
@@ -438,7 +487,7 @@ function createAgentRuntimeSessionService({
     const limit = Number.isFinite(Number(input.limit)) ? Math.max(1, Math.min(MAX_READ_LIMIT, Math.floor(Number(input.limit)))) : 50;
     const bindings = (Array.isArray(readBindings(store)) ? readBindings(store) : [])
       .filter(item => !bindingId || item.id === bindingId)
-      .filter(item => input.activeOnly !== true || ACTIVE_STATES.has(item.state));
+      .filter(item => input.activeOnly !== true || item.state === 'starting' || ACTIVE_STATES.has(item.turn?.state));
     const bindingIds = new Set(bindings.map(item => item.id));
     const events = (Array.isArray(readEvents(store)) ? readEvents(store) : []).filter(item => bindingIds.has(item.bindingId));
     return { ok: true, bindings: clone(bindings.slice(-limit)), events: clone(events.slice(-limit)), hasMore: bindings.length > limit || events.length > limit };
@@ -478,9 +527,17 @@ function createAgentRuntimeSessionService({
     const timestamp = now();
     let changed = 0;
     const next = bindings.map((binding) => {
-      if (!ACTIVE_STATES.has(binding.state)) return binding;
+      if (!['starting', 'ready', 'active', 'needs-input', 'cancelling'].includes(binding.state)) return binding;
       changed += 1;
-      return { ...binding, revision: Number(binding.revision || 0) + 1, state: 'interrupted', terminalReason: 'process-exit', updatedAt: timestamp, lastObservedAt: timestamp };
+      return {
+        ...binding,
+        revision: Number(binding.revision || 0) + 1,
+        state: 'interrupted',
+        terminalReason: 'process-exit',
+        updatedAt: timestamp,
+        lastObservedAt: timestamp,
+        ...(ACTIVE_STATES.has(binding.turn?.state) ? { turn: { ...binding.turn, state: 'interrupted', terminalReason: 'process-exit', updatedAt: timestamp, finishedAt: timestamp } } : {}),
+      };
     });
     if (changed) writeBindings(store, next);
     return { ok: true, changed };
@@ -489,7 +546,7 @@ function createAgentRuntimeSessionService({
   function prepareArchive(store, bindingId) {
     const binding = (Array.isArray(readBindings(store)) ? readBindings(store) : []).find(item => item.id === normalizeString(bindingId));
     if (!binding) return failure('ACP_SESSION_NOT_FOUND', 'Session binding was not found.');
-    if (ACTIVE_STATES.has(binding.state)) return failure('ACP_SESSION_ACTIVE', 'Close or cancel the active session before archiving its work.');
+    if (binding.state === 'starting' || ACTIVE_STATES.has(binding.turn?.state)) return failure('ACP_SESSION_ACTIVE', 'Close or cancel the active task turn before archiving its work.');
     if (!binding.opaqueSessionRef) return { ok: true, binding: clone(binding), changed: false };
     const result = updateBinding(store, { bindingId: binding.id, expectedRevision: binding.revision, state: 'closed', terminalReason: 'closed', opaqueSessionRef: '' });
     return result.ok ? { ...result, changed: true } : result;

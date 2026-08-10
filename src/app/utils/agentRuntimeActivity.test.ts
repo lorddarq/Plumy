@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { describeAgentRuntimeSession, joinAgentMessageDeltas, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
+import { agentRuntimeTurnState, describeAgentRuntimeSession, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
 
 test('agent message delta joining preserves normal boundaries and repairs compact legacy chunks', () => {
   assert.equal(joinAgentMessageDeltas(['Current ', 'implementation ', 'passes.']), 'Current implementation passes.');
@@ -39,6 +39,15 @@ test('runtime session summary distinguishes connected idle and stopping states',
   const stopping = describeAgentRuntimeSession('cancelling', []);
   assert.equal(stopping.label, 'Agent is stopping');
   assert.equal(stopping.isTurnActive, false);
+});
+
+test('a ready provider session reports work only from its canonical turn projection', () => {
+  const idle = { state: 'ready', turn: { id: 'turn-1', state: 'completed' } };
+  const working = { state: 'ready', turn: { id: 'turn-2', state: 'active' } };
+  assert.equal(isAgentRuntimeTurnInFlight(idle), false);
+  assert.equal(isAgentRuntimeTurnInFlight(working), true);
+  assert.equal(agentRuntimeTurnState(working), 'active');
+  assert.equal(describeAgentRuntimeSession('ready', [], undefined, agentRuntimeTurnState(working)).label, 'Agent is working');
 });
 
 test('runtime activity identifies tool connections when the provider reports their names', () => {

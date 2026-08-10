@@ -27,14 +27,14 @@ function harness(seed = {}) {
 
 const scope = { kind: 'task', taskId: 'task-1', contributionId: 'contribution-1', executionAttemptId: 'attempt-1', taskRevision: 4 };
 
-test('session bindings are provider-neutral, revisioned, idempotent, and keep one active binding per attempt', () => {
+test('session bindings are provider-neutral, revisioned, idempotent, and keep one active turn globally', () => {
   const { service, state } = harness();
-  const first = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1', capabilities: [{ id: 'resume', support: 'supported' }] });
+  const first = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1', capabilities: [{ id: 'resume', support: 'supported' }], turn: { id: 'turn-1', state: 'queued' } });
   assert.equal(first.ok, true);
   assert.equal(first.binding.state, 'starting');
   assert.equal(first.binding.revision, 0);
   assert.equal(state.attachedBindingId, first.binding.id);
-  assert.equal(service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1', capabilities: [{ id: 'resume', support: 'supported' }] }).idempotent, true);
+  assert.equal(service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1', capabilities: [{ id: 'resume', support: 'supported' }], turn: { id: 'turn-1', state: 'queued' } }).idempotent, true);
   assert.equal(service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-2' }).error, 'ACP_EXECUTION_ALREADY_ACTIVE');
 
   const ready = service.updateBinding(null, { bindingId: first.binding.id, expectedRevision: 0, state: 'ready', opaqueSessionRef: 'provider-session-1' });
@@ -44,28 +44,34 @@ test('session bindings are provider-neutral, revisioned, idempotent, and keep on
   assert.equal(state.bindings.length, 1);
 });
 
-test('session bindings enforce one active session across task and Goal-node scopes', () => {
+test('a reusable ready session is idle capacity while an in-flight turn blocks task and Goal-node starts', () => {
   const { service } = harness();
   const first = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'task-binding' });
+  const ready = service.updateBinding(null, { bindingId: first.binding.id, expectedRevision: 0, state: 'ready', opaqueSessionRef: 'session-1' });
   const second = service.createBinding(null, {
     runtimeProfileId: 'runtime-1',
     scope: { kind: 'goal-node', goalId: 'goal-1', goalElementId: 'node-1', goalExecutionId: 'execution-1', executionAttempt: 0, goalRevision: 1 },
     idempotencyKey: 'goal-binding',
   });
   assert.equal(first.ok, true);
-  assert.equal(second.ok, false);
-  assert.equal(second.error, 'ACP_EXECUTION_ALREADY_ACTIVE');
-  assert.equal(second.bindingId, first.binding.id);
+  assert.equal(ready.ok, true);
+  assert.equal(second.ok, true);
+  const active = service.updateBinding(null, { bindingId: first.binding.id, expectedRevision: ready.binding.revision, turn: { id: 'turn-1', state: 'active' } });
+  assert.equal(active.ok, true);
+  const blocked = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'task-binding-2' });
+  assert.equal(blocked.error, 'ACP_EXECUTION_ALREADY_ACTIVE');
+  assert.equal(blocked.bindingId, first.binding.id);
 });
 
-test('a completed model turn returns an active session to ready', () => {
+test('a completed model turn cannot be resurrected and leaves its provider session ready', () => {
   const { service } = harness();
   const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
   const ready = service.updateBinding(null, { bindingId: binding.id, expectedRevision: 0, state: 'ready', opaqueSessionRef: 'session-1' }).binding;
-  const active = service.updateBinding(null, { bindingId: binding.id, expectedRevision: ready.revision, state: 'active' }).binding;
-  const idle = service.updateBinding(null, { bindingId: binding.id, expectedRevision: active.revision, state: 'ready' });
-  assert.equal(idle.ok, true);
+  const active = service.updateBinding(null, { bindingId: binding.id, expectedRevision: ready.revision, turn: { id: 'turn-1', state: 'active' } }).binding;
+  const idle = service.updateBinding(null, { bindingId: binding.id, expectedRevision: active.revision, turn: { id: 'turn-1', state: 'completed' } });
   assert.equal(idle.binding.state, 'ready');
+  assert.equal(idle.binding.turn.state, 'completed');
+  assert.equal(service.updateBinding(null, { bindingId: binding.id, expectedRevision: idle.binding.revision, turn: { id: 'turn-1', state: 'active' } }).error, 'INVALID_ACP_TURN_TRANSITION');
 });
 
 test('normalized events retain correlation and reported usage without private runtime payloads', () => {

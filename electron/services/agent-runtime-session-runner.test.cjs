@@ -2,11 +2,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createAgentRuntimeSessionRunner } = require('./agent-runtime-session-runner.cjs');
 
-test('does not start a second active task session', async () => {
+test('does not start a second active task turn', async () => {
   let confirmCalls = 0;
   const activeBinding = {
     id: 'binding-1',
-    state: 'active',
+    revision: 1,
+    runtimeProfileId: 'runtime-1',
+    state: 'ready',
+    turn: { id: 'turn-1', state: 'active' },
     scope: { kind: 'task', taskId: 'task-1' },
   };
   const runner = createAgentRuntimeSessionRunner({
@@ -160,6 +163,7 @@ test('injects the bounded Omvra context pack into a new native session', async (
   let lifecycle;
   const statusMoves = [];
   const client = {
+    profile: { approvalPolicy: 'never' },
     initialize: async () => ({ capabilities: { prompt: true } }),
     startSession: async (configuration) => {
       mcpConfiguration = configuration;
@@ -193,7 +197,7 @@ test('injects the bounded Omvra context pack into a new native session', async (
     },
     createBinding: (_store, input) => {
       bindingInputs.push(input);
-      storedBinding = { id: 'binding-1', revision: 0, runtimeProfileId: 'runtime-1', state: 'starting', scope: { kind: 'task', taskId: 'task-1' } };
+      storedBinding = { id: 'binding-1', revision: 0, runtimeProfileId: 'runtime-1', state: 'starting', scope: { kind: 'task', taskId: 'task-1' }, mcpGrantId: input.mcpGrantId, turn: input.turn };
       return { ok: true, binding: storedBinding };
     },
     updateBinding: (_store, input) => {
@@ -224,8 +228,9 @@ test('injects the bounded Omvra context pack into a new native session', async (
   });
   assert.equal(prompts.length, 1);
   assert.match(prompts[0], /Continue from accepted checkpoint/);
-  assert.equal(result.binding.state, 'active');
-  assert.equal(updates.at(-1).state, 'active');
+  assert.equal(result.binding.state, 'ready');
+  assert.equal(result.binding.turn.state, 'active');
+  assert.equal(updates.at(-1).turn.state, 'active');
   const mcpEvent = events.find(event => event.nativeEventType === 'mcpServer/startupStatus/updated');
   assert.equal(mcpEvent.toolName, 'figma');
   assert.equal(mcpEvent.state, 'failed');
@@ -233,23 +238,28 @@ test('injects the bounded Omvra context pack into a new native session', async (
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent'), true);
   assert.equal(logs.some(entry => entry.message === '[agent-runtime] session.ready' && entry.details.bindingId === 'binding-1'), true);
   assert.equal(logs.some(entry => entry.message === '[agent-runtime] notification' && entry.details.subject === 'figma'), true);
+  notify({ method: 'mcpServer/elicitation/request', id: 41, params: { serverName: 'omvra', mode: 'form', message: 'Allow the omvra MCP server to run tool "tasks_get"?', requestedSchema: { type: 'object', properties: { approval: { type: 'string', enum: ['deny', 'allow'] } } }, _meta: { codex_approval_kind: 'mcp_tool_call' } } });
+  assert.equal(runner.listRequests('binding-1').length, 0);
+  assert.equal(storedBinding.turn.state, 'active');
+  assert.deepEqual(responses.at(-1), { requestId: 41, response: { action: 'accept', content: { approval: 'allow' } }, error: undefined });
+  assert.equal(events.at(-1).nativeEventType, 'omvra/mcpToolApproval/auto-accepted');
   notify({ method: 'mcpServer/elicitation/request', id: 42, params: { serverName: 'omvra_testing_mcp', mode: 'form', message: 'Allow the task preflight?', requestedSchema: { type: 'object', properties: { confirmed: { type: 'boolean', title: 'Confirm', default: true } }, required: ['confirmed'] } } });
   assert.equal(runner.listRequests('binding-1')[0].message, 'Allow the task preflight?');
-  assert.equal(storedBinding.state, 'needs-input');
+  assert.equal(storedBinding.turn.state, 'waiting-input');
   assert.equal((await runner.respond('binding-1', 42, { action: 'accept', content: { confirmed: true }, _meta: null })).ok, true);
   assert.equal(runner.listRequests('binding-1').length, 0);
-  assert.equal(responses[0].requestId, 42);
-  assert.equal(storedBinding.state, 'active');
+  assert.equal(responses[1].requestId, 42);
+  assert.equal(storedBinding.turn.state, 'active');
   notify({ method: 'item/commandExecution/requestApproval', id: 'approval-1', params: { reason: 'Write the requested implementation.' } });
   assert.equal(runner.listRequests('binding-1')[0].responseKind, 'codex-approval');
-  assert.equal(storedBinding.state, 'needs-input');
+  assert.equal(storedBinding.turn.state, 'waiting-input');
   assert.equal((await runner.respond('binding-1', 'approval-1', { decision: 'accept' })).ok, true);
   assert.deepEqual(responses.at(-1), { requestId: 'approval-1', response: { decision: 'accept' }, error: undefined });
-  assert.equal(storedBinding.state, 'active');
+  assert.equal(storedBinding.turn.state, 'active');
   notify({ method: 'error', params: { error: { message: 'Task tool failed.' }, willRetry: false } });
   assert.equal(events.at(-1).outcome, 'Task tool failed.');
   notify({ method: 'thread/inputTokens/updated', params: { inputTokens: 12 } });
-  assert.equal(storedBinding.state, 'active');
+  assert.equal(storedBinding.turn.state, 'active');
   assert.equal(runner.listRequests('binding-1').length, 0);
   lifecycle({ kind: 'exit', code: 'ACP_SESSION_INTERRUPTED' });
   assert.equal(storedBinding.state, 'interrupted');
@@ -290,7 +300,8 @@ test('resuming interrupted task work immediately sends the current authoritative
 
   const result = await runner.resume('binding-resume', { workspacePath: '/tmp/workspace' });
   assert.equal(result.ok, true);
-  assert.equal(result.binding.state, 'active');
+  assert.equal(result.binding.state, 'ready');
+  assert.equal(result.binding.turn.state, 'active');
   assert.equal(prompts.length, 1);
   assert.match(prompts[0], /Title: Test task/);
   assert.match(prompts[0], /Update the task description with the agent details/);
@@ -306,7 +317,7 @@ test('automatically starts the next bounded batch after a completed turn', async
   const events = [];
   let notify;
   let binding = null;
-  const initialBinding = { id: 'binding-auto', revision: 0, runtimeProfileId: 'runtime-1', state: 'starting', scope: { kind: 'task', taskId: 'task-1', executionAttemptId: 'attempt-1', taskRevision: 1 } };
+  const initialBinding = { id: 'binding-auto', revision: 0, runtimeProfileId: 'runtime-1', state: 'starting', scope: { kind: 'task', taskId: 'task-1', executionAttemptId: 'attempt-1', taskRevision: 1 }, turn: { id: 'turn-initial', state: 'queued' } };
   const client = {
     initialize: async () => ({ capabilities: { prompt: true } }),
     onNotification: callback => { notify = callback; },
@@ -342,7 +353,8 @@ test('automatically starts the next bounded batch after a completed turn', async
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(prompts.length, 2);
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskBatch/automatic-continuing'), true);
-  assert.equal(binding.state, 'active');
+  assert.equal(binding.state, 'ready');
+  assert.equal(binding.turn.state, 'active');
   notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(binding.state, 'closed');

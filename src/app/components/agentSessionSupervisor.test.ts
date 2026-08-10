@@ -48,6 +48,8 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(source, /sessions\?\.list/);
   assert.match(source, /setInterval\(\(\) => void refresh\(\), 10000\)/);
   assert.match(source, /sessions\?\.onEvent/);
+  assert.match(source, /sessions\?\.requests/);
+  assert.match(source, /pendingRequest/);
   assert.match(source, /openSession/);
   const execution = readComponent('TaskExecutionAction.tsx');
   assert.match(execution, /showClose=\{false\}/);
@@ -79,12 +81,19 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(statusBar, /No action pending/);
   assert.match(statusBar, /getAttentionState\('blocked'\)/);
   assert.match(statusBar, /Open supervision:/);
+  assert.match(statusBar, /pendingRequest\.message/);
+  assert.match(statusBar, /Input request unavailable/);
+  assert.match(execution, /Answer the pending request above/);
+  assert.match(execution, /requestFieldIsMissing/);
+  assert.match(execution, /Reconnect session/);
+  assert.match(execution, /onBlockedByBinding\(result\.binding/);
+  assert.match(source, /onBlockedByBinding=\{openBinding\}/);
 });
 
-test('task supervision prefers a live binding over a newer closed historical binding', () => {
+test('task supervision prefers an in-flight turn or reusable ready session over closed history', () => {
   const execution = readComponent('TaskExecutionAction.tsx');
-  assert.match(execution, /const ACTIVE_SESSION_STATES = new Set\(\['starting', 'ready', 'active', 'needs-input', 'cancelling'\]\)/);
-  assert.match(execution, /taskBindings\.filter\(candidate => ACTIVE_SESSION_STATES\.has\(candidate\.state\)\)/);
+  assert.match(execution, /isAgentRuntimeTurnInFlight\(candidate\)/);
+  assert.match(execution, /candidate\.state === 'ready'/);
   assert.match(execution, /newestFirst\(taskBindings\.filter/);
   assert.match(execution, /const refreshSequence = useRef\(0\)/);
   assert.match(execution, /if \(sequence !== refreshSequence\.current\) return null/);

@@ -21,8 +21,8 @@ test('Goal-node start binds one provider-neutral session to the immutable execut
   assert.deepEqual(bindings[0].scope, { kind: 'goal-node', goalId: 'goal-1', goalElementId: 'node-1', goalExecutionId: 'execution-1', executionAttempt: 2, goalRevision: 5 });
 });
 
-test('Goal-node start rejects an active task session before resolving the runtime', async () => {
-  const activeBinding = { id: 'task-binding-1', state: 'ready', scope: { kind: 'task', taskId: 'task-1' } };
+test('Goal-node start rejects an active task turn before resolving the runtime', async () => {
+  const activeBinding = { id: 'task-binding-1', revision: 1, runtimeProfileId: 'runtime-1', state: 'ready', turn: { id: 'turn-1', state: 'active' }, scope: { kind: 'task', taskId: 'task-1' } };
   let resolved = false;
   const runner = createAgentRuntimeSessionRunner({
     store: {},

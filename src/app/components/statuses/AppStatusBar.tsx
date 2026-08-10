@@ -9,6 +9,7 @@ import { FiltersIcon } from '../SettingsPanel';
 import { useAgentSessionSupervisor } from '../AgentSessionSupervisor';
 import { getAttentionState, getSessionAttentionState } from '../../utils/attention';
 import { ChevronDown } from 'lucide-react';
+import { agentRuntimeTurnState, type AgentRuntimeTurnProjection } from '../../utils/agentRuntimeActivity';
 
 export interface AppStatusBarProps {
   tasks: Task[];
@@ -65,11 +66,7 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
   const hasSessions = sessionDock.items.length > 0;
   const attention = sessionDock.state === 'blocked'
     ? getAttentionState('blocked')
-    : getSessionAttentionState({
-        bindingState: sessionDock.binding?.state,
-        executionState: sessionDock.binding?.taskExecution?.state,
-        taskStatus: sessionDock.task?.status,
-      }) || null;
+    : getRequestAwareAttention(sessionDock.binding, sessionDock.task, sessionDock.pendingRequest) || null;
   const accessibleLabel = `${buttonLabel || `Work status: ${label}`}. ${attention ? `${attention.description} Next action: ${attention.nextStep}` : 'No attention action is pending.'}`;
   const attentionClass = sessionDock.state === 'needs-input' || sessionDock.state === 'blocked' || attention?.tone === 'warning'
     ? 'bg-amber-50 text-amber-900'
@@ -103,8 +100,8 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
             </div>
             <span className="text-[11px] text-slate-400">{sessionDock.items.length} shown</span>
           </div>
-          {sessionDock.items.map(({ binding, task }, index) => {
-            const state = getSessionItemState(binding, task);
+          {sessionDock.items.map(({ binding, task, pendingRequest }, index) => {
+            const state = getSessionItemState(binding, task, pendingRequest);
             const isLatest = index === 0;
             const showAttention = state.attention && !['complete', 'ready'].includes(state.attention.kind);
             return (
@@ -136,8 +133,15 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
   );
 }
 
-function getSessionItemState(binding: { state: string; taskExecution?: { state?: string } }, task?: Task) {
-  const attention = getSessionAttentionState({ bindingState: binding.state, executionState: binding.taskExecution?.state, taskStatus: task?.status });
+function getRequestAwareAttention(binding?: { state: string; turn?: AgentRuntimeTurnProjection; taskExecution?: { state?: string } }, task?: Task, pendingRequest?: { message: string }) {
+  const attention = getSessionAttentionState({ bindingState: binding?.state, turnState: agentRuntimeTurnState(binding), executionState: binding?.taskExecution?.state, taskStatus: task?.status });
+  if (attention?.kind !== 'needs-input') return attention;
+  if (pendingRequest) return { ...attention, description: pendingRequest.message };
+  return { ...getAttentionState('interrupted'), label: 'Input request unavailable', description: 'The session says it needs input, but Omvra has no answerable request.', nextStep: 'Open supervision to reconnect or replace the stale session.' };
+}
+
+function getSessionItemState(binding: { state: string; turn?: AgentRuntimeTurnProjection; taskExecution?: { state?: string } }, task?: Task, pendingRequest?: { message: string }) {
+  const attention = getRequestAwareAttention(binding, task, pendingRequest);
   if (!attention) return { label: 'Session status unavailable', icon: '?', className: 'bg-slate-100 text-slate-700', attention };
   const suffix = attention.kind === 'active' ? ' · Open to monitor'
     : attention.kind === 'needs-input' ? ' · Review request'
@@ -152,7 +156,7 @@ function getSessionItemState(binding: { state: string; taskExecution?: { state?:
 function getSessionDockLabel(sessionDock: ReturnType<typeof useAgentSessionSupervisor>['sessionDock']): string {
   if (sessionDock.state === 'none') return 'No active work';
   if (sessionDock.state === 'blocked') return `${getAttentionState('blocked').label} · Another session is active`;
-  const attention = getSessionAttentionState({ bindingState: sessionDock.binding?.state, executionState: sessionDock.binding?.taskExecution?.state, taskStatus: sessionDock.task?.status });
+  const attention = getRequestAwareAttention(sessionDock.binding, sessionDock.task, sessionDock.pendingRequest);
   if (!attention) return 'Session status unavailable';
   if (attention.kind === 'active') return `${attention.label} · Open to monitor`;
   if (attention.kind === 'needs-input') return `${attention.label} · Review request`;

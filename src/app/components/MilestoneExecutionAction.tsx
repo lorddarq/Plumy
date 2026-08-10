@@ -9,6 +9,7 @@ import { useAgentSessionSupervisor } from './AgentSessionSupervisor';
 import { OverflowActionMenu } from './OverflowActionMenu';
 import { ExecutionNotice } from './ExecutionNotice';
 import { getAttentionState, getSessionAttentionState, type AttentionState } from '../utils/attention';
+import { agentRuntimeTurnState, isAgentRuntimeTurnInFlight } from '../utils/agentRuntimeActivity';
 
 interface MilestoneExecutionActionProps {
   milestone: ProjectMilestone;
@@ -95,9 +96,9 @@ export function MilestoneExecutionAction({ milestone, tasks, projects, trigger, 
           const binding = activeBindings.find((candidate: { id: string; scope?: { taskId?: string }; state?: string }) => candidate.scope?.taskId === task.id);
           const usageEvent = binding ? [...sessionEvents].reverse().find((event: { bindingId?: string; type?: string }) => event.bindingId === binding.id && event.type === 'usage-reported') : undefined;
           const accepted = task.collaboration?.contributions?.filter(contribution => contribution.state === 'accepted').length || 0;
-          const attention = getSessionAttentionState({ bindingState: binding?.state, executionState: binding?.taskExecution?.state, taskStatus: task.status })
+          const attention = getSessionAttentionState({ bindingState: binding?.state, turnState: agentRuntimeTurnState(binding), executionState: binding?.taskExecution?.state, taskStatus: task.status })
             || (blockers.length > 0 ? getAttentionState('blocked') : getAttentionState('ready'));
-          return { task, folder, folderSource: agentRuntimeWorkspaceSourceLabel(workspace?.source), runtime: runtimeLabel(resolution?.profile?.integrationMode), blockers: [...new Set(blockers)], active: Boolean(binding && ['starting', 'ready', 'active', 'needs-input', 'cancelling'].includes(binding.state || '')), sessionState: binding?.state, attention, accepted, usage: usageEvent ? `${usageEvent.totalTokens ?? 'unknown'} tokens${usageEvent.cost !== undefined ? ` · ${usageEvent.cost} ${usageEvent.currency || ''}` : ''}` : undefined };
+          return { task, folder, folderSource: agentRuntimeWorkspaceSourceLabel(workspace?.source), runtime: runtimeLabel(resolution?.profile?.integrationMode), blockers: [...new Set(blockers)], active: isAgentRuntimeTurnInFlight(binding), sessionState: binding?.state, attention, accepted, usage: usageEvent ? `${usageEvent.totalTokens ?? 'unknown'} tokens${usageEvent.cost !== undefined ? ` · ${usageEvent.cost} ${usageEvent.currency || ''}` : ''}` : undefined };
         }));
         if (!cancelled) setRows(nextRows);
       } catch (caught) {

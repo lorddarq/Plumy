@@ -252,8 +252,8 @@ function recordRendererFailure(details = {}) {
     occurredAt: new Date().toISOString(),
     ...Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined && value !== null)),
     activeRuntimeBindings: (sessions?.bindings || [])
-      .filter(binding => ['starting', 'ready', 'active', 'needs-input', 'cancelling'].includes(binding.state))
-      .map(binding => ({ id: binding.id, state: binding.state, taskId: binding.scope?.taskId || null, updatedAt: binding.updatedAt || null, lastObservedAt: binding.lastObservedAt || null })),
+      .filter(binding => ['queued', 'starting', 'active', 'waiting-input', 'cancelling'].includes(binding.turn?.state))
+      .map(binding => ({ id: binding.id, state: binding.turn.state, turnId: binding.turn.id, taskId: binding.scope?.taskId || null, updatedAt: binding.turn.updatedAt || binding.updatedAt || null, lastObservedAt: binding.lastObservedAt || null })),
   };
   store.set(RENDERER_FAILURES_KEY, current.concat(report).slice(-20));
   console.error('[renderer-diagnostic]', report);

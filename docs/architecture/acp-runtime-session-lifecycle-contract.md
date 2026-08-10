@@ -164,18 +164,48 @@ Provider-reported tokens, context usage, and cost are optional observations labe
 
 ## Session binding contract
 
+### 2026-08 lifecycle audit and decision
+
+Verified ownership before this change: `agent-runtime-session-service.cjs` persisted binding state and normalized events; `agent-runtime-session-runner.cjs` owned live clients, pending requests, provider notifications, cancellation, and task-execution synchronization; task attempts persisted `runtimeExecution`; renderer supervision, milestone launch, and status surfaces each interpreted binding state independently. The uncommitted pending-request controls and scoped MCP approval handling were retained because they close real interaction gaps. Their binding-state-derived work labels were rewritten to consume the canonical turn projection. No unrelated dirty files were discarded.
+
+| Option | Benefit | Cost or disqualifier | Decision |
+| --- | --- | --- | --- |
+| Keep overloaded binding states and add renderer guards | Lowest immediate diff | Preserves contradictory owners and makes every new surface repeat lifecycle inference | Rejected |
+| Put all turn state only on task attempts | Reuses task persistence | Cannot represent Goal-node turns or provide one provider-neutral blocker projection | Rejected |
+| Add the latest turn projection to the existing binding and mirror task attempts | Reuses the binding, event, IPC, and task-attempt contracts; covers task and Goal scopes | Adds one optional backward-compatible binding field and coordinated writes | Selected |
+| Add a new turn store/event bus | Strong separation on paper | Unproven operational need, migration and backup cost, duplicate correlation | Rejected by YAGNI |
+
 Store bindings separately under `omvra.acpSessionBindings.v1`. Current task, collaboration, and editable Goal graph records contain at most a `sessionBindingId` correlation field on their stable execution-attempt record. They never contain the opaque session reference.
 
 ```ts
 type AcpSessionState =
   | 'starting'
   | 'ready'
-  | 'active'
-  | 'needs-input'
-  | 'cancelling'
   | 'interrupted'
   | 'closed'
   | 'failed';
+
+type AcpTaskTurnState =
+  | 'queued'
+  | 'starting'
+  | 'active'
+  | 'waiting-input'
+  | 'cancelling'
+  | 'completed'
+  | 'failed'
+  | 'interrupted';
+
+interface AcpTaskTurnProjectionV1 {
+  schemaVersion: 1;
+  id: string;
+  state: AcpTaskTurnState;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  requestId?: string;
+  terminalReason?: string;
+}
 
 type AcpWorkScopeV1 =
   | {
@@ -202,6 +232,7 @@ interface AcpSessionBindingV1 {
   opaqueSessionRef?: string;
   mcpGrantId?: string;
   state: AcpSessionState;
+  turn?: AcpTaskTurnProjectionV1;
   capabilities: RuntimeCapabilityObservationV1[];
   createdAt: string;
   updatedAt: string;
@@ -211,17 +242,45 @@ interface AcpSessionBindingV1 {
 }
 ```
 
-Binding invariants:
+The runner/main process is the sole transition owner. `sessions/list` returns this combined projection through the existing IPC/preload boundary; renderers may format it but may not derive work state from task status, binding state, and event history.
+
+Binding and turn invariants:
 
 - One binding references exactly one runtime profile and one task or Goal-node execution attempt.
-- One execution attempt has at most one active binding. Starting a fresh provider session requires a new execution attempt; resuming the same provider-owned session keeps the existing binding and attempt.
-- An active or resumable binding requires `opaqueSessionRef`; terminal retention may clear it without deleting the binding record.
+- A `ready` binding is a connected reusable provider session and does not mean an agent is working.
+- “Agent is working” means the binding has an in-flight turn (`queued`, `starting`, `active`, `waiting-input`, or `cancelling`).
+- One binding has at most one in-flight turn. A terminal turn cannot be resurrected; a later batch receives a new turn ID.
+- An in-flight turn is correlated to its task/contribution attempt or immutable Goal-node execution through the binding scope. Goal acceptance remains separate.
+- A connected or resumable binding requires `opaqueSessionRef`; terminal retention may clear it without deleting the binding record.
+- Pending input is addressable only by binding ID, turn ID, and provider request ID. Routine policy-approved tool permission requests remain permission events and do not enter `waiting-input`.
 - `opaqueSessionRef` is a runtime-owned correlation token, not an agent identity, credential, transcript locator, acceptance signal, or authority grant.
 - `mcpGrantId` correlates a separately managed MCP authorization grant. It is not the bearer secret and cannot be exchanged for one through workspace reads.
 - The captured task/Goal revision identifies the context used to start the session. A later revision marks the session context stale; it does not roll back the work record or authorize overwriting the newer revision.
 - Every governed write still supplies the current task or Goal revision. The adapter cannot bypass optimistic concurrency.
 - Capabilities are a start-time snapshot for reproducibility. Current controls also consult the latest observation and fail if support is no longer available.
 - Bindings preserve unknown fields across backup/restore and no-op migration.
+
+### Transition and concurrency policy
+
+| Owner | From | To | Trigger |
+| --- | --- | --- | --- |
+| Runner | session absent | `starting` | explicit task or Goal launch after preflight |
+| Runner | `starting` | `ready` | provider session negotiated and live |
+| Runner | `starting`/`ready` | `interrupted` | missing client, process exit, transport loss, or shutdown |
+| Runner | `starting`/`ready` | `failed` | unrecoverable protocol/start failure |
+| Runner | `ready` | `closed` | explicit close or bounded automatic retirement |
+| Runner | no turn/terminal turn | `queued`/`starting` | prompt accepted for dispatch |
+| Runner | `queued`/`starting` | `active` | provider turn-start observation |
+| Runner | `active` | `waiting-input` | genuine structured elicitation with concrete request correlation |
+| Runner | `waiting-input` | `active` | matching response sent |
+| Runner | in-flight | `cancelling` | explicit cancellation |
+| Runner | in-flight | `completed`/`failed`/`interrupted` | one matching terminal outcome, cancellation settlement, timeout, or provider loss |
+
+Current policy is one in-flight turn across the workspace, one in-flight turn per runtime session, and one in-flight turn per task/Goal execution scope. Idle `ready` sessions do not consume that capacity. Before duplicate-start validation, the runner reconciles persisted bindings against its live client/process registry. Rejection identifies the exact blocking binding, task/Goal scope, and turn ID before another prompt or process is spawned.
+
+Durable task context appended during a turn is queued for the next task turn by default because every new prompt rebuilds the bounded authoritative context pack. Explicit live guidance uses `steer` only when the negotiated provider capability supports it; otherwise the UI leaves the guidance unsent and requires a follow-up turn. Omvra does not inject changing task records into an active provider turn implicitly.
+
+The existing task attempt `runtimeExecution` remains a compatibility mirror for task status/evidence surfaces. The binding `turn` projection is necessary because Goal-node turns and cross-surface concurrency cannot be represented by task attempts alone. No new store or event bus is introduced.
 
 ## Session-scoped MCP access contract
 
@@ -285,11 +344,11 @@ sequenceDiagram
 
 ## Closure, crash, resume, cancellation, and missing runtime
 
-- **Explicit close:** mark the binding `closed` and close or stop the attempt. Preserve durable Omvra state. Closing cannot submit, accept, complete, delete, archive, or abandon work.
+- **Explicit close:** terminalize any in-flight turn once, mark the provider session `closed`, and preserve durable Omvra state. Closing cannot submit, accept, complete, delete, archive, or abandon work.
 - **Normal process exit:** record the observed exit and mark the attempt `completed` only when the existing lifecycle permits it. Contribution/task/Goal state does not advance automatically.
-- **Crash or lost transport:** mark the binding `interrupted` and the attempt `failed` or `stopped` through the existing lifecycle. Keep the work scope and checkpoint available.
+- **Crash or lost transport:** mark any in-flight turn `interrupted`, then mark the provider session `interrupted`. Keep the work scope and checkpoint available and release execution capacity.
 - **Resume:** allowed only with the same runtime profile when session-resume capability is `supported` and the opaque reference remains valid. Otherwise the user starts a new execution attempt and receives the latest accepted Omvra context pack.
-- **Cancellation:** enter `cancelling`, issue the selected protocol's cancel operation only when supported, and wait for acknowledgement. A timeout becomes `interrupted`; Omvra does not claim cancellation succeeded. The attempt stops only through its existing transition.
+- **Cancellation:** move the turn, not the session, to `cancelling`; issue the selected protocol's cancel operation only when supported and wait for acknowledgement. A timeout makes the turn `interrupted`; the reusable provider session remains `ready` when transport liveness is intact.
 - **Missing or unavailable runtime:** fail before session creation. Do not create a fabricated session, background retry, or fallback attempt. External handoff remains a separate explicit action.
 - **Authentication required:** surface the runtime-provided method or agent-native sign-in instruction. Omvra never receives or persists the credential.
 - **MCP grant failure or expiry:** deny MCP access visibly without falling back to a broader token or transport. The ACP session may remain open for user steering, but it cannot claim governed Omvra work succeeded.
@@ -306,7 +365,7 @@ Active and interrupted bindings retain the opaque reference so a supported resum
 - Launch requires an explicit user or already-governed Goal action. Assignment, delegation eligibility, watcher changes, and board polling cannot launch it.
 - The executable path is exact, fixed arguments are an array, the workspace directory is validated, and no shell interpolation is used.
 - Only the selected runtime receives the bounded context pack and session-scoped Omvra MCP connection configuration required for the scope.
-- Omvra may run explicitly requested task/contribution or Goal-node attempts concurrently. A runtime may multiplex concurrent sessions when its native protocol advertises that capability; otherwise Omvra uses separately managed subprocesses. Join behavior is based on accepted durable outputs, never shared transcripts or session proximity.
+- The first migrated policy permits one in-flight task/Goal turn across the workspace while allowing multiple idle reusable sessions. Per-runtime multiplexing is deferred until a provider-neutral advertised-capacity contract exists. Join behavior is based on accepted durable outputs, never shared transcripts or session proximity.
 - This is local multi-agent execution, not a remote/shared agent pool. Remote ACP over HTTP/WebSocket may later expand deployment location and independent scaling without changing the collaboration, session-binding, MCP-grant, or acceptance contracts.
 - Remote gateways, hosted agents, Omvra-owned provider credentials, provider SDKs, arbitrary runtime/plugin installation, recursive agent trees, background relaunch, and silent runtime failover are out of scope.
 - `Open externally` uses an allowlisted application link or exact executable handoff. It records `external-handoff` only, creates no ACP binding or MCP grant, does not prove authentication or execution, and does not change task/Goal status. The UI should describe this as opening/preparing work externally, not starting or sending an ACP session.
@@ -339,8 +398,8 @@ Every native runtime event and runtime-authored context outcome carries a non-di
 
 ### Archive, backup, and restore
 
-- Archiving is blocked while a binding is `starting`, `ready`, `active`, `needs-input`, or `cancelling`.
-- The user must cancel/close the session or explicitly resolve an interrupted attempt first.
+- Archiving is blocked while a provider session is `starting` or its turn is in flight. An idle `ready` session may be explicitly closed as part of archive preparation.
+- The user must cancel/close an in-flight turn or explicitly resolve an interrupted attempt first.
 - Archive cleanup removes resumability by clearing the opaque reference while preserving normalized metadata, context, evidence, lifecycle, and audit history.
 - Restoring archived work starts from a durable Omvra checkpoint; it never silently resumes a provider session.
 - Workspace backup/restore includes runtime profiles, defaults, session-binding metadata, attempts, normalized events, context entries, and evidence references. It excludes provider credentials and raw transcripts.

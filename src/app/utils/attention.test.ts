@@ -28,4 +28,6 @@ test('session attention prioritizes task outcome over provider session metadata'
   assert.equal(getSessionAttentionState({ bindingState: 'active', taskStatus: 'under-review' })?.kind, 'review');
   assert.equal(getSessionAttentionState({ bindingState: 'closed', taskStatus: 'in-progress' })?.kind, 'closed');
   assert.equal(getSessionAttentionState({ bindingState: 'active', taskStatus: 'done' })?.kind, 'complete');
+  assert.equal(getSessionAttentionState({ bindingState: 'ready', turnState: 'active', taskStatus: 'in-progress' })?.kind, 'active');
+  assert.equal(getSessionAttentionState({ bindingState: 'ready', turnState: 'waiting-input', taskStatus: 'in-progress' })?.kind, 'needs-input');
 });

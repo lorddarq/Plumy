@@ -24,7 +24,8 @@ const TASKS_KEY = 'omvra.tasks.v1';
 const TASK_CONTRIBUTION_ATTEMPTS_KEY = 'omvra.taskContributionAttempts.v1';
 const TASK_COLLABORATION_EVENTS_KEY = 'omvra.taskCollaborationEvents.v1';
 const TASK_CONTEXT_ENTRIES_KEY = 'omvra.taskContextEntries.v1';
-const ACTIVE_RUNTIME_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
+const ACTIVE_RUNTIME_TURN_STATES = new Set(['queued', 'starting', 'active', 'waiting-input', 'cancelling']);
+const OWNED_RUNTIME_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
 const MILESTONES_KEY = 'omvra.milestones.v1';
 const PEOPLE_KEY = 'omvra.people.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
@@ -1922,7 +1923,7 @@ function recoverOrphanedTaskExecution(store, { taskId } = {}) {
     binding.scope?.kind === 'task'
     && binding.scope.taskId === task.id
     && binding.scope.executionAttemptId === contribution.latestAttemptId
-    && ACTIVE_RUNTIME_SESSION_STATES.has(binding.state)
+    && (OWNED_RUNTIME_SESSION_STATES.has(binding.state) || ACTIVE_RUNTIME_TURN_STATES.has(binding.turn?.state))
   ));
   if (activeBinding) return { ok: true, changed: false, task, binding: activeBinding };
   return recoverOrphanedAttempt(store, {
@@ -1974,7 +1975,7 @@ function finalizeAgentRuntimeAttempt(store, { taskId, attemptId, state = 'comple
   return { ok: true, attempt: nextAttempt };
 }
 
-function updateAgentRuntimeTaskExecution(store, { taskId, attemptId, state, reason, batchNumber, lastEventAt } = {}) {
+function updateAgentRuntimeTaskExecution(store, { taskId, attemptId, state, reason, batchNumber, lastEventAt, turnId, turnState } = {}) {
   const normalizedTaskId = normalizeString(taskId);
   const normalizedAttemptId = normalizeString(attemptId);
   if (!normalizedTaskId || !normalizedAttemptId) return { ok: false, error: 'ACP_EXECUTION_ATTEMPT_REQUIRED', message: 'A task and execution attempt are required.' };
@@ -1989,6 +1990,8 @@ function updateAgentRuntimeTaskExecution(store, { taskId, attemptId, state, reas
     state,
     batchNumber: Number.isInteger(batchNumber) && batchNumber >= 0 ? batchNumber : Number(previous.batchNumber || 0),
     updatedAt,
+    ...(normalizeString(turnId) ? { turnId: normalizeString(turnId).slice(0, 160) } : {}),
+    ...(ACTIVE_RUNTIME_TURN_STATES.has(turnState) || ['completed', 'failed', 'interrupted'].includes(turnState) ? { turnState } : {}),
     ...(normalizeString(reason) ? { reason: normalizeString(reason).slice(0, 500) } : {}),
   };
   const nextAttempt = { ...attempt, runtimeExecution, updatedAt };

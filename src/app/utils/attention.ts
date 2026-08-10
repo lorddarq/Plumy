@@ -49,15 +49,19 @@ export function getExecutionAttentionState(state: string): AttentionState | unde
   return undefined;
 }
 
-export function getSessionAttentionState({ bindingState, executionState, taskStatus }: { bindingState?: string; executionState?: string; taskStatus?: string }): AttentionState | undefined {
+export function getSessionAttentionState({ bindingState, turnState, executionState, taskStatus }: { bindingState?: string; turnState?: string; executionState?: string; taskStatus?: string }): AttentionState | undefined {
   if (taskStatus === 'done' || executionState === 'complete') return getAttentionState('complete');
   if (taskStatus === 'under-review' || executionState === 'ready-for-review') return getAttentionState('review');
   if (executionState) {
     const executionAttention = getExecutionAttentionState(executionState);
     if (executionAttention && !['ready', 'starting'].includes(executionAttention.kind)) return executionAttention;
   }
-  if (bindingState === 'active') return getAttentionState('active');
-  if (bindingState === 'needs-input') return getAttentionState('needs-input');
+  if (turnState === 'active' || bindingState === 'active') return getAttentionState('active');
+  if (turnState === 'waiting-input' || bindingState === 'needs-input') return getAttentionState('needs-input');
+  if (turnState === 'failed') return getAttentionState('failed');
+  if (turnState === 'interrupted') return getAttentionState('interrupted');
+  if (turnState === 'cancelling') return getAttentionState('stopping');
+  if (turnState === 'queued' || turnState === 'starting') return getAttentionState('starting');
   if (bindingState === 'failed') return getAttentionState('failed');
   if (bindingState === 'interrupted') return getAttentionState('interrupted');
   if (bindingState === 'cancelling') return getAttentionState('stopping');

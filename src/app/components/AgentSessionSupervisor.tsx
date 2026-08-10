@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type Context, type ReactNode } from 'react';
 import type { Task, TimelineSwimlane } from '../types';
 import { TaskExecutionAction } from './TaskExecutionAction';
-import { getSessionAttentionState } from '../utils/attention';
+import { agentRuntimeTurnState, isAgentRuntimeTurnInFlight, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
 
-export const ACTIVE_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
+export const CONNECTED_SESSION_STATES = new Set(['starting', 'ready']);
 const HISTORY_SESSION_STATES = new Set(['interrupted', 'failed', 'closed', 'complete', 'completed']);
 
 export interface SessionBinding {
@@ -12,11 +12,14 @@ export interface SessionBinding {
   workspacePath?: string;
   scope?: { kind?: string; taskId?: string; goalId?: string; goalElementId?: string };
   taskExecution?: { state?: string; batchNumber?: number; reason?: string; updatedAt?: string };
+  turn?: AgentRuntimeTurnProjection & { updatedAt?: string };
+  updatedAt?: string;
 }
 
 export interface SessionDockItem {
   binding: SessionBinding;
   task?: Task;
+  pendingRequest?: { requestId: string | number; message: string };
 }
 
 interface AgentSessionRequest {
@@ -38,6 +41,7 @@ export interface SessionDockProjection {
   task?: Task;
   historyCount: number;
   items: SessionDockItem[];
+  pendingRequest?: SessionDockItem['pendingRequest'];
 }
 
 type AgentSessionSupervisorGlobal = typeof globalThis & {
@@ -59,6 +63,7 @@ export function useAgentSessionSupervisor() {
 export function AgentSessionSupervisorProvider({ children, tasks, projects }: { children: ReactNode; tasks: Task[]; projects: TimelineSwimlane[] }) {
   const [request, setRequest] = useState<AgentSessionRequest | null>(null);
   const [bindings, setBindings] = useState<SessionBinding[]>([]);
+  const [pendingRequestsByBinding, setPendingRequestsByBinding] = useState<Record<string, SessionDockItem['pendingRequest']>>({});
   const [supervisionVisible, setSupervisionVisible] = useState(false);
 
   useEffect(() => {
@@ -69,7 +74,19 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       refreshRunning = true;
       try {
         const result = await window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 });
-        if (!disposed && result?.ok && Array.isArray(result.bindings)) setBindings(result.bindings as SessionBinding[]);
+        if (!result?.ok || !Array.isArray(result.bindings)) return;
+        const nextBindings = result.bindings as SessionBinding[];
+        const requestEntries = await Promise.all(nextBindings
+          .filter(binding => agentRuntimeTurnState(binding) === 'waiting-input')
+          .map(async binding => {
+            const requests = await window.electron?.agentRuntime?.sessions?.requests?.(binding.id);
+            const request = Array.isArray(requests) ? requests[0] : undefined;
+            return [binding.id, request && typeof request.message === 'string' ? { requestId: request.requestId, message: request.message } : undefined] as const;
+          }));
+        if (!disposed) {
+          setBindings(nextBindings);
+          setPendingRequestsByBinding(Object.fromEntries(requestEntries));
+        }
       } finally {
         refreshRunning = false;
       }
@@ -77,9 +94,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
     void refresh();
     const timer = window.setInterval(() => void refresh(), 10000);
     const unsubscribe = window.electron?.agentRuntime?.sessions?.onEvent?.((payload) => {
-      const nextBinding = payload?.binding as SessionBinding | undefined;
-      if (!nextBinding) return;
-      setBindings(current => [...current.filter(binding => binding.id !== nextBinding.id), nextBinding]);
+      if (payload?.binding) void refresh();
     });
     return () => {
       disposed = true;
@@ -100,7 +115,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
   const openBinding = useCallback((binding: SessionBinding) => {
     const task = binding.scope?.taskId ? tasks.find(candidate => candidate.id === binding.scope?.taskId) : undefined;
     if (!task) return;
-    const currentBinding = newestFirst(bindings.filter(candidate => candidate.scope?.kind === 'task' && candidate.scope?.taskId === task.id && ACTIVE_SESSION_STATES.has(candidate.state)))[0] || binding;
+    const currentBinding = newestFirst(bindings.filter(candidate => candidate.scope?.kind === 'task' && candidate.scope?.taskId === task.id && (isAgentRuntimeTurnInFlight(candidate) || CONNECTED_SESSION_STATES.has(candidate.state))))[0] || binding;
     const project = projects.find(candidate => task.projectIds?.includes(candidate.id) || candidate.id === task.swimlaneId);
     setRequest(current => ({
       task,
@@ -109,23 +124,21 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       requestId: (current?.requestId || 0) + 1,
     }));
   }, [bindings, newestFirst, projects, tasks]);
-  const activeBinding = newestFirst(bindings.filter(binding => ACTIVE_SESSION_STATES.has(binding.state)))[0];
+  const activeBinding = newestFirst(bindings.filter(isAgentRuntimeTurnInFlight))[0];
+  const readyBinding = newestFirst(bindings.filter(binding => binding.state === 'ready' && !isAgentRuntimeTurnInFlight(binding)))[0];
   const historyBinding = [...bindings].reverse().find(binding => HISTORY_SESSION_STATES.has(binding.state));
-  const dockBinding = activeBinding || historyBinding;
+  const dockBinding = activeBinding || readyBinding || historyBinding;
   const dockTask = dockBinding?.scope?.taskId ? tasks.find(task => task.id === dockBinding.scope?.taskId) : undefined;
-  const activeTask = activeBinding?.scope?.taskId ? tasks.find(task => task.id === activeBinding.scope?.taskId) : undefined;
-  const activeAttention = activeBinding
-    ? getSessionAttentionState({ bindingState: activeBinding.state, executionState: activeBinding.taskExecution?.state, taskStatus: activeTask?.status })
-    : undefined;
   const dockItems = [...bindings]
     .filter(binding => binding.scope?.kind === 'task' && tasks.some(task => task.id === binding.scope?.taskId))
     .sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''))
     .slice(0, 8)
-    .map(binding => ({ binding, task: tasks.find(task => task.id === binding.scope?.taskId) }));
+    .map(binding => ({ binding, task: tasks.find(task => task.id === binding.scope?.taskId), pendingRequest: pendingRequestsByBinding[binding.id] }));
   const blockedByActiveSession = Boolean(activeBinding && request && activeBinding.scope?.taskId !== request.task.id);
   const sessionDock = useMemo<SessionDockProjection>(() => ({
     state: blockedByActiveSession ? 'blocked' : activeBinding
-      ? activeBinding.state === 'starting' ? 'starting' : activeBinding.state === 'needs-input' ? 'needs-input' : ['batch-finished', 'outcome-review', 'review'].includes(activeAttention?.kind || '') ? 'ready' : activeBinding.state === 'ready' ? 'ready' : supervisionVisible ? 'working' : 'hidden-active'
+      ? ['queued', 'starting'].includes(agentRuntimeTurnState(activeBinding) || '') ? 'starting' : agentRuntimeTurnState(activeBinding) === 'waiting-input' ? 'needs-input' : supervisionVisible ? 'working' : 'hidden-active'
+      : readyBinding ? 'ready'
       : historyBinding?.state === 'interrupted' ? 'interrupted'
         : historyBinding?.state === 'failed' ? 'failed'
           : historyBinding ? 'history' : 'none',
@@ -133,7 +146,8 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
     task: dockTask,
     historyCount: bindings.filter(binding => HISTORY_SESSION_STATES.has(binding.state)).length,
     items: dockItems,
-  }), [activeAttention, activeBinding, bindings, blockedByActiveSession, dockBinding, dockItems, dockTask, historyBinding, supervisionVisible]);
+    pendingRequest: dockBinding ? pendingRequestsByBinding[dockBinding.id] : undefined,
+  }), [activeBinding, bindings, blockedByActiveSession, dockBinding, dockItems, dockTask, historyBinding, pendingRequestsByBinding, readyBinding, supervisionVisible]);
   const value = useMemo(() => ({ requestTask, sessionDock, openSession: openBinding }), [openBinding, requestTask, sessionDock]);
   return (
     <AgentSessionSupervisorContext.Provider value={value}>
@@ -146,6 +160,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
           openRequest={request.requestId}
           startOnOpenRequest={request.startOnRequest}
           onVisibilityChange={setSupervisionVisible}
+          onBlockedByBinding={openBinding}
           trigger={null}
         />
       )}

@@ -2,7 +2,8 @@ const { randomUUID } = require('node:crypto');
 const { createNativeRuntimeClient } = require('./agent-runtime-protocol-client.cjs');
 const { createAgentRuntimeContextPack } = require('../domain/agent-runtime-context-pack.cjs');
 
-const ACTIVE_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
+const ACTIVE_TURN_STATES = new Set(['queued', 'starting', 'active', 'waiting-input', 'cancelling']);
+const TERMINAL_TURN_STATES = new Set(['completed', 'failed', 'interrupted']);
 const CANCEL_SETTLE_TIMEOUT_MS = 3_000;
 
 function createAgentRuntimeSessionRunner({
@@ -47,7 +48,8 @@ function createAgentRuntimeSessionRunner({
     try { emitRuntimeEvent?.(payload); } catch (error) { log('warn', 'live-event.emit-failed', { message: error?.message || String(error) }); }
   };
   const appendRuntimeEvent = (payload) => {
-    const result = appendEvent(store, payload);
+    const turnId = bindingFor(payload.bindingId)?.turn?.id;
+    const result = appendEvent(store, { ...payload, ...(turnId ? { turnId } : {}) });
     if (result?.ok && !result.idempotent && result.event) {
       emit({ kind: 'event', event: result.event, binding: bindingFor(result.event.bindingId) });
     }
@@ -55,7 +57,13 @@ function createAgentRuntimeSessionRunner({
   };
   const syncTaskExecution = (binding, state, details = {}) => {
     if (typeof updateTaskExecutionState !== 'function' || binding?.scope?.kind !== 'task') return null;
-    const result = updateTaskExecutionState(store, { taskId: binding.scope.taskId, attemptId: binding.scope.executionAttemptId, state, ...details });
+    const result = updateTaskExecutionState(store, {
+      taskId: binding.scope.taskId,
+      attemptId: binding.scope.executionAttemptId,
+      state,
+      ...(binding.turn?.id ? { turnId: binding.turn.id, turnState: binding.turn.state } : {}),
+      ...details,
+    });
     if (!result?.ok) log('warn', 'task-execution.state-sync-failed', { bindingId: binding.id, state, error: result?.error });
     else emit({ kind: 'binding', binding: bindingFor(binding.id) || binding });
     return result;
@@ -65,11 +73,12 @@ function createAgentRuntimeSessionRunner({
     const { opaqueSessionRef: _opaqueSessionRef, mcpGrantId: _mcpGrantId, ...safe } = binding;
     return safe;
   };
-  const activeSession = () => (listSessions(store, { activeOnly: true, limit: 1 })?.bindings || []).find(binding => ACTIVE_STATES.has(binding.state));
-  const activeSessionFailure = binding => failure(
+  const turnStateFor = binding => binding?.turn?.state || ({ active: 'active', 'needs-input': 'waiting-input', cancelling: 'cancelling' }[binding?.state]);
+  const activeTurn = () => (listSessions(store, { limit: 100 })?.bindings || []).find(binding => ACTIVE_TURN_STATES.has(turnStateFor(binding)));
+  const activeTurnFailure = binding => failure(
     'ACP_EXECUTION_ALREADY_ACTIVE',
-    'Another runtime session is already active. Open its supervision before starting new work.',
-    { bindingId: binding.id, binding: safeBinding(binding) },
+    'Another task turn is already active. Open its supervision before starting new work.',
+    { bindingId: binding.id, turnId: binding.turn?.id, binding: safeBinding(binding) },
   );
 
   async function prepareMcp(profile, scope) {
@@ -108,6 +117,7 @@ function createAgentRuntimeSessionRunner({
           : 'call an MCP tool';
       return {
         bindingId,
+        turnId: bindingFor(bindingId)?.turn?.id,
         requestId: message.id,
         method: message.method,
         responseKind: 'codex-approval',
@@ -136,6 +146,7 @@ function createAgentRuntimeSessionRunner({
     });
     return {
       bindingId,
+      turnId: bindingFor(bindingId)?.turn?.id,
       requestId: message.id,
       method: message.method,
       responseKind: 'elicitation',
@@ -144,6 +155,19 @@ function createAgentRuntimeSessionRunner({
       message: typeof params.message === 'string' ? params.message.slice(0, 2_000) : 'Codex needs input before it can continue.',
       fields,
     };
+  }
+
+  function advertisedApprovalContent(params = {}) {
+    const properties = params.requestedSchema?.properties;
+    if (!properties || typeof properties !== 'object' || Array.isArray(properties)) return {};
+    for (const [name, definition] of Object.entries(properties)) {
+      if (!definition || typeof definition !== 'object' || !Array.isArray(definition.enum) || definition.enum.length === 0) continue;
+      const preferred = definition.default !== undefined && definition.enum.includes(definition.default)
+        ? definition.default
+        : definition.enum.find(option => /^(?:allow|approve|approved|accept|yes)$/i.test(String(option))) ?? definition.enum[0];
+      return { [String(name).slice(0, 128)]: preferred };
+    }
+    return {};
   }
 
   function listRequests(bindingId) {
@@ -173,18 +197,55 @@ function createAgentRuntimeSessionRunner({
     return result?.bindings?.[0] || null;
   }
 
-  function syncBindingState(bindingId, state) {
+  function syncSessionState(bindingId, state, terminalReason) {
     const current = bindingFor(bindingId);
     if (!current || current.state === state) return current;
-    const result = updateBinding(store, { bindingId, expectedRevision: current.revision, state });
+    const result = updateBinding(store, { bindingId, expectedRevision: current.revision, state, ...(terminalReason ? { terminalReason } : {}) });
     if (!result.ok) log('warn', 'binding.state-sync-failed', { bindingId, from: current.state, to: state, error: result.error });
     else {
-      const taskState = { starting: 'starting', ready: 'ready', active: 'working', 'needs-input': 'waiting', cancelling: 'stopping', interrupted: 'interrupted', failed: 'failed', closed: 'stopped' }[state];
+      const taskState = { starting: 'starting', ready: 'ready', interrupted: 'interrupted', failed: 'failed', closed: 'stopped' }[state];
       if (taskState) syncTaskExecution(result.binding || current, taskState, { reason: state });
       emit({ kind: 'binding', binding: result.binding || current });
       log('info', 'binding.state-changed', { bindingId, from: current.state, to: state });
     }
     return result.binding || current;
+  }
+
+  function syncTurnState(bindingId, state, details = {}) {
+    const current = bindingFor(bindingId);
+    if (!current) return null;
+    const previous = current.turn;
+    if (!previous && !details.turnId) return current;
+    if (previous?.state === state && !details.requestId) return current;
+    if (previous && TERMINAL_TURN_STATES.has(previous.state) && previous.id === (details.turnId || previous.id)) return current;
+    const result = updateBinding(store, {
+      bindingId,
+      expectedRevision: current.revision,
+      state: current.state,
+      turn: {
+        id: details.turnId || previous?.id,
+        state,
+        ...(details.reason ? { terminalReason: details.reason } : {}),
+        ...(details.requestId !== undefined ? { requestId: details.requestId } : {}),
+      },
+    });
+    if (!result.ok) {
+      log('warn', 'turn.state-sync-failed', { bindingId, turnId: details.turnId || previous?.id, from: previous?.state, to: state, error: result.error });
+      return bindingFor(bindingId) || current;
+    }
+    const next = result.binding || bindingFor(bindingId) || current;
+    const taskState = { queued: 'starting', starting: 'starting', active: 'working', 'waiting-input': 'waiting', cancelling: 'stopping', completed: 'batch-finished', failed: 'failed', interrupted: 'interrupted' }[state];
+    if (taskState) syncTaskExecution(next, taskState, { reason: details.reason || state, ...(details.batchNumber !== undefined ? { batchNumber: details.batchNumber } : {}) });
+    emit({ kind: 'binding', binding: next });
+    log('info', 'turn.state-changed', { bindingId, turnId: next.turn?.id || details.turnId || previous?.id, from: previous?.state || null, to: state });
+    return next;
+  }
+
+  function beginTurn(bindingId, details = {}) {
+    const current = bindingFor(bindingId);
+    if (!current) return null;
+    if (ACTIVE_TURN_STATES.has(current.turn?.state)) return current;
+    return syncTurnState(bindingId, details.state || 'starting', { ...details, turnId: details.turnId || `turn-${randomUUID()}` });
   }
 
   function reconcileBindingLoss(bindingId, lifecycle = {}) {
@@ -193,14 +254,16 @@ function createAgentRuntimeSessionRunner({
     const current = bindingFor(bindingId);
     if (!current || ['interrupted', 'closed', 'failed'].includes(current.state)) return current;
     const reason = lifecycle.code === 'ACP_RUNTIME_MISSING' ? 'runtime-missing' : lifecycle.kind === 'exit' ? 'process-exit' : 'protocol-error';
-    let updated = updateBinding(store, { bindingId, expectedRevision: current.revision, state: 'interrupted', terminalReason: reason });
+    if (ACTIVE_TURN_STATES.has(current.turn?.state)) syncTurnState(bindingId, 'interrupted', { reason });
+    const afterTurn = bindingFor(bindingId) || current;
+    let updated = updateBinding(store, { bindingId, expectedRevision: afterTurn.revision, state: 'interrupted', terminalReason: reason });
     if (!updated.ok && updated.error === 'REVISION_MISMATCH') {
       const latest = bindingFor(bindingId);
       if (latest && !['interrupted', 'closed', 'failed'].includes(latest.state)) {
         updated = updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'interrupted', terminalReason: reason });
       }
     }
-    const binding = updated.ok ? updated.binding : bindingFor(bindingId) || current;
+    const binding = updated.ok && updated.binding ? updated.binding : bindingFor(bindingId) || current;
     appendRuntimeEvent({
       bindingId,
       runtimeProfileId: binding.runtimeProfileId,
@@ -248,7 +311,7 @@ function createAgentRuntimeSessionRunner({
       idempotencyKey: `runtime:${binding.id}:automatic-outcome:${executionState}`,
     });
     const current = bindingFor(binding.id) || binding;
-    if (ACTIVE_STATES.has(current.state)) {
+    if (['starting', 'ready'].includes(current.state)) {
       const closed = updateBinding(store, { bindingId: current.id, expectedRevision: current.revision, state: 'closed', terminalReason: 'closed' });
       const session = clients.get(binding.id);
       try { await session?.client?.closeSession?.(current.opaqueSessionRef); } catch (error) { log('debug', 'automatic-outcome.remote-close-failed', { bindingId: binding.id, message: error?.message || String(error) }); }
@@ -263,7 +326,7 @@ function createAgentRuntimeSessionRunner({
   function scheduleAutomaticContinuation(bindingId) {
     if (!Number.isInteger(maxAutomaticBatches) || maxAutomaticBatches <= 0 || automaticContinuationInFlight.has(bindingId)) return;
     const current = bindingFor(bindingId);
-    if (!current || current.state !== 'ready' || !taskMayContinue(current)) return;
+    if (!current || current.state !== 'ready' || ACTIVE_TURN_STATES.has(current.turn?.state) || !taskMayContinue(current)) return;
     const completedBatches = (automaticBatchCounts.get(bindingId) || 0) + 1;
     automaticBatchCounts.set(bindingId, completedBatches);
     if (completedBatches > maxAutomaticBatches) {
@@ -283,7 +346,7 @@ function createAgentRuntimeSessionRunner({
     setTimeout(async () => {
       try {
         const latest = bindingFor(bindingId);
-        if (!latest || latest.state !== 'ready' || !taskMayContinue(latest)) return;
+        if (!latest || latest.state !== 'ready' || ACTIVE_TURN_STATES.has(latest.turn?.state) || !taskMayContinue(latest)) return;
       appendRuntimeEvent({
           bindingId,
           runtimeProfileId: latest.runtimeProfileId,
@@ -325,6 +388,27 @@ function createAgentRuntimeSessionRunner({
       error: errorMessage ? errorMessage.slice(0, 500) : null,
     };
     log(summary.state === 'failed' ? 'warn' : 'debug', 'notification', summary);
+    const activeClient = clients.get(binding.id)?.client;
+    const scopedOmvraApproval = message?.method === 'mcpServer/elicitation/request'
+      && message.params?.serverName === 'omvra'
+      && message.params?._meta?.codex_approval_kind === 'mcp_tool_call'
+      && activeClient?.profile?.approvalPolicy === 'never'
+      && Boolean(bindingFor(binding.id)?.mcpGrantId || binding.mcpGrantId);
+    if (scopedOmvraApproval) {
+      activeClient.respond(message.id, { action: 'accept', content: advertisedApprovalContent(message.params) });
+      return appendRuntimeEvent({
+        bindingId: binding.id,
+        runtimeProfileId: binding.runtimeProfileId,
+        kind: 'permission',
+        nativeEventType: 'omvra/mcpToolApproval/auto-accepted',
+        state: 'allowed',
+        outcome: 'scoped-mcp-grant',
+        requestId: message.id,
+        toolName: 'omvra',
+        permissionState: 'allowed',
+        idempotencyKey: `runtime:${binding.id}:mcp-auto-approval:${String(message.id)}`,
+      });
+    }
     const elicitation = sanitizedElicitation(binding.id, message);
     if (elicitation) pendingRequests.set(requestKey(binding.id, elicitation.requestId), elicitation);
     const appended = appendRuntimeEvent({
@@ -350,22 +434,22 @@ function createAgentRuntimeSessionRunner({
         : undefined,
       idempotencyKey: `runtime:${binding.id}:${randomUUID()}`,
     });
-    if (method === 'turn/started') syncBindingState(binding.id, 'active');
+    if (method === 'turn/started') syncTurnState(binding.id, 'active');
     else if (method === 'turn/completed') {
       const waitingForInput = [...pendingRequests.values()].some(request => request.bindingId === binding.id);
-      const cancellationRequested = bindingFor(binding.id)?.state === 'cancelling';
+      const cancellationRequested = bindingFor(binding.id)?.turn?.state === 'cancelling';
       if (!waitingForInput) for (const key of pendingRequests.keys()) if (key.startsWith(`${binding.id}:`)) pendingRequests.delete(key);
       const turnState = params.turn?.status || params.status || params.state;
-      const nextState = waitingForInput ? 'needs-input' : turnState === 'failed' ? 'failed' : turnState === 'interrupted' || cancellationRequested ? 'interrupted' : 'ready';
-      const nextBinding = syncBindingState(binding.id, nextState);
-      if (!waitingForInput && turnState !== 'failed' && turnState !== 'interrupted' && nextBinding?.state === 'ready') {
+      const nextState = waitingForInput ? 'waiting-input' : turnState === 'failed' ? 'failed' : turnState === 'interrupted' || cancellationRequested ? 'interrupted' : 'completed';
+      const nextBinding = syncTurnState(binding.id, nextState, { reason: nextState });
+      if (!waitingForInput && turnState !== 'failed' && turnState !== 'interrupted' && nextBinding?.turn?.state === 'completed') {
         const task = typeof getTaskById === 'function' && binding.scope?.kind === 'task' ? getTaskById(store, binding.scope.taskId) : null;
         const taskState = task?.status === 'done' ? 'complete' : task?.status === 'under-review' ? 'ready-for-review' : 'batch-finished';
         syncTaskExecution(nextBinding, taskState, { reason: taskState === 'complete' ? 'task-complete' : taskState === 'ready-for-review' ? 'task-under-review' : 'turn-completed' });
       }
-      if (!waitingForInput && turnState !== 'failed' && turnState !== 'interrupted' && nextBinding?.state === 'ready') scheduleAutomaticContinuation(binding.id);
+      if (!waitingForInput && turnState !== 'failed' && turnState !== 'interrupted' && nextBinding?.turn?.state === 'completed') scheduleAutomaticContinuation(binding.id);
     }
-    else if (elicitation) syncBindingState(binding.id, 'needs-input');
+    else if (elicitation) syncTurnState(binding.id, 'waiting-input', { requestId: elicitation.requestId });
     return appended;
   }
 
@@ -380,10 +464,11 @@ function createAgentRuntimeSessionRunner({
       return failure('ACP_REPOSITORY_FOLDER_REQUIRED', 'A repository folder is required before starting work.');
     }
 
-    const activeExisting = activeSession();
+    reconcile();
+    const activeExisting = activeTurn();
     if (activeExisting) {
       log('warn', 'start.rejected', { taskId: payload.taskId, bindingId: activeExisting.id, error: 'ACP_EXECUTION_ALREADY_ACTIVE' });
-      return activeSessionFailure(activeExisting);
+      return activeTurnFailure(activeExisting);
     }
 
     const confirmed = confirmStart(store, payload);
@@ -461,6 +546,7 @@ function createAgentRuntimeSessionRunner({
         taskRevision: Number(started.task?.__mcpRevision || latestRevision),
       },
       capabilities: [],
+      turn: { id: `turn-${randomUUID()}`, state: 'queued' },
       extensions: { workspacePath: payload.workspacePath.trim() },
       ...(mcp.grant ? { mcpGrantId: mcp.grant.grantId } : {}),
     });
@@ -491,11 +577,12 @@ function createAgentRuntimeSessionRunner({
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The runtime session could not be marked ready.'), { code: ready.error });
       syncTaskExecution(ready.binding, 'ready', { reason: 'session-ready' });
       clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profile.id, mcpGrantId: mcp.grant?.grantId || null });
-      if (contextPack.text) {
+      {
+        const promptText = contextPack.text || 'Begin working on the assigned task. Re-read its current state before making changes.';
         log('info', 'context.prompting', { bindingId: binding.id, contextEntryCount: confirmed.contractSnapshot.contextEntryIds?.length || 0 });
         appendRuntimeEvent({ bindingId: binding.id, runtimeProfileId: profile.id, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${binding.id}:task-instructions` });
-        syncTaskExecution(bindingFor(binding.id) || binding, 'working', { batchNumber: 1, reason: 'initial-prompt' });
-        await client.prompt(session.sessionId, contextPack.text);
+        syncTurnState(binding.id, 'starting', { batchNumber: 1 });
+        await client.prompt(session.sessionId, promptText);
         log('info', 'context.accepted', { bindingId: binding.id });
       }
       log('info', 'session.ready', { taskId: payload.taskId, bindingId: binding.id, runtimeProfileId: profile.id });
@@ -504,6 +591,7 @@ function createAgentRuntimeSessionRunner({
     } catch (error) {
       client?.close?.();
       if (mcp.grant && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, mcp.grant.grantId);
+      syncTurnState(binding.id, 'failed', { reason: error.code || 'protocol-error' });
       const current = bindingFor(binding.id) || binding;
       updateBinding(store, { bindingId: binding.id, expectedRevision: current.revision, state: 'failed', terminalReason: 'protocol-error' });
       syncTaskExecution(bindingFor(binding.id) || binding, 'failed', { reason: error.code || 'protocol-error' });
@@ -519,8 +607,9 @@ function createAgentRuntimeSessionRunner({
     const goalRevision = Number(payload.goalRevision);
     const executionAttempt = Number(payload.executionAttempt);
     if (!Number.isInteger(goalRevision) || goalRevision < 0 || !Number.isInteger(executionAttempt) || executionAttempt < 0) return failure('ACP_GOAL_SCOPE_REQUIRED', 'Goal revision and execution attempt are required.');
-    const activeExisting = activeSession();
-    if (activeExisting) return activeSessionFailure(activeExisting);
+    reconcile();
+    const activeExisting = activeTurn();
+    if (activeExisting) return activeTurnFailure(activeExisting);
     const profileResolution = resolveProfile(store, payload);
     if (!profileResolution.ok || !profileResolution.profile) {
       if (profileResolution.state === 'disabled') return failure('ACP_RUNTIME_ACCESS_DISABLED', profileResolution.error, { state: 'disabled' });
@@ -567,26 +656,27 @@ function createAgentRuntimeSessionRunner({
     let current = bindingFor(bindingId);
     const session = clients.get(bindingId);
     if (!current || !session) return inactiveSession();
+    if (method === 'prompt') {
+      const blocking = activeTurn();
+      if (blocking && blocking.id !== bindingId) return activeTurnFailure(blocking);
+      current = beginTurn(bindingId, { state: 'starting' }) || current;
+    }
+    if (method === 'steer' && !ACTIVE_TURN_STATES.has(current.turn?.state)) return failure('ACP_SESSION_BUSY', 'There is no active task turn to steer.');
+    if (method === 'cancel' && !ACTIVE_TURN_STATES.has(current.turn?.state)) return failure('ACP_SESSION_BUSY', 'There is no active task turn to cancel.');
     const ref = current.opaqueSessionRef;
     try {
       if (method === 'cancel') {
-        const cancelling = updateBinding(store, { bindingId, expectedRevision: current.revision, state: 'cancelling' });
-        if (!cancelling.ok) return cancelling;
-        current = cancelling.binding;
+        current = syncTurnState(bindingId, 'cancelling') || current;
       }
       const result = method === 'prompt' ? await session.client.prompt(ref, text) : method === 'steer' ? await session.client.steer(ref, text) : await session.client.cancel(ref);
       if (method === 'cancel') {
         const latest = bindingFor(bindingId);
-        if (result?.acknowledged === true && latest?.state === 'cancelling') {
-          const interrupted = updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'interrupted', terminalReason: 'cancelled' });
-          if (interrupted.ok) syncTaskExecution(interrupted.binding, 'interrupted', { reason: 'cancelled' });
-        } else if (latest?.state === 'cancelling') {
+        if (result?.acknowledged === true && latest?.turn?.state === 'cancelling') {
+          syncTurnState(bindingId, 'interrupted', { reason: 'cancelled' });
+        } else if (latest?.turn?.state === 'cancelling') {
           setTimeout(() => {
             const pending = bindingFor(bindingId);
-            if (pending?.state === 'cancelling') {
-              const interrupted = updateBinding(store, { bindingId, expectedRevision: pending.revision, state: 'interrupted', terminalReason: 'cancelled' });
-              if (interrupted.ok) syncTaskExecution(interrupted.binding, 'interrupted', { reason: 'cancelled' });
-            }
+            if (pending?.turn?.state === 'cancelling') syncTurnState(bindingId, 'interrupted', { reason: 'cancelled' });
           }, CANCEL_SETTLE_TIMEOUT_MS);
         }
       }
@@ -594,10 +684,7 @@ function createAgentRuntimeSessionRunner({
     } catch (error) {
       if (method === 'cancel') {
         const latest = bindingFor(bindingId);
-        if (latest?.state === 'cancelling') {
-          const active = updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'active' });
-          if (active.ok) syncTaskExecution(active.binding, 'working', { reason: 'cancel-failed' });
-        }
+        if (latest?.turn?.state === 'cancelling') syncTurnState(bindingId, 'active', { reason: 'cancel-failed' });
       }
       return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The runtime operation failed.');
     }
@@ -608,12 +695,15 @@ function createAgentRuntimeSessionRunner({
     const session = clients.get(bindingId);
     if (!current || !session) return inactiveSession();
     if (current.scope?.kind !== 'task') return failure('ACP_CAPABILITY_UNSUPPORTED', 'Only task sessions can be continued from Start work.');
-    if (current.state !== 'ready' && !(automatic && current.state === 'active')) return failure('ACP_SESSION_BUSY', `Session is ${current.state}.`);
+    if (current.state !== 'ready') return failure('ACP_SESSION_BUSY', `Session is ${current.state}.`);
+    const blocking = activeTurn();
+    if (blocking && blocking.id !== bindingId) return activeTurnFailure(blocking);
+    if (ACTIVE_TURN_STATES.has(current.turn?.state)) return failure('ACP_SESSION_BUSY', `Turn is ${current.turn.state}.`);
     const contextPack = buildCurrentTaskContext(current);
     if (!contextPack.ok) return contextPack;
     const text = contextPack.text || 'Continue working on the assigned task. Re-read its current state before making changes.';
     try {
-      if (automatic && current.state === 'ready') syncBindingState(bindingId, 'active');
+      beginTurn(bindingId, { state: 'starting', batchNumber: Number(current.taskExecution?.batchNumber || 0) + 1 });
       syncTaskExecution(bindingFor(bindingId) || current, automatic ? 'continuing' : 'working', { reason: automatic ? 'automatic-batch' : 'manual-batch', batchNumber: Number(current.taskExecution?.batchNumber || 0) + 1 });
       appendRuntimeEvent({ bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${randomUUID()}` });
       await session.client.prompt(current.opaqueSessionRef, text);
@@ -631,7 +721,7 @@ function createAgentRuntimeSessionRunner({
     try {
       session.client.respond(requestId, result, error);
       pendingRequests.delete(requestKey(bindingId, requestId));
-      if (current.state === 'needs-input') syncBindingState(bindingId, 'active');
+      if (current.turn?.state === 'waiting-input') syncTurnState(bindingId, 'active');
       return { ok: true };
     } catch (caught) {
       return failure(caught.code || 'ACP_PROTOCOL_INCOMPATIBLE', caught.message || 'The runtime request could not be answered.');
@@ -673,14 +763,17 @@ function createAgentRuntimeSessionRunner({
       clients.set(bindingId, { client, workspacePath, profileId: current.runtimeProfileId, mcpGrantId: mcp.grant?.grantId || null });
       const contextPack = buildCurrentTaskContext(ready.binding);
       if (!contextPack.ok) throw Object.assign(new Error(contextPack.message), { code: contextPack.error });
-      if (contextPack.text) {
+      {
+        const promptText = contextPack.text || 'Resume working on the assigned task. Re-read its current state before making changes.';
         appendRuntimeEvent({ bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${ready.binding.revision}` });
-        await client.prompt(current.opaqueSessionRef, contextPack.text);
+        beginTurn(bindingId, { state: 'starting' });
+        await client.prompt(current.opaqueSessionRef, promptText);
       }
       return { ...ready, binding: bindingFor(bindingId) || ready.binding };
     } catch (error) {
       client?.close?.();
       if (mcp.grant && typeof revokeMcpGrant === 'function') revokeMcpGrant(store, mcp.grant.grantId);
+      if (ACTIVE_TURN_STATES.has(bindingFor(bindingId)?.turn?.state)) syncTurnState(bindingId, 'failed', { reason: error.code || 'protocol-error' });
       const latest = bindingFor(bindingId) || starting.binding;
       updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'failed', terminalReason: 'protocol-error' });
       syncTaskExecution(bindingFor(bindingId) || latest, 'failed', { reason: error.code || 'protocol-error' });
@@ -702,6 +795,7 @@ function createAgentRuntimeSessionRunner({
       }
     }
     try {
+      if (ACTIVE_TURN_STATES.has((bindingFor(bindingId) || current).turn?.state)) syncTurnState(bindingId, 'interrupted', { reason: 'closed' });
       const latest = bindingFor(bindingId) || current;
       const result = updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'closed', terminalReason: 'closed' });
       if (!result.ok) return result;
@@ -718,9 +812,9 @@ function createAgentRuntimeSessionRunner({
   }
 
   function reconcile() {
-    const persistedActiveBindings = listSessions(store, { activeOnly: true, limit: 100 })?.bindings || [];
-    for (const binding of persistedActiveBindings) {
-      if (binding.state !== 'starting' && !clients.has(binding.id)) {
+    const persistedSessions = listSessions(store, { limit: 100 })?.bindings || [];
+    for (const binding of persistedSessions) {
+      if (['ready', 'active', 'needs-input', 'cancelling'].includes(binding.state) && !clients.has(binding.id)) {
         reconcileBindingLoss(binding.id, { code: 'ACP_RUNTIME_MISSING', kind: 'error' });
       }
     }

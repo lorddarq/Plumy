@@ -19,6 +19,23 @@ export interface AgentRuntimeActivityItem {
   tone: 'neutral' | 'positive' | 'warning' | 'danger';
 }
 
+export interface AgentRuntimeTurnProjection {
+  id?: string;
+  state?: string;
+  terminalReason?: string;
+  requestId?: string;
+}
+
+export const IN_FLIGHT_AGENT_RUNTIME_TURN_STATES = new Set(['queued', 'starting', 'active', 'waiting-input', 'cancelling']);
+
+export function agentRuntimeTurnState(binding?: { state?: string; turn?: AgentRuntimeTurnProjection }): string | undefined {
+  return binding?.turn?.state || ({ active: 'active', 'needs-input': 'waiting-input', cancelling: 'cancelling' } as Record<string, string>)[binding?.state || ''];
+}
+
+export function isAgentRuntimeTurnInFlight(binding?: { state?: string; turn?: AgentRuntimeTurnProjection }): boolean {
+  return IN_FLIGHT_AGENT_RUNTIME_TURN_STATES.has(agentRuntimeTurnState(binding) || '');
+}
+
 export function joinAgentMessageDeltas(deltas: string[]): string {
   const cleaned = deltas.filter(delta => delta.length > 0);
   if (cleaned.length < 2) return cleaned.join('').trim();
@@ -98,17 +115,20 @@ export function summarizeAgentRuntimeActivity(events: AgentRuntimeActivityEvent[
   return [...grouped.values()].sort((left, right) => (left.observedAt || '').localeCompare(right.observedAt || ''));
 }
 
-export function describeAgentRuntimeSession(bindingState: string, events: AgentRuntimeActivityEvent[], executionState?: string) {
+export function describeAgentRuntimeSession(bindingState: string, events: AgentRuntimeActivityEvent[], executionState?: string, turnState?: string) {
   if (executionState === 'complete') return { label: 'Task work complete', detail: 'The agent completed the task execution.', tone: 'positive' as const, isTurnActive: false };
   if (executionState === 'outcome-unreconciled') return { label: 'Outcome needs review', detail: 'The agent delivered an outcome, but the task status was not updated. Review and move the task forward.', tone: 'warning' as const, isTurnActive: false };
-  if (executionState === 'batch-finished' && bindingState !== 'active' && bindingState !== 'starting' && bindingState !== 'needs-input') {
+  if (executionState === 'batch-finished' && !IN_FLIGHT_AGENT_RUNTIME_TURN_STATES.has(turnState || '')) {
     return { label: 'Last batch completed', detail: 'The agent completed its latest work batch. Continue the task if more work is needed.', tone: 'positive' as const, isTurnActive: false };
   }
   if (bindingState === 'failed') return { label: 'Previous runtime unavailable', detail: 'This provider session is no longer connected to Omvra. Start a new session; the current task context is preserved.', tone: 'danger' as const, isTurnActive: false };
-  if (bindingState === 'needs-input') return { label: 'Agent is waiting for you', detail: 'The agent cannot continue until you respond.', tone: 'warning' as const, isTurnActive: false };
+  if (turnState === 'waiting-input' || bindingState === 'needs-input') return { label: 'Agent is waiting for you', detail: 'The agent cannot continue until you respond.', tone: 'warning' as const, isTurnActive: false };
   if (bindingState === 'interrupted') return { label: 'Work was interrupted', detail: 'The previous runtime may belong to another app process. Resume if available, or start a new session; task context is preserved.', tone: 'warning' as const, isTurnActive: false };
-  if (bindingState === 'active') return { label: 'Agent is working', detail: 'The agent is actively working on the task.', tone: 'positive' as const, isTurnActive: true };
-  if (bindingState === 'cancelling') return { label: 'Agent is stopping', detail: 'The agent is stopping the current run.', tone: 'warning' as const, isTurnActive: false };
+  if (turnState === 'active' || bindingState === 'active') return { label: 'Agent is working', detail: 'The agent is actively working on the task.', tone: 'positive' as const, isTurnActive: true };
+  if (turnState === 'cancelling' || bindingState === 'cancelling') return { label: 'Agent is stopping', detail: 'The agent is stopping the current run.', tone: 'warning' as const, isTurnActive: false };
+  if (turnState === 'queued' || turnState === 'starting') return { label: 'Agent is starting', detail: 'Omvra is starting this task turn.', tone: 'neutral' as const, isTurnActive: false };
+  if (turnState === 'failed') return { label: 'Latest run failed', detail: 'The provider session remains available, but the latest task turn failed.', tone: 'danger' as const, isTurnActive: false };
+  if (turnState === 'interrupted') return { label: 'Latest run interrupted', detail: 'The provider session may be reusable after recovery.', tone: 'warning' as const, isTurnActive: false };
   if (bindingState === 'starting') return { label: 'Agent is starting', detail: 'Omvra is connecting to the assigned agent.', tone: 'neutral' as const, isTurnActive: false };
   if (bindingState === 'closed') return { label: 'No agent is working', detail: 'This supervision is showing a closed session. The task may still need more work.', tone: 'warning' as const, isTurnActive: false };
   const latestTurn = [...events].reverse().find(event => event.nativeEventType === 'turn/started' || event.nativeEventType === 'turn/completed');

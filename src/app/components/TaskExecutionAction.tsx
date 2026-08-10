@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Copy, Folder, Info, MessageSquarePlus, Play, Server, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
-import { describeAgentRuntimeSession, joinAgentMessageDeltas, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent } from '../utils/agentRuntimeActivity';
+import { agentRuntimeTurnState, describeAgentRuntimeSession, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
 import {
   agentRuntimeWorkspaceSourceLabel,
   resolveAgentRuntimeWorkspace,
@@ -53,6 +53,7 @@ interface SessionBinding {
   updatedAt?: string;
   lastObservedAt?: string;
   taskExecution?: { state?: string; batchNumber?: number; reason?: string; updatedAt?: string };
+  turn?: AgentRuntimeTurnProjection & { updatedAt?: string };
 }
 
 interface SessionEvent extends AgentRuntimeActivityEvent {
@@ -63,6 +64,7 @@ interface SessionEvent extends AgentRuntimeActivityEvent {
 
 interface PendingRuntimeRequest {
   bindingId: string;
+  turnId?: string;
   requestId: string | number;
   method: string;
   responseKind?: 'elicitation' | 'codex-approval';
@@ -72,6 +74,17 @@ interface PendingRuntimeRequest {
   fields: Array<{ name: string; type: string; title: string; description: string; required: boolean; defaultValue?: unknown; options?: unknown[] }>;
 }
 
+const requestValueKey = (request: PendingRuntimeRequest, fieldName: string) => `${String(request.requestId)}:${fieldName}`;
+const requestFieldValue = (request: PendingRuntimeRequest, field: PendingRuntimeRequest['fields'][number], values: Record<string, unknown>) =>
+  values[requestValueKey(request, field.name)] ?? field.defaultValue ?? (field.type === 'boolean' ? false : '');
+const requestFieldIsMissing = (request: PendingRuntimeRequest, field: PendingRuntimeRequest['fields'][number], values: Record<string, unknown>) => {
+  if (!field.required) return false;
+  const value = requestFieldValue(request, field, values);
+  if (field.type === 'boolean') return typeof value !== 'boolean';
+  if (field.type === 'number' || field.type === 'integer') return value === '' || !Number.isFinite(Number(value));
+  return typeof value !== 'string' || value.trim() === '';
+};
+
 interface TaskExecutionActionProps {
   task: Task;
   repositoryFolder?: string;
@@ -79,6 +92,7 @@ interface TaskExecutionActionProps {
   openRequest?: number;
   onOpenRequestHandled?: () => void;
   onVisibilityChange?: (visible: boolean) => void;
+  onBlockedByBinding?: (binding: SessionBinding) => void;
   startOnTrigger?: boolean;
   startOnOpenRequest?: boolean;
   onOpen?: () => void;
@@ -99,8 +113,6 @@ function taskStatusLabel(status: Task['status']) {
   return 'Open';
 }
 
-const ACTIVE_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
-
 function ExecutionHint({ tone, title, body }: { tone: 'info' | 'warning' | 'danger'; title: string; body: string }) {
   const Icon = tone === 'info' ? Info : AlertTriangle;
   const colorClass = tone === 'danger' ? 'text-red-700 hover:bg-red-50 focus-visible:ring-red-500' : tone === 'warning' ? 'text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-500' : 'text-blue-700 hover:bg-blue-50 focus-visible:ring-blue-500';
@@ -118,7 +130,7 @@ function ExecutionHint({ tone, title, body }: { tone: 'info' | 'warning' | 'dang
   </Tooltip>;
 }
 
-export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, onVisibilityChange, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
+export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, onVisibilityChange, onBlockedByBinding, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
   const [open, setOpen] = useState(false);
   const [startRequested, setStartRequested] = useState(false);
   const [sessionLoaded, setSessionLoaded] = useState(false);
@@ -145,7 +157,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     contribution.state === 'pending' || contribution.state === 'revision-requested'
   );
   const terminalBinding = binding?.state === 'closed' || binding?.state === 'failed';
-  const activeAttempt = Boolean(binding && !terminalBinding) || (Boolean(activeContribution?.latestAttemptId) && (
+  const activeAttempt = isAgentRuntimeTurnInFlight(binding || undefined) || (Boolean(activeContribution?.latestAttemptId) && (
     !preflight || preflight.blockers?.some(blocker => blocker.code === 'ACP_EXECUTION_ALREADY_ACTIVE') === true
   ));
   const executionContributionId = preflight?.contractSnapshot?.contributionId || startableContribution?.id;
@@ -252,7 +264,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const hasCapability = (id: string) => binding?.capabilities?.some(capability => capability.id === id && capability.support === 'supported') ?? false;
   const taskExecutionState = binding?.taskExecution?.state;
   const lastBatchCompleted = taskExecutionState === 'batch-finished' || events.some(event => event.nativeEventType === 'turn/completed' && !['failed', 'interrupted'].includes(event.state || ''));
-  const sessionSummary = binding ? describeAgentRuntimeSession(binding.state, events, lastBatchCompleted ? (taskExecutionState || 'batch-finished') : taskExecutionState) : null;
+  const turnState = agentRuntimeTurnState(binding || undefined);
+  const sessionSummary = binding ? describeAgentRuntimeSession(binding.state, events, lastBatchCompleted ? (taskExecutionState || 'batch-finished') : taskExecutionState, turnState) : null;
   const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', 'outcome-unreconciled': 'Outcome needs review', complete: 'Complete' };
   const latestTurnStartIndex = events.findLastIndex(event => event.nativeEventType === 'turn/started');
   const latestRunEvents = latestTurnStartIndex < 0 ? [] : events.slice(latestTurnStartIndex).filter(event =>
@@ -288,13 +301,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     ? { tone: 'info' as const, title: 'Last batch completed', body: 'The agent completed its latest work batch. The session is closed, but you can continue the task from its saved context.' }
     : binding?.state === 'closed'
       ? { tone: 'warning' as const, title: 'No agent is working right now', body: 'This task is still in progress, but the session shown here was closed. Start a new session to continue from the saved task context.' }
-    : binding?.state === 'ready'
+    : binding?.state === 'ready' && !isAgentRuntimeTurnInFlight(binding)
       ? { tone: 'info' as const, title: 'Last batch completed', body: 'The agent completed its latest work batch. Continue the task if more work is needed.' }
-      : binding?.state === 'active'
+      : turnState === 'active'
         ? { tone: 'info' as const, title: 'Agent is working now', body: lastObservedLabel ? `The runtime last reported activity at ${lastObservedLabel}.` : 'The runtime is actively reporting work.' }
-        : binding?.state === 'starting'
+        : binding?.state === 'starting' || turnState === 'queued' || turnState === 'starting'
           ? { tone: 'info' as const, title: 'Connecting to the agent', body: 'The session is being created. Activity will appear here as soon as the runtime reports it.' }
-          : binding?.state === 'needs-input'
+          : turnState === 'waiting-input'
             ? { tone: 'warning' as const, title: 'Agent is waiting', body: 'The agent cannot continue until the pending request above is answered.' }
             : null;
   const copyAgentOutput = async () => {
@@ -334,7 +347,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     }
     const taskBindings = (index.bindings || []).filter((candidate: SessionBinding) => candidate.scope?.kind === 'task' && candidate.scope?.taskId === task.id);
     const newestFirst = (items: SessionBinding[]) => [...items].sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''));
-    const nextBinding = newestFirst(taskBindings.filter(candidate => ACTIVE_SESSION_STATES.has(candidate.state)))[0]
+    const nextBinding = newestFirst(taskBindings.filter(candidate => isAgentRuntimeTurnInFlight(candidate) || candidate.state === 'ready' || candidate.state === 'starting'))[0]
       || newestFirst(taskBindings)[0]
       || null;
     if (!nextBinding) {
@@ -366,7 +379,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     // Re-enter the normal launch effect: it continues a recovered `ready`
     // session, leaves active/input sessions alone, and starts a new session
     // only when no usable replacement exists.
-    setStartRequested(!replacement || ['ready', 'active', 'needs-input', 'starting', 'cancelling'].includes(replacement.state));
+    setStartRequested(!replacement || replacement.state === 'ready' || replacement.state === 'starting' || isAgentRuntimeTurnInFlight(replacement));
     toast.info('Runtime session recovered', { description: 'The previous provider session was replaced while preserving your task context.' });
   };
 
@@ -394,8 +407,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       });
       if (!result?.ok) {
         if (result.error === 'ACP_EXECUTION_ALREADY_ACTIVE') {
+          if (result.binding && onBlockedByBinding) {
+            onBlockedByBinding(result.binding as SessionBinding);
+            toast.info('Opened the blocking task turn', { description: 'Omvra switched supervision to the exact task turn that is using execution capacity.' });
+            return;
+          }
           const current = await refreshSession();
-          if (current && ACTIVE_SESSION_STATES.has(current.state)) {
+          if (current && isAgentRuntimeTurnInFlight(current)) {
             setError(null);
             toast.info('This task is already open', { description: 'The active runtime session is now shown in this supervision window.' });
             return;
@@ -449,7 +467,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setError(null);
     try {
       const content = action === 'accept'
-        ? Object.fromEntries(request.fields.map(field => [field.name, requestValues[field.name] ?? field.defaultValue ?? (field.type === 'boolean' ? false : '')]))
+        ? Object.fromEntries(request.fields.map(field => [field.name, requestFieldValue(request, field, requestValues)]))
         : null;
       const response = request.responseKind === 'codex-approval'
         ? { decision: action === 'accept' ? 'accept' : 'decline' }
@@ -625,25 +643,32 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                 </div>
                 {executionNotice && <div className="mt-2"><ExecutionHint tone={executionNotice.tone} title={executionNotice.title} body={executionNotice.body} /></div>}
                 {!terminalBinding && pendingRequests.map(request => {
-                  const missingRequired = request.fields.some(field => field.required && (requestValues[field.name] ?? field.defaultValue ?? '') === '');
+                  const missingRequired = request.fields.some(field => requestFieldIsMissing(request, field, requestValues));
                   return <div key={`${request.method}-${request.requestId}`} className="mt-3">
                     <ExecutionNotice tone="warning" title={getAttentionState('needs-input').label} nextStep={getAttentionState('needs-input').nextStep} assertive>
                       <div>{request.message}</div>
                       {request.serverName && <div className="mt-1 text-[11px] text-amber-700">Requested by {request.serverName}</div>}
                     {request.fields.length > 0 && <div className="mt-3 space-y-2">{request.fields.map(field => {
-                      const value = requestValues[field.name] ?? field.defaultValue ?? (field.type === 'boolean' ? false : '');
+                      const key = requestValueKey(request, field.name);
+                      const value = requestFieldValue(request, field, requestValues);
                       return <label key={field.name} className="block text-xs text-slate-700"><span className="font-medium">{field.title}{field.required ? ' *' : ''}</span>{field.description && <span className="ml-1 text-slate-500">{field.description}</span>}
                         {field.type === 'boolean'
-                          ? <input type="checkbox" checked={Boolean(value)} onChange={event => setRequestValues(current => ({ ...current, [field.name]: event.target.checked }))} className="ml-2 align-middle" />
+                          ? <input type="checkbox" checked={Boolean(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.checked }))} className="ml-2 align-middle" />
                           : field.options?.length
-                            ? <select value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [field.name]: event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5"><option value="">Select…</option>{field.options.map(option => <option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
-                            : <input type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'} value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [field.name]: field.type === 'number' || field.type === 'integer' ? Number(event.target.value) : event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5" />}
+                            ? <select value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5"><option value="">Select…</option>{field.options.map(option => <option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
+                            : <input type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'} value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5" />}
                       </label>;
                     })}</div>}
                       <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => void respondToRequest(request, 'decline')} disabled={requestBusy} className="rounded border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40">Decline</button><button type="button" onClick={() => void respondToRequest(request, 'accept')} disabled={requestBusy || missingRequired} className="rounded bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40">{request.responseKind === 'codex-approval' ? 'Allow' : 'Continue'}</button></div>
                     </ExecutionNotice>
                   </div>;
                 })}
+                {!terminalBinding && turnState === 'waiting-input' && sessionLoaded && pendingRequests.length === 0 && (
+                  <ExecutionNotice tone="warning" title="Input request unavailable" nextStep="Reconnect the session to continue." assertive>
+                    <div>Omvra no longer has an answerable request for this session.</div>
+                    <div className="mt-3 flex justify-end"><button type="button" onClick={() => void recoverOrphanedSession(binding.id)} disabled={operationBusy} className="rounded bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Reconnect session</button></div>
+                  </ExecutionNotice>
+                )}
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">
                   <div className="text-xs font-semibold text-slate-700">Work stages</div>
                   <div className="mt-3 grid gap-2 text-xs">
@@ -672,17 +697,17 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   </div>) : <div className="px-1.5 py-1">The agent has not started work yet.</div>}
                 </div>
                 <div className="mt-3">
-                  <TaskSessionComposer
+                  {pendingRequests.length > 0 ? <ExecutionNotice tone="warning" title="Answer the pending request above">The guidance composer is paused while the agent waits for this response. Use Continue or Decline on the request.</ExecutionNotice> : <TaskSessionComposer
                     value={steerText}
                     running={isTurnActive}
                     busy={operationBusy}
                     canSubmit={!terminalBinding && Boolean(steerText.trim()) && (isTurnActive ? hasCapability('steer') : hasCapability('prompt'))}
-                    canStop={!terminalBinding && hasCapability('cancel')}
+                    canStop={!terminalBinding && isAgentRuntimeTurnInFlight(binding) && hasCapability('cancel')}
                     placeholder={isTurnActive ? 'Add optional guidance' : 'Start an optional follow-up'}
                     onChange={setSteerText}
                     onSubmit={() => void runSessionOperation(isTurnActive && hasCapability('steer') ? 'steer' : 'prompt')}
                     onStop={() => void runSessionOperation('cancel')}
-                  />
+                  />}
                 </div>
               </div>
             )}
