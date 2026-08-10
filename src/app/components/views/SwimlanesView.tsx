@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import { useDrag, useDragLayer, useDrop } from 'react-dnd';
 import { Person, Task, TaskStatus, StatusColumn } from '../../types';
 import { EmptyStateCard } from '../EmptyStateCard';
@@ -226,10 +226,15 @@ export function SwimlanesView({
     monitor.isDragging() && monitor.getItemType() === SWIMLANE_COLUMN
   ));
   const visibleColumnDropIndicator = isColumnDragging ? columnDropIndicator : null;
-
-  const getTasksByStatus = (status: string) => {
-    return tasks.filter(task => task.status === status);
-  };
+  const tasksByStatus = useMemo(() => {
+    const grouped = new Map<string, Task[]>();
+    tasks.forEach(task => {
+      const statusTasks = grouped.get(task.status);
+      if (statusTasks) statusTasks.push(task);
+      else grouped.set(task.status, [task]);
+    });
+    return grouped;
+  }, [tasks]);
 
   const handleDropTask = (draggedTask: Task, targetStatus: TaskStatus, targetIndex: number) => {
     if (isFilterActive) {
@@ -288,7 +293,7 @@ export function SwimlanesView({
         )}
         <div className="kanban-columns-track">
         {cols.map((swimlane, index) => {
-            const swimlaneTasks = getTasksByStatus(swimlane.id);
+            const swimlaneTasks = tasksByStatus.get(swimlane.id) ?? [];
             return (
               <Fragment key={swimlane.id}>
                 {visibleColumnDropIndicator?.targetId === swimlane.id && visibleColumnDropIndicator.position === 'before' && (
