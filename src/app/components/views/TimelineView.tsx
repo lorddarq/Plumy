@@ -61,6 +61,7 @@ const MIN_LEFT_COL_WIDTH = 260;
 const MAX_LEFT_COL_WIDTH = 420;
 const HORIZONTAL_RENDER_BUFFER_PX = 1200;
 const WINDOW_EXTENSION_BUFFER_PX = 1200;
+const HORIZONTAL_METRICS_STEP_PX = 64;
 
 function TimelineSwimlaneInsertionMarker({
   height,
@@ -213,6 +214,11 @@ export function TimelineView({
     scrollLeft: 0,
     viewportWidth: 0,
   });
+  const horizontalMetricsRef = useRef(horizontalMetrics);
+
+  useEffect(() => {
+    horizontalMetricsRef.current = horizontalMetrics;
+  }, [horizontalMetrics]);
   const [swimlaneDropIndicator, setSwimlaneDropIndicator] = useState<SwimlaneRowDropIndicator | null>(null);
   const [draggingSwimlaneId, setDraggingSwimlaneId] = useState<string | null>(null);
   const visibleSwimlaneDropIndicator = draggingSwimlaneId ? swimlaneDropIndicator : null;
@@ -994,11 +1000,13 @@ export function TimelineView({
               scrollLeft: rowsContainer.scrollLeft,
               viewportWidth: clientWidth,
             };
-            setHorizontalMetrics(current => (
-              current.scrollLeft === nextMetrics.scrollLeft && current.viewportWidth === nextMetrics.viewportWidth
-                ? current
-                : nextMetrics
-            ));
+            const publishedMetrics = horizontalMetricsRef.current;
+            const shouldPublishMetrics = nextMetrics.viewportWidth !== publishedMetrics.viewportWidth
+              || Math.abs(nextMetrics.scrollLeft - publishedMetrics.scrollLeft) >= HORIZONTAL_METRICS_STEP_PX;
+            if (shouldPublishMetrics) {
+              horizontalMetricsRef.current = nextMetrics;
+              setHorizontalMetrics(nextMetrics);
+            }
           }
           onTimelineScroll?.({
             scrollLeft,

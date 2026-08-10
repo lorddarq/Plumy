@@ -100,7 +100,8 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
 
 test('Timeline scroll does not publish unchanged horizontal metrics', () => {
   const source = readComponent('views/TimelineView.tsx');
-  assert.match(source, /current\.scrollLeft === nextMetrics\.scrollLeft && current\.viewportWidth === nextMetrics\.viewportWidth/);
+  assert.match(source, /HORIZONTAL_METRICS_STEP_PX = 64/);
+  assert.match(source, /Math\.abs\(nextMetrics\.scrollLeft - publishedMetrics\.scrollLeft\) >= HORIZONTAL_METRICS_STEP_PX/);
 });
 
 test('task supervision prefers an in-flight turn or reusable ready session over closed history', () => {
