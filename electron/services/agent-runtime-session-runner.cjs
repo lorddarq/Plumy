@@ -365,7 +365,7 @@ function createAgentRuntimeSessionRunner({
       }
       if (!waitingForInput && turnState !== 'failed' && turnState !== 'interrupted' && nextBinding?.state === 'ready') scheduleAutomaticContinuation(binding.id);
     }
-    else if (kind === 'input' || kind === 'permission') syncBindingState(binding.id, 'needs-input');
+    else if (elicitation) syncBindingState(binding.id, 'needs-input');
     return appended;
   }
 
@@ -718,6 +718,12 @@ function createAgentRuntimeSessionRunner({
   }
 
   function reconcile() {
+    const persistedActiveBindings = listSessions(store, { activeOnly: true, limit: 100 })?.bindings || [];
+    for (const binding of persistedActiveBindings) {
+      if (binding.state !== 'starting' && !clients.has(binding.id)) {
+        reconcileBindingLoss(binding.id, { code: 'ACP_RUNTIME_MISSING', kind: 'error' });
+      }
+    }
     for (const [bindingId, session] of clients.entries()) {
       if (typeof session.client.isAlive === 'function' && !session.client.isAlive()) reconcileBindingLoss(bindingId, { code: 'ACP_SESSION_INTERRUPTED', kind: 'error' });
     }

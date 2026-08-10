@@ -114,6 +114,39 @@ test('explains that a persisted session needs a new app-process session when its
   assert.match(result.message, /current task context/);
 });
 
+test('reconciliation interrupts persisted input state when its answerable request belongs to a previous app process', () => {
+  const events = [];
+  let storedBinding = {
+    id: 'binding-1',
+    revision: 3,
+    runtimeProfileId: 'runtime-1',
+    state: 'needs-input',
+    scope: { kind: 'task', taskId: 'task-1' },
+  };
+  const runner = createAgentRuntimeSessionRunner({
+    store: {},
+    resolveProfile: () => ({ ok: true }),
+    confirmStart: () => ({ canStart: false }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: () => ({ ok: false }),
+    updateBinding: (_store, input) => {
+      storedBinding = { ...storedBinding, ...input, revision: input.expectedRevision + 1 };
+      return { ok: true, binding: storedBinding };
+    },
+    appendEvent: (_store, event) => {
+      events.push(event);
+      return { ok: true, event };
+    },
+    listSessions: () => ({ bindings: [storedBinding], events: [] }),
+  });
+
+  runner.reconcile();
+
+  assert.equal(storedBinding.state, 'interrupted');
+  assert.equal(storedBinding.terminalReason, 'runtime-missing');
+  assert.equal(events.at(-1).nativeEventType, 'omvra/runtime/connection-lost');
+});
+
 test('injects the bounded Omvra context pack into a new native session', async () => {
   const prompts = [];
   const bindingInputs = [];
@@ -215,6 +248,9 @@ test('injects the bounded Omvra context pack into a new native session', async (
   assert.equal(storedBinding.state, 'active');
   notify({ method: 'error', params: { error: { message: 'Task tool failed.' }, willRetry: false } });
   assert.equal(events.at(-1).outcome, 'Task tool failed.');
+  notify({ method: 'thread/inputTokens/updated', params: { inputTokens: 12 } });
+  assert.equal(storedBinding.state, 'active');
+  assert.equal(runner.listRequests('binding-1').length, 0);
   lifecycle({ kind: 'exit', code: 'ACP_SESSION_INTERRUPTED' });
   assert.equal(storedBinding.state, 'interrupted');
   assert.equal(events.at(-1).nativeEventType, 'omvra/runtime/connection-lost');
