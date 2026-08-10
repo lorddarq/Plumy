@@ -45,26 +45,33 @@ export function useWorkspacePersistence(state: WorkspacePersistenceState) {
   const pendingCanonicalWritesRef = useRef<Record<string, number>>({});
   const pendingWorkspaceWritesRef = useRef<Record<string, unknown>>({});
   const pendingWorkspaceFlushRef = useRef<Promise<void> | null>(null);
+  const pendingWorkspaceFlushTimerRef = useRef<number | null>(null);
 
   const persistWorkspaceJSON = useCallback((key: string, value: unknown) => {
     if (!(key in pendingWorkspaceWritesRef.current)) {
       pendingCanonicalWritesRef.current[key] = (pendingCanonicalWritesRef.current[key] ?? 0) + 1;
     }
     pendingWorkspaceWritesRef.current[key] = value;
-    if (pendingWorkspaceFlushRef.current) return;
+    if (pendingWorkspaceFlushRef.current || pendingWorkspaceFlushTimerRef.current !== null) return;
 
     const scheduleFlush = () => {
-      pendingWorkspaceFlushRef.current = Promise.resolve().then(async () => {
-        const batch = pendingWorkspaceWritesRef.current;
-        pendingWorkspaceWritesRef.current = {};
-        await persistJSONBatchWithElectronMirror(batch);
-        Object.keys(batch).forEach(batchKey => {
-          pendingCanonicalWritesRef.current[batchKey] = Math.max(0, (pendingCanonicalWritesRef.current[batchKey] ?? 1) - 1);
+      // Let the interaction/render turn finish before cloning large workspace
+      // arrays for IPC and asking electron-store to serialize them. This also
+      // coalesces rapid drag/edit updates into one write batch.
+      pendingWorkspaceFlushTimerRef.current = window.setTimeout(() => {
+        pendingWorkspaceFlushTimerRef.current = null;
+        pendingWorkspaceFlushRef.current = Promise.resolve().then(async () => {
+          const batch = pendingWorkspaceWritesRef.current;
+          pendingWorkspaceWritesRef.current = {};
+          await persistJSONBatchWithElectronMirror(batch);
+          Object.keys(batch).forEach(batchKey => {
+            pendingCanonicalWritesRef.current[batchKey] = Math.max(0, (pendingCanonicalWritesRef.current[batchKey] ?? 1) - 1);
+          });
+        }).finally(() => {
+          pendingWorkspaceFlushRef.current = null;
+          if (Object.keys(pendingWorkspaceWritesRef.current).length > 0) scheduleFlush();
         });
-      }).finally(() => {
-        pendingWorkspaceFlushRef.current = null;
-        if (Object.keys(pendingWorkspaceWritesRef.current).length > 0) scheduleFlush();
-      });
+      }, 50);
     };
     scheduleFlush();
   }, []);
