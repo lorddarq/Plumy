@@ -459,6 +459,26 @@ export function DraggableSwimlaneRow({
       : startIndex;
     return { task, startIndex, endIndex };
   }), [getVisibleIndexForDate, timelineTasks]);
+  const rowDayWidths = useMemo(
+    () => (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60),
+    [dateWidths, dates]
+  );
+  const rowDayPrefix = useMemo(() => {
+    const prefix: number[] = [0];
+    rowDayWidths.forEach(width => prefix.push(prefix[prefix.length - 1] + width));
+    return prefix;
+  }, [rowDayWidths]);
+  const rowMonthStarts = useMemo(() => {
+    const monthStarts: Record<string, number> = {};
+    (monthKeys ?? []).forEach(monthKey => {
+      const monthDates = datesByMonth?.[monthKey];
+      if (monthDates?.length) {
+        const index = dates.findIndex(date => date.getTime() === monthDates[0].getTime());
+        monthStarts[monthKey] = index >= 0 ? index : 0;
+      }
+    });
+    return monthStarts;
+  }, [dates, datesByMonth, monthKeys]);
 
   return (
     <div
@@ -495,20 +515,6 @@ export function DraggableSwimlaneRow({
         <div className="flex" style={{ height: '100%', width: '100%' }}>
           {/* Precompute prefix sums for date widths to make slicing easier */}
           {(() => {
-            const dayWidths = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
-            const prefix: number[] = [0];
-            for (let i = 0; i < dayWidths.length; i++) prefix.push(prefix[i] + dayWidths[i]);
-
-            // build monthStarts map
-            const monthStarts: Record<string, number> = {};
-            (monthKeys ?? []).forEach((k) => {
-              const md = datesByMonth?.[k];
-              if (md && md.length) {
-                const idx = dates.findIndex(d => d.getTime() === md[0].getTime());
-                monthStarts[k] = idx >= 0 ? idx : 0;
-              }
-            });
-
             return (
               <>
                 {leadingSpacerWidth > 0 && (
@@ -519,10 +525,10 @@ export function DraggableSwimlaneRow({
                   />
                 )}
                 {(monthKeys ?? []).map((monthKey) => {
-              const startIdx = monthStarts[monthKey] ?? 0;
+              const startIdx = rowMonthStarts[monthKey] ?? 0;
               const len = datesByMonth?.[monthKey]?.length ?? 0;
-              const monthLeft = prefix[startIdx];
-              const monthWidth = prefix[startIdx + len] - prefix[startIdx];
+              const monthLeft = rowDayPrefix[startIdx];
+              const monthWidth = rowDayPrefix[startIdx + len] - rowDayPrefix[startIdx];
 
               return (
                 <div
@@ -535,7 +541,7 @@ export function DraggableSwimlaneRow({
                     <div className="absolute inset-0 flex" aria-hidden>
                       {(datesByMonth?.[monthKey] ?? []).map((d, di) => {
                         const globalIdx = startIdx + di;
-                        const w = dayWidths?.[globalIdx] ?? 60;
+                        const w = rowDayWidths[globalIdx] ?? 60;
                         
                         // Check if this is a weekend (Saturday = 6, Sunday = 0)
                         const dayOfWeek = d.getDay();
@@ -596,8 +602,8 @@ export function DraggableSwimlaneRow({
                       const monthSelectionStart = Math.max(minIdx, startIdx);
                       const monthSelectionEnd = Math.min(maxIdx, startIdx + len - 1);
                       
-                      const selectionLeft = prefix[monthSelectionStart] - monthLeft;
-                      const selectionWidth = prefix[monthSelectionEnd + 1] - prefix[monthSelectionStart];
+                      const selectionLeft = rowDayPrefix[monthSelectionStart] - monthLeft;
+                      const selectionWidth = rowDayPrefix[monthSelectionEnd + 1] - rowDayPrefix[monthSelectionStart];
                       
                       return (
                         <div
@@ -631,8 +637,8 @@ export function DraggableSwimlaneRow({
                         const overlapEnd = Math.min(endIndex, startIdx + len - 1);
                         if (overlapStart > overlapEnd) return null;
 
-                        leftWithin = prefix[overlapStart] - monthLeft;
-                        widthWithin = prefix[overlapEnd + 1] - prefix[overlapStart];
+                        leftWithin = rowDayPrefix[overlapStart] - monthLeft;
+                        widthWithin = rowDayPrefix[overlapEnd + 1] - rowDayPrefix[overlapStart];
                         widthWithin = Math.max(8, widthWithin - 8); // small padding like before
                       }
 
