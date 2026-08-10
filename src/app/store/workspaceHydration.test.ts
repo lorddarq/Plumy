@@ -61,3 +61,37 @@ test('restart hydration restores portable local workspace data in dependency ord
     }
   }
 });
+
+test('initial hydration parses each repeated workspace key once', () => {
+  const originalWindow = globalThis.window;
+  const reads = new Map<string, number>();
+  const values = new Map<string, string>([
+    [SWIMLANES_KEY, JSON.stringify([{ id: 'project-1', name: 'Project One' }])],
+    [TASKS_KEY, JSON.stringify([{ id: 'task-1', title: 'Task', status: 'open', swimlaneId: 'project-1' }])],
+  ]);
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      localStorage: {
+        getItem: (key: string) => {
+          reads.set(key, (reads.get(key) ?? 0) + 1);
+          return values.get(key) ?? null;
+        },
+        setItem: () => undefined,
+        removeItem: () => undefined,
+        get length() { return values.size; },
+        key: () => null,
+      },
+    },
+  });
+
+  try {
+    readInitialWorkspaceState({ tasks: [], timelineSwimlanes: [], people: [], milestones: [] });
+    assert.equal(reads.get(SWIMLANES_KEY), 1);
+    assert.equal(reads.get('omvra.preferences.v1'), 1);
+    assert.equal(reads.get('omvra.milestones.v1'), 1);
+  } finally {
+    if (originalWindow === undefined) Reflect.deleteProperty(globalThis, 'window');
+    else Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow });
+  }
+});

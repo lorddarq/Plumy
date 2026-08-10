@@ -67,35 +67,33 @@ export interface InitialWorkspaceState extends WorkspaceSeeds {
 }
 
 export function readInitialWorkspaceState(seeds: WorkspaceSeeds): InitialWorkspaceState {
-  const storedTasks = readInitialWorkspaceJSON<Task[]>(TASKS_KEY, seeds.tasks);
-  const taskProjects = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, seeds.timelineSwimlanes);
-  const tasks = storedTasks.map(task => normalizeTask(task, taskProjects));
-
   const storedProjects = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, seeds.timelineSwimlanes);
+  const storedPreferences = readInitialWorkspaceJSON<Partial<AppPreferences> & {
+    executionLoadStatusId?: TaskStatus;
+    pipelineLoadStatusId?: TaskStatus;
+  }>(PREFERENCES_KEY, {});
+  const storedMilestones = readInitialWorkspaceJSON<ProjectMilestone[]>(MILESTONES_KEY, seeds.milestones);
+  const storedTasks = readInitialWorkspaceJSON<Task[]>(TASKS_KEY, seeds.tasks);
+  const tasks = storedTasks.map(task => normalizeTask(task, storedProjects));
   const timelineSwimlanes = sanitizeTimelineSwimlanes(storedProjects, seeds.timelineSwimlanes);
   const people = sanitizePeople(
     readInitialWorkspaceJSON<Person[]>(PEOPLE_KEY, seeds.people),
     seeds.people
   );
-  const milestoneProjects = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, seeds.timelineSwimlanes);
+  const milestoneProjects = storedProjects;
   const milestones = sanitizeMilestones(
-    readInitialWorkspaceJSON<ProjectMilestone[]>(MILESTONES_KEY, seeds.milestones),
+    storedMilestones,
     milestoneProjects,
     seeds.milestones
   );
-  const legacyPreferences = readInitialWorkspaceJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
   const statusColumns = sanitizeStatusColumns(
     readInitialWorkspaceJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes),
     defaultSwimlanes,
     {
-      executionLoadStatusIds: legacyPreferences.executionLoadStatusIds,
-      pipelineLoadStatusIds: legacyPreferences.pipelineLoadStatusIds,
+      executionLoadStatusIds: storedPreferences.executionLoadStatusIds,
+      pipelineLoadStatusIds: storedPreferences.pipelineLoadStatusIds,
     }
   );
-  const storedPreferences = readInitialWorkspaceJSON<Partial<AppPreferences> & {
-    executionLoadStatusId?: TaskStatus;
-    pipelineLoadStatusId?: TaskStatus;
-  }>(PREFERENCES_KEY, {});
   const executionDefault = getDefaultStatusId(defaultSwimlanes, 'in-progress');
   const pipelineDefault = getDefaultStatusId(defaultSwimlanes, 'open');
   const preferences: AppPreferences = {
