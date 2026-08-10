@@ -1142,12 +1142,16 @@ function updateGoalArtifactReferences(store, {
 function getWorkspaceSnapshot(store) {
   // TODO(next-phase): unify storage source of truth. The renderer currently persists
   // most workspace state in localStorage; MCP should read from a canonical backend store.
-  const tasks = readArray(store, TASKS_KEY).map(normalizeTaskForMcp);
-  const milestones = listMilestones(store);
-  const people = readArray(store, PEOPLE_KEY).map(normalizePersonForMcp);
-  const projects = readArray(store, SWIMLANES_KEY).map(normalizeProjectForMcp);
-  const statusColumns = readArray(store, STATUS_COLUMNS_KEY).map(normalizeStatusColumnForMcp);
-  const goals = listGoals(store);
+  const storedSnapshot = store?.store;
+  const snapshotStore = storedSnapshot && typeof storedSnapshot === 'object'
+    ? { get: key => storedSnapshot[key], set: (key, value) => store.set(key, value) }
+    : store;
+  const tasks = readArray(snapshotStore, TASKS_KEY).map(normalizeTaskForMcp);
+  const milestones = listMilestones(snapshotStore);
+  const people = readArray(snapshotStore, PEOPLE_KEY).map(normalizePersonForMcp);
+  const projects = readArray(snapshotStore, SWIMLANES_KEY).map(normalizeProjectForMcp);
+  const statusColumns = readArray(snapshotStore, STATUS_COLUMNS_KEY).map(normalizeStatusColumnForMcp);
+  const goals = listGoals(snapshotStore);
 
   return {
     schemaVersion: '1',
@@ -1166,7 +1170,7 @@ function getWorkspaceSnapshot(store) {
     },
     meta: {
       source: 'electron-store',
-      mcpAgentAccessEnabled: isMcpAgentAccessEnabled(store),
+      mcpAgentAccessEnabled: isMcpAgentAccessEnabled(snapshotStore),
       fieldSemantics: buildAgentInstructionsFieldSemantics(),
       counts: {
         tasks: tasks.length,

@@ -121,6 +121,24 @@ test('workspace snapshot contract has expected keys and stable counts', () => {
   assert.equal(snapshot.meta.counts.statusColumns, snapshot.workspace.statusColumns.length);
 });
 
+test('workspace snapshot reads a production store snapshot once', () => {
+  const source = makeStoreFromFixture('workspace-basic');
+  let snapshotReads = 0;
+  const store = {
+    get: key => source.get(key),
+    set: (key, value) => source.set(key, value),
+    get store() {
+      snapshotReads += 1;
+      return Object.fromEntries(source.map);
+    },
+  };
+
+  const snapshot = getWorkspaceSnapshot(store);
+
+  assert.ok(snapshot.workspace.tasks.length >= 0);
+  assert.equal(snapshotReads, 1);
+});
+
 test('kanban and timeline card projections include board and swimlane descriptions', () => {
   const store = makeStoreFromFixture('workspace-basic');
   store.set(STATUS_COLUMNS_KEY, [
