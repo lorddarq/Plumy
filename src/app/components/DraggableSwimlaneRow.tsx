@@ -450,6 +450,15 @@ export function DraggableSwimlaneRow({
 
   // Tasks are already filtered by the parent (TimelineView) based on mode
   const timelineTasks = tasks;
+  const timelineTaskRanges = useMemo(() => timelineTasks.map(task => {
+    const parsedStart = parseISODateLocal(task.startDate);
+    const startIndex = parsedStart ? getVisibleIndexForDate(parsedStart, 'start') : -1;
+    const parsedEnd = parseISODateLocal(task.endDate);
+    const endIndex = task.endDate
+      ? (parsedEnd ? getVisibleIndexForDate(parsedEnd, 'end') : startIndex)
+      : startIndex;
+    return { task, startIndex, endIndex };
+  }), [getVisibleIndexForDate, timelineTasks]);
 
   return (
     <div
@@ -498,17 +507,6 @@ export function DraggableSwimlaneRow({
                 const idx = dates.findIndex(d => d.getTime() === md[0].getTime());
                 monthStarts[k] = idx >= 0 ? idx : 0;
               }
-            });
-
-            // Precompute task ranges
-            const tasksRanges = timelineTasks.map(task => {
-              const parsedStart = parseISODateLocal(task.startDate);
-              const s = parsedStart ? getVisibleIndexForDate(parsedStart, 'start') : -1;
-              const parsedEnd = parseISODateLocal(task.endDate);
-              const e = task.endDate
-                ? (parsedEnd ? getVisibleIndexForDate(parsedEnd, 'end') : s)
-                : s;
-              return { task, startIndex: s, endIndex: e };
             });
 
             return (
@@ -612,7 +610,7 @@ export function DraggableSwimlaneRow({
                       );
                     })()}
 
-                    {tasksRanges.map(({ task, startIndex, endIndex }) => {
+                    {timelineTaskRanges.map(({ task, startIndex, endIndex }) => {
                       if (startIndex < 0 || endIndex < 0) return null;
 
                       const preview = taskResizePreview?.taskId === task.id ? taskResizePreview : null;
