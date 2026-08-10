@@ -165,13 +165,29 @@ function sanitizeAppPreferences(
   return sanitizePreferences(preferences, statusColumns, fallback) as AppPreferences;
 }
 
+const pendingLocalMirrorWrites = new Map<string, unknown>();
+let localMirrorFlushTimer: number | null = null;
+
+function flushLocalMirrorWrites(): void {
+  localMirrorFlushTimer = null;
+  if (typeof window === 'undefined') return;
+  const writes = Array.from(pendingLocalMirrorWrites.entries());
+  pendingLocalMirrorWrites.clear();
+  writes.forEach(([key, value]) => {
+    try {
+      if (value === undefined) window.localStorage.removeItem(key);
+      else window.localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // Local mirroring is best effort; canonical-store updates remain non-blocking.
+    }
+  });
+}
+
 function mirrorCanonicalJsonToLocalStorage(key: string, value: unknown): void {
   if (typeof window === 'undefined') return;
-  try {
-    if (value === undefined) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Local mirroring is best effort; canonical-store updates remain non-blocking.
+  pendingLocalMirrorWrites.set(key, value);
+  if (localMirrorFlushTimer === null) {
+    localMirrorFlushTimer = window.setTimeout(flushLocalMirrorWrites, 0);
   }
 }
 
