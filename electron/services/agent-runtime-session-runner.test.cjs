@@ -271,7 +271,6 @@ test('resuming interrupted task work immediately sends the current authoritative
   let binding = { id: 'binding-resume', revision: 2, runtimeProfileId: 'runtime-1', state: 'interrupted', opaqueSessionRef: 'thread-1', scope: { kind: 'task', taskId: 'task-1', executionAttemptId: 'attempt-1', taskRevision: 4 } };
   const runner = createAgentRuntimeSessionRunner({
     store: {},
-    maxAutomaticBatches: 0,
     resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'codex-app-server-stdio', executablePath: '/tmp/codex' } }),
     confirmStart: () => ({ canStart: false }),
     transitionContribution: () => ({ ok: true }),
@@ -303,6 +302,8 @@ test('resuming interrupted task work immediately sends the current authoritative
   assert.match(prompts[0], /Update the task description with the agent details/);
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent'), true);
   notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(prompts.length, 1, 'completed turns remain idle until the user continues work');
   assert.equal((await runner.continueTask('binding-resume')).ok, true);
   assert.equal(prompts.length, 2);
   assert.match(prompts[1], /Update the task description with the agent details/);

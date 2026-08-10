@@ -26,7 +26,7 @@ function createAgentRuntimeSessionRunner({
   createClient = createNativeRuntimeClient,
   now = () => new Date().toISOString(),
   logger = null,
-  maxAutomaticBatches = 6,
+  maxAutomaticBatches = 0,
 }) {
   const clients = new Map();
   const pendingRequests = new Map();

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Copy, Folder, Info, MessageSquarePlus, Play, Server, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
-import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
+import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
 import {
   agentRuntimeWorkspaceSourceLabel,
   resolveAgentRuntimeWorkspace,
@@ -271,8 +271,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const turnState = agentRuntimeTurnState(binding || undefined);
   const sessionSummary = binding ? describeAgentRuntimeSession(binding.state, events, lastBatchCompleted ? (taskExecutionState || 'batch-finished') : taskExecutionState, turnState) : null;
   const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', 'outcome-unreconciled': 'Outcome needs review', complete: 'Complete' };
-  const latestTurnStartIndex = events.findLastIndex(event => event.nativeEventType === 'turn/started');
-  const latestRunEvents = latestTurnStartIndex < 0 ? [] : events.slice(latestTurnStartIndex).filter(event =>
+  const latestRunEvents = selectCurrentAgentRuntimeTurnEvents(events, binding?.turn?.id).filter(event =>
     ['turn/started', 'turn/completed', 'item/agentMessage/delta', 'item/started', 'item/completed', 'warning', 'error', 'omvra/taskBatch/automatic-continuing', 'omvra/taskBatch/automatic-limit-reached'].includes(event.nativeEventType || '')
   );
   const activity = summarizeAgentRuntimeActivity(latestRunEvents);

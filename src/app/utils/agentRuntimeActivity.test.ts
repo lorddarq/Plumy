@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
+import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
 
 test('agent message delta joining preserves normal boundaries and repairs compact legacy chunks', () => {
   assert.equal(joinAgentMessageDeltas(['Current ', 'implementation ', 'passes.']), 'Current implementation passes.');
@@ -54,6 +54,16 @@ test('an active turn proves task instructions were accepted before events arrive
   assert.equal(hasAgentRuntimeTaskStarted('active', []), true);
   assert.equal(hasAgentRuntimeTaskStarted('starting', []), false);
   assert.equal(hasAgentRuntimeTaskStarted(undefined, [{ id: 'event-1', type: 'turn-state', nativeEventType: 'turn/started' }]), true);
+});
+
+test('current turn activity remains visible after its start event leaves the bounded window', () => {
+  const events = [
+    { id: 'event-0', type: 'turn-state', turnId: 'turn-previous', nativeEventType: 'turn/started' },
+    { id: 'event-1', type: 'session-state', turnId: 'turn-current', nativeEventType: 'item/started', toolName: 'reasoning' },
+    { id: 'event-2', type: 'session-state', turnId: 'turn-current', nativeEventType: 'item/agentMessage/delta', messagePreview: 'Still working.' },
+  ];
+  assert.deepEqual(selectCurrentAgentRuntimeTurnEvents(events, 'turn-current'), events.slice(1));
+  assert.deepEqual(selectCurrentAgentRuntimeTurnEvents(events, 'turn-other'), []);
 });
 
 test('terminal provider sessions ignore stale in-flight turn projections', () => {

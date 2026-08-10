@@ -1,6 +1,7 @@
 export interface AgentRuntimeActivityEvent {
   id: string;
   type: string;
+  turnId?: string;
   state?: string;
   outcome?: string;
   nativeEventType?: string;
@@ -41,6 +42,16 @@ export function isAgentRuntimeTurnInFlight(binding?: { state?: string; turn?: Ag
 export function hasAgentRuntimeTaskStarted(turnState: string | undefined, events: AgentRuntimeActivityEvent[]): boolean {
   return ['active', 'waiting-input', 'cancelling'].includes(turnState || '')
     || events.some(event => event.nativeEventType === 'turn/started' || event.nativeEventType === 'omvra/taskInstructions/sent');
+}
+
+export function selectCurrentAgentRuntimeTurnEvents(events: AgentRuntimeActivityEvent[], turnId?: string): AgentRuntimeActivityEvent[] {
+  if (turnId) {
+    const currentTurnStartIndex = events.findLastIndex(event => event.nativeEventType === 'turn/started' && event.turnId === turnId);
+    const currentTurnEvents = currentTurnStartIndex >= 0 ? events.slice(currentTurnStartIndex) : events;
+    return currentTurnEvents.filter(event => event.turnId === turnId);
+  }
+  const latestTurnStartIndex = events.findLastIndex(event => event.nativeEventType === 'turn/started');
+  return latestTurnStartIndex >= 0 ? events.slice(latestTurnStartIndex) : [];
 }
 
 export function joinAgentMessageDeltas(deltas: string[]): string {
