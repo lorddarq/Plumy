@@ -9,10 +9,8 @@ import { useTaskActions } from './useTaskActions.ts';
 import { useProjectActions } from './useProjectActions.ts';
 import { useStatusColumnActions } from './useStatusColumnActions.ts';
 import { getMilestoneProjectIds } from '../utils/roadmap.ts';
-import { createMcpReadService } from '../services/mcp/service.ts';
 import { useMcpHealthValidation } from './useMcpHealthValidation.ts';
 import { useMcpPanelState } from './useMcpPanelState.ts';
-import { getAgentWatchPollingInterval, useAgentWatchRuntime } from './useAgentWatchRuntime.ts';
 import { getStatusIdsForLoad } from '../utils/statusColumnSemantics.ts';
 import { usePeopleActions } from './usePeopleActions.ts';
 import {
@@ -88,8 +86,6 @@ export function useAppShell(): AppShellState {
     setMilestones,
     statusColumns,
     setStatusColumns,
-    agentWatchConfigs,
-    setAgentWatchConfigs,
     preferences,
     setPreferences,
     goalPolicy,
@@ -260,13 +256,6 @@ export function useAppShell(): AppShellState {
     setTasks,
   });
 
-  const mcpReadService = useMemo(() => createMcpReadService({
-    enabled: preferences.mcpAgentAccessEnabled,
-    endpoint: preferences.mcpServerAddress,
-    headers: preferences.mcpAccessToken
-      ? { Authorization: `Bearer ${preferences.mcpAccessToken}` }
-      : undefined,
-  }), [preferences.mcpAccessToken, preferences.mcpAgentAccessEnabled, preferences.mcpServerAddress]);
   const mcpHealth = useMcpHealthValidation({
     enabled: preferences.mcpAgentAccessEnabled,
     endpoint: preferences.mcpServerAddress,
@@ -300,39 +289,10 @@ export function useAppShell(): AppShellState {
     setPreferences,
     runHealthCheck: mcpHealth.runHealthCheck,
   });
-  const {
-    agentWatchRuntime,
-    pollAgentWatcher,
-    upsertAgentWatchConfig,
-    removeAgentWatchConfig,
-  } = useAgentWatchRuntime({
-    mcpReadService,
-    enabled: preferences.mcpAgentAccessEnabled,
-    agentWatchConfigs,
-    setAgentWatchConfigs,
-    statusColumns,
-    setTasks,
-  });
-
   useEffect(() => {
     if (!preferences.mcpAgentAccessEnabled) return;
     void refreshMcpAuditLog();
   }, [preferences.mcpAgentAccessEnabled, refreshMcpAuditLog]);
-
-  useEffect(() => {
-    if (!preferences.mcpAgentAccessEnabled) return;
-
-    const intervalMs = getAgentWatchPollingInterval(agentWatchConfigs);
-    if (intervalMs <= 0) return;
-
-    const timer = window.setInterval(() => {
-      void refreshMcpAuditLog();
-    }, intervalMs);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [agentWatchConfigs, preferences.mcpAgentAccessEnabled, refreshMcpAuditLog]);
 
   const handleTimelineScroll = useCallback((state: { scrollLeft: number; scrollTop: number }) => {
     setTimelineScrollState(state);
@@ -352,14 +312,6 @@ export function useAppShell(): AppShellState {
     return () => document.removeEventListener('kanbanScroll', handleKanbanScroll);
   }, [applyKanbanScrollState]);
 
-  const handlePollAgentWatchFromPanel = useCallback((personId: string) => {
-    const config = agentWatchConfigs.find(item => item.personId === personId) || {
-      personId,
-      enabled: true,
-      intervalSeconds: 60,
-    };
-    void pollAgentWatcher(config);
-  }, [agentWatchConfigs, pollAgentWatcher]);
   const {
     addPerson: handleAddPerson,
     deletePerson: handleDeletePerson,
@@ -368,7 +320,6 @@ export function useAppShell(): AppShellState {
   } = usePeopleActions({
     setPeople,
     setTasks,
-    onDeleteAgentWatchConfig: removeAgentWatchConfig,
   });
 
   const handleReorderTasks = useCallback((reorderedTasks: Task[]) => {
@@ -568,11 +519,6 @@ export function useAppShell(): AppShellState {
   }, [setPreferences, statusColumns]);
 
   useEffect(() => {
-    const validPeople = new Set(people.filter(person => person.kind === 'agentic').map(person => person.id));
-    setAgentWatchConfigs(prev => prev.filter(config => validPeople.has(config.personId)));
-  }, [people, setAgentWatchConfigs, statusColumns]);
-
-  useEffect(() => {
     if (!isPreferencesOpen) return;
     void refreshMcpListenerStatus();
     void refreshMcpAuditLog();
@@ -646,8 +592,6 @@ export function useAppShell(): AppShellState {
     statusBarProps: {
       tasks,
       people,
-      agentWatchConfigs,
-      agentWatchRuntime,
       mcpAuditLog,
       mcpAgentAccessEnabled: preferences.mcpAgentAccessEnabled,
       mcpListenerStatus,
@@ -692,8 +636,6 @@ export function useAppShell(): AppShellState {
         customScrollbarsEnabled: preferences.customScrollbarsEnabled,
         condensedUI: preferences.condensedUI,
         goalPolicy,
-        agentWatchConfigs,
-        agentWatchRuntime,
         storageMeter,
         importFeedback,
         mcpAgentAccessEnabled: preferences.mcpAgentAccessEnabled,
@@ -737,9 +679,6 @@ export function useAppShell(): AppShellState {
         onAddPerson: handleAddPerson,
         onUpdatePerson: handleUpdatePerson,
         onDeletePerson: handleDeletePerson,
-        onSaveAgentWatchConfig: upsertAgentWatchConfig,
-        onRemoveAgentWatchConfig: removeAgentWatchConfig,
-        onPollAgentWatch: handlePollAgentWatchFromPanel,
         onClosePreferences: closePreferences,
         onNukeLocalData: handleNukeLocalData,
         onExportWorkspaceBackup: handleExportWorkspaceBackup,

@@ -148,23 +148,6 @@ const READ_TOOL_DEFINITIONS = [
     },
   },
   {
-    name: 'boards.watch.poll',
-    description: 'Polls a kanban board/status for new or changed tasks and persists watcher state for duplicate suppression. Call this repeatedly to watch a board for incoming work.',
-    inputSchema: {
-      type: 'object',
-      additionalProperties: true,
-      properties: {
-        watcherId: { type: 'string' },
-        statusId: { type: 'string' },
-        assigneeId: { type: 'string' },
-        projectId: { type: 'string' },
-        search: { type: 'string' },
-        persist: { type: 'boolean' },
-      },
-      required: ['statusId'],
-    },
-  },
-  {
     name: 'milestones.list',
     description: 'Lists roadmap milestones with project scope, release dates, notes, and linked task IDs.',
     inputSchema: {
@@ -946,7 +929,6 @@ const TOOL_NAME_ALIASES = new Map([
   ['agent_resolve_task_context', 'agent.resolve_task_context'],
   ['cards_kanban_list', 'cards.kanban.list'],
   ['cards_timeline_list', 'cards.timeline.list'],
-  ['boards_watch_poll', 'boards.watch.poll'],
   ['milestones_list', 'milestones.list'],
   ['milestones_get', 'milestones.get'],
   ['tasks_create_follow_up', 'tasks.create_follow_up'],

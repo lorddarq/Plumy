@@ -8,7 +8,6 @@ const { createRequestDispatcher } = require('./mcp-http-server.cjs');
 
 const {
   MCP_TASK_REV_FIELD,
-  MCP_BOARD_WATCHERS_KEY,
   getMcpServerConfig,
   getMcpAccessTokenStatus,
   isMcpAccessTokenExpired,
@@ -25,8 +24,6 @@ const {
   listTimelineCards,
   listMcpAuditLog,
   buildMcpAuditSummary,
-  listBoardWatcherStates,
-  pollBoardWatcher,
   createTask,
   updateTaskDetails,
   updateTaskDescription,
@@ -1032,66 +1029,6 @@ test('custom status fixture is preserved in workspace snapshot and task filters'
   assert.ok(snapshot.workspace.statusColumns.some(column => column.id === 'ideas'));
   assert.equal(task.id, 'task-custom-1');
   assert.equal(task.status, 'ideas');
-});
-
-test('board watcher poll suppresses duplicates and persists watcher state', () => {
-  const store = makeStoreFromFixture('workspace-basic');
-
-  const first = pollBoardWatcher(store, {
-    statusId: 'in-progress',
-    assigneeId: 'agent-1',
-  });
-
-  assert.equal(first.ok, true);
-  assert.equal(first.changes.newTasks.length, 1);
-  assert.equal(first.changes.updatedTasks.length, 0);
-  assert.equal(first.changes.removedTaskIds.length, 0);
-  assert.equal(first.board.taskCount, 1);
-  assert.equal(first.changes.newTasks[0].id, 'task-1');
-
-  const persisted = listBoardWatcherStates(store);
-  assert.equal(persisted.length, 1);
-  assert.equal(persisted[0].watcherId, first.watcherState.watcherId);
-  assert.deepEqual(persisted[0].lastSeenTaskIds, ['task-1']);
-  assert.ok(persisted[0].lastProcessedAt);
-
-  const second = pollBoardWatcher(store, {
-    watcherId: first.watcherState.watcherId,
-    statusId: 'in-progress',
-    assigneeId: 'agent-1',
-  });
-
-  assert.equal(second.ok, true);
-  assert.equal(second.changes.newTasks.length, 0);
-  assert.equal(second.changes.updatedTasks.length, 0);
-  assert.equal(second.changes.removedTaskIds.length, 0);
-
-  const tasks = store.get(TASKS_KEY);
-  store.set(require('./test-fixtures.cjs').TASKS_KEY, tasks.map(task => {
-    if (task.id !== 'task-1') return task;
-    return {
-      ...task,
-      title: 'Build timeline and watcher',
-      notes: `${task.notes} with a fresh pass`,
-      [MCP_TASK_REV_FIELD]: Number(task[MCP_TASK_REV_FIELD] || 0) + 1,
-    };
-  }));
-
-  const third = pollBoardWatcher(store, {
-    watcherId: first.watcherState.watcherId,
-    statusId: 'in-progress',
-    assigneeId: 'agent-1',
-  });
-
-  assert.equal(third.ok, true);
-  assert.equal(third.changes.newTasks.length, 0);
-  assert.deepEqual(third.changes.updatedTasks.map(task => task.id), ['task-1']);
-  assert.equal(third.changes.removedTaskIds.length, 0);
-  assert.match(third.changes.updatedTasks[0].notes, /fresh pass/);
-
-  const watcherStoreValue = store.get(MCP_BOARD_WATCHERS_KEY);
-  assert.ok(Array.isArray(watcherStoreValue));
-  assert.equal(watcherStoreValue[0].watcherId, first.watcherState.watcherId);
 });
 
 test('Goal agent dispatch read model preserves canonical, ephemeral, and unavailable states', () => {

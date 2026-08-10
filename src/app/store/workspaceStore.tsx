@@ -25,10 +25,7 @@ import {
   type MarkdownAppearance,
 } from '../utils/markdownAppearance.ts';
 import { getDefaultStatusId } from '../utils/mcpPreferences.ts';
-import {
-  type AgentWatchConfig,
-  type StatusColumnState,
-} from '../utils/workspaceSanitizers.ts';
+import { type StatusColumnState } from '../utils/workspaceSanitizers.ts';
 import {
   type GoalPolicyV1,
   updateGoalPolicy,
@@ -85,8 +82,6 @@ export interface WorkspaceStoreValue {
   setMilestones: Dispatch<SetStateAction<ProjectMilestone[]>>;
   statusColumns: StatusColumnState[];
   setStatusColumns: Dispatch<SetStateAction<StatusColumnState[]>>;
-  agentWatchConfigs: AgentWatchConfig[];
-  setAgentWatchConfigs: Dispatch<SetStateAction<AgentWatchConfig[]>>;
   preferences: AppPreferences;
   setPreferences: Dispatch<SetStateAction<AppPreferences>>;
   goalPolicy: GoalPolicyV1;
@@ -160,7 +155,6 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
   const [people, setPeople] = useState<Person[]>(initialState.people);
   const [milestones, setMilestones] = useState<ProjectMilestone[]>(initialState.milestones);
   const [statusColumns, setStatusColumns] = useState<StatusColumnState[]>(initialState.statusColumns);
-  const [agentWatchConfigs, setAgentWatchConfigs] = useState<AgentWatchConfig[]>(initialState.agentWatchConfigs);
   const [preferences, setPreferences] = useState<AppPreferences>(initialState.preferences);
   const [goalPolicy, setGoalPolicy] = useState<GoalPolicyV1>(initialState.goalPolicy);
   const [hasHydratedCanonicalWorkspace, setHasHydratedCanonicalWorkspace] = useState(
@@ -173,7 +167,6 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     people,
     milestones,
     statusColumns,
-    agentWatchConfigs,
     preferences,
     goalPolicy,
     hasHydratedCanonicalWorkspace,
@@ -190,7 +183,6 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setStatusColumns,
     setPreferences,
     setGoalPolicy,
-    setAgentWatchConfigs,
     timelineSwimlanesRef: persistence.timelineSwimlanesRef,
     statusColumnsRef: persistence.statusColumnsRef,
     preferencesRef: persistence.preferencesRef,
@@ -206,7 +198,6 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setPeople,
     setMilestones,
     setStatusColumns,
-    setAgentWatchConfigs,
     setPreferences,
     setGoalPolicy,
     createDefaultPreferences: createDefaultAppPreferences,
@@ -223,8 +214,6 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setMilestones,
     statusColumns,
     setStatusColumns,
-    agentWatchConfigs,
-    setAgentWatchConfigs,
     preferences,
     setPreferences,
     goalPolicy,
@@ -233,7 +222,6 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     hasHydratedCanonicalWorkspace,
   }), [
     actions,
-    agentWatchConfigs,
     goalPolicy,
     hasHydratedCanonicalWorkspace,
     milestones,

@@ -1,19 +1,17 @@
-import type { AgentWatchAction, LoadClassification, RoadmapStage, StatusColumn, Task } from '../types.ts';
+import type { LoadClassification, RoadmapStage, StatusColumn, Task } from '../types.ts';
 
-export const DEFAULT_AI_ACTION: AgentWatchAction = 'inspect_and_work';
-
-export function getDefaultColumnSemantics(id: string): Pick<StatusColumn, 'loadClassification' | 'roadmapStage' | 'aiWatchEnabled' | 'aiAction'> {
+export function getDefaultColumnSemantics(id: string): Pick<StatusColumn, 'loadClassification' | 'roadmapStage'> {
   switch (id) {
     case 'open':
-      return { loadClassification: 'open-tasks', roadmapStage: 'not-started', aiWatchEnabled: false, aiAction: DEFAULT_AI_ACTION };
+      return { loadClassification: 'open-tasks', roadmapStage: 'not-started' };
     case 'in-progress':
-      return { loadClassification: 'in-progress', roadmapStage: 'in-progress', aiWatchEnabled: false, aiAction: DEFAULT_AI_ACTION };
+      return { loadClassification: 'in-progress', roadmapStage: 'in-progress' };
     case 'under-review':
-      return { loadClassification: 'in-review', roadmapStage: 'in-review', aiWatchEnabled: false, aiAction: DEFAULT_AI_ACTION };
+      return { loadClassification: 'in-review', roadmapStage: 'in-review' };
     case 'done':
-      return { loadClassification: 'none', roadmapStage: 'complete', aiWatchEnabled: false, aiAction: 'inspect_only' };
+      return { loadClassification: 'none', roadmapStage: 'complete' };
     default:
-      return { loadClassification: 'none', roadmapStage: 'excluded', aiWatchEnabled: false, aiAction: DEFAULT_AI_ACTION };
+      return { loadClassification: 'none', roadmapStage: 'excluded' };
   }
 }
 
@@ -51,10 +49,4 @@ export const ROADMAP_STAGES: Array<{ value: RoadmapStage; label: string }> = [
   { value: 'in-review', label: 'In review' },
   { value: 'complete', label: 'Complete' },
   { value: 'excluded', label: 'Excluded' },
-];
-
-export const AI_ACTIONS: Array<{ value: AgentWatchAction; label: string }> = [
-  { value: 'inspect_only', label: 'Inspect only' },
-  { value: 'inspect_and_work', label: 'Inspect and work' },
-  { value: 'move_to_ready_for_human_review', label: 'Move to human review' },
 ];

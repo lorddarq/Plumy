@@ -5,7 +5,6 @@ export type TaskPriority = 'urgent' | 'moderate' | 'normal' | 'low';
 export type PersonKind = 'human' | 'agentic';
 export type LoadClassification = 'open-tasks' | 'in-progress' | 'in-review' | 'none';
 export type RoadmapStage = 'not-started' | 'in-progress' | 'in-review' | 'complete' | 'excluded';
-export type AgentWatchAction = 'inspect_only' | 'inspect_and_work' | 'move_to_ready_for_human_review';
 
 export interface StatusColumn {
   id: string;
@@ -14,8 +13,6 @@ export interface StatusColumn {
   description?: string;
   loadClassification?: LoadClassification;
   roadmapStage?: RoadmapStage;
-  aiWatchEnabled?: boolean;
-  aiAction?: AgentWatchAction;
 }
 
 export interface TaskComment {

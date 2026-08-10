@@ -35,7 +35,6 @@ const GOAL_EXECUTIONS_KEY = 'omvra.goalExecutions.v1';
 const GOAL_RECONCILIATIONS_KEY = 'omvra.goalReconciliations.v1';
 const GOAL_EVIDENCE_KEY = 'omvra.goalEvidence.v1';
 const GOAL_SCHEDULE_OCCURRENCES_KEY = 'omvra.goalScheduleOccurrences.v1';
-const MCP_BOARD_WATCHERS_KEY = 'omvra.mcp.boardWatchers.v1';
 const REQUIRES_HUMAN_REVIEW_STATUS_ID = 'requires-human-review';
 const REQUIRES_HUMAN_REVIEW_STATUS_TITLE = 'Requires human review';
 const REQUIRES_HUMAN_REVIEW_STATUS_COLOR = '#f97316';
@@ -135,171 +134,6 @@ function normalizeRevisionMap(value) {
     out[taskKey] = Math.max(0, Math.floor(revision));
   }
   return out;
-}
-
-function normalizeWatcherFilters(value) {
-  const raw = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const filters = {};
-  const assigneeId = normalizeString(raw.assigneeId);
-  const projectId = normalizeString(raw.projectId);
-  const search = normalizeString(raw.search);
-  if (assigneeId) filters.assigneeId = assigneeId;
-  if (projectId) filters.projectId = projectId;
-  if (search) filters.search = search;
-  return filters;
-}
-
-function normalizeBoardWatcherState(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const watcherId = normalizeString(value.watcherId || value.id);
-  const statusId = normalizeString(value.statusId);
-  if (!watcherId || !statusId) return null;
-
-  const lastProcessedAt = typeof value.lastProcessedAt === 'string' ? value.lastProcessedAt : undefined;
-  return {
-    watcherId,
-    statusId,
-    filters: normalizeWatcherFilters(value.filters),
-    lastSeenTaskIds: normalizeTaskIdList(value.lastSeenTaskIds),
-    lastSeenRevisions: normalizeRevisionMap(value.lastSeenRevisions),
-    lastProcessedAt,
-  };
-}
-
-function readBoardWatcherStates(store) {
-  return readArray(store, MCP_BOARD_WATCHERS_KEY)
-    .map(normalizeBoardWatcherState)
-    .filter(Boolean);
-}
-
-function listBoardWatcherStates(store) {
-  return readBoardWatcherStates(store);
-}
-
-function saveBoardWatcherStates(store, watcherStates) {
-  const normalized = Array.isArray(watcherStates)
-    ? watcherStates.map(normalizeBoardWatcherState).filter(Boolean)
-    : [];
-  store.set(MCP_BOARD_WATCHERS_KEY, normalized);
-  return normalized;
-}
-
-function getBoardWatcherState(store, watcherId) {
-  const normalizedWatcherId = normalizeString(watcherId);
-  if (!normalizedWatcherId) return null;
-  return readBoardWatcherStates(store).find(state => state.watcherId === normalizedWatcherId) || null;
-}
-
-function upsertBoardWatcherState(store, nextState) {
-  const normalized = normalizeBoardWatcherState(nextState);
-  if (!normalized) {
-    return { ok: false, error: 'INVALID_WATCHER_STATE', message: 'watcherId and statusId are required.' };
-  }
-
-  const states = readBoardWatcherStates(store);
-  const nextStates = states.filter(state => state.watcherId !== normalized.watcherId).concat(normalized);
-  saveBoardWatcherStates(store, nextStates);
-  return { ok: true, watcherState: normalized };
-}
-
-function buildBoardWatcherStorageKey({ statusId, assigneeId, projectId, search }) {
-  return [
-    `status:${normalizeString(statusId) || 'any'}`,
-    `assignee:${normalizeString(assigneeId) || 'any'}`,
-    `project:${normalizeString(projectId) || 'any'}`,
-    `search:${normalizeString(search) || 'any'}`,
-  ].join('|');
-}
-
-function pollBoardWatcher(store, {
-  watcherId,
-  statusId,
-  assigneeId,
-  projectId,
-  search,
-  persist = true,
-} = {}) {
-  const normalizedStatusId = normalizeString(statusId);
-  if (!normalizedStatusId) {
-    return {
-      ok: false,
-      error: 'STATUS_ID_REQUIRED',
-      message: 'statusId is required to poll a board.',
-    };
-  }
-
-  const normalizedWatcherId = normalizeString(watcherId) || buildBoardWatcherStorageKey({
-    statusId: normalizedStatusId,
-    assigneeId,
-    projectId,
-    search,
-  });
-  const nextFilters = normalizeWatcherFilters({ assigneeId, projectId, search });
-  const previousState = getBoardWatcherState(store, normalizedWatcherId) || {
-    watcherId: normalizedWatcherId,
-    statusId: normalizedStatusId,
-    filters: nextFilters,
-    lastSeenTaskIds: [],
-    lastSeenRevisions: {},
-  };
-
-  const tasks = listTasks(store, {
-    status: normalizedStatusId,
-    ...nextFilters,
-  });
-  const currentTaskIds = tasks.map(task => task.id);
-  const currentTaskIdSet = new Set(currentTaskIds);
-  const previousTaskIdSet = new Set(previousState.lastSeenTaskIds || []);
-  const previousRevisionMap = normalizeRevisionMap(previousState.lastSeenRevisions);
-  const currentRevisionMap = {};
-
-  const newTasks = [];
-  const updatedTasks = [];
-
-  for (const task of tasks) {
-    const currentRevision = Number.isFinite(Number(task[MCP_TASK_REV_FIELD]))
-      ? Math.max(0, Math.floor(Number(task[MCP_TASK_REV_FIELD])))
-      : 0;
-    currentRevisionMap[task.id] = currentRevision;
-
-    if (!previousTaskIdSet.has(task.id)) {
-      newTasks.push(task);
-      continue;
-    }
-
-    if ((previousRevisionMap[task.id] || 0) !== currentRevision) {
-      updatedTasks.push(task);
-    }
-  }
-
-  const removedTaskIds = (previousState.lastSeenTaskIds || []).filter(taskId => !currentTaskIdSet.has(taskId));
-  const nextWatcherState = {
-    watcherId: normalizedWatcherId,
-    statusId: normalizedStatusId,
-    filters: nextFilters,
-    lastSeenTaskIds: currentTaskIds,
-    lastSeenRevisions: currentRevisionMap,
-    lastProcessedAt: new Date().toISOString(),
-  };
-
-  if (persist) {
-    upsertBoardWatcherState(store, nextWatcherState);
-  }
-
-  return {
-    ok: true,
-    watcherState: nextWatcherState,
-    board: {
-      id: normalizedStatusId,
-      taskCount: tasks.length,
-      currentTaskIds,
-    },
-    changes: {
-      newTasks,
-      updatedTasks,
-      removedTaskIds,
-    },
-  };
 }
 
 function isMcpAgentAccessEnabled(store) {
@@ -1432,7 +1266,6 @@ function buildMcpAgentGuide() {
       'tasks.collaboration_history',
       'cards.kanban.list',
       'cards.timeline.list',
-      'boards.watch.poll',
       'task_write',
       'tasks.update',
       'tasks.update_description',
@@ -1557,7 +1390,6 @@ function buildMcpTaskExecutionSchema() {
       'During task execution, prefer task.assigneeId -> omvra://agents/{personId}/assigned as the deterministic assignee-context preflight.',
       'Call agent.resolve_task_context with the exact taskId before implementation work; use standard agentic operation when ok=false and canStart=true, and stop only when canStart=false.',
       'Use tasks.create_follow_up to log parent-linked bug-hunting or follow-up work; use task_write only for standalone tasks.',
-      'Use boards.watch.poll to watch a board for changes.',
       'Use cards.kanban.list for board-friendly projections.',
     ],
   };
@@ -2041,7 +1873,6 @@ module.exports = {
   GOAL_MUTATION_COMMANDS_KEY,
   GOAL_ARTIFACT_AUDIT_KEY,
   GOAL_PROJECT_BINDING_AUDIT_KEY,
-  MCP_BOARD_WATCHERS_KEY,
   isMcpAgentAccessEnabled,
   getMcpServerConfig,
   isMcpAccessTokenExpired,
@@ -2092,9 +1923,6 @@ module.exports = {
   buildMcpTaskExecutionSchema,
   buildMcpPromptCatalog,
   getMcpPrompt,
-  listBoardWatcherStates,
-  getBoardWatcherState,
-  pollBoardWatcher,
   createTask,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,

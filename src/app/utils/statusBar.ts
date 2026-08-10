@@ -1,7 +1,5 @@
-import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime.ts';
 import type { Person, Task } from '../types.ts';
 import { getAgentProvenanceBrand, type AgentProvenanceBrand } from './agentProvenance.ts';
-import type { AgentWatchConfig } from './workspaceSanitizers.ts';
 
 export type AgentStatusTone = 'success' | 'warning' | 'danger' | 'unknown' | 'muted';
 export type DerivedAgentStatusState = 'idle' | 'working' | 'writing' | 'unavailable';
@@ -43,7 +41,6 @@ export interface McpActivitySignal {
 
 const WRITE_WINDOW_MS = 45_000;
 const WORKING_WINDOW_MS = 2 * 60_000;
-const IDLE_FRESHNESS_WINDOW_MS = 10 * 60_000;
 const MCP_ACTIVITY_PULSE_WINDOW_MS = 1_500;
 
 function getAgeMs(timestamp?: string, now = Date.now()): number | null {
@@ -63,7 +60,6 @@ function isLikelyWriteTool(toolName?: string): boolean {
   return !(
     toolName.endsWith('.list')
     || toolName === 'workspace.get_snapshot'
-    || toolName === 'boards.watch.poll'
     || toolName.startsWith('cards.')
   );
 }
@@ -123,27 +119,17 @@ const getRecentGenericTaskActivity = ({
 export function deriveAgentStatuses({
   people,
   tasks,
-  agentWatchConfigs,
-  agentWatchRuntime,
   mcpAuditLog,
   now = Date.now(),
 }: {
   people: Person[];
   tasks: Task[];
-  agentWatchConfigs: AgentWatchConfig[];
-  agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   mcpAuditLog: McpAuditEntry[];
   now?: number;
 }): DerivedAgentStatus[] {
   const agenticPeople = people.filter(person => person.kind === 'agentic');
-  const enabledConfigByPersonId = new Map(
-    agentWatchConfigs.filter(config => config.enabled).map(config => [config.personId, config])
-  );
-
   return agenticPeople
     .map(person => {
-      const runtime = agentWatchRuntime[person.id];
-      const enabledConfig = enabledConfigByPersonId.get(person.id);
       const recentWriteEntry = getRecentAgentWriteEntry({ person, mcpAuditLog, now });
       const recentWriteAt = recentWriteEntry?.timestamp;
       const recentGenericTaskActivity = getRecentGenericTaskActivity({
@@ -155,24 +141,6 @@ export function deriveAgentStatuses({
       const recentGenericTaskActivityAt = recentGenericTaskActivity?.mcpUpdatedAt;
       const fallbackProvenance = getAgentProvenanceBrand(person.name);
       const hasFreshWrite = Boolean(recentWriteAt);
-      const hasRuntimeError = Boolean(runtime?.error);
-      const hasFreshRuntimeSignal = Boolean(
-        enabledConfig
-        && runtime?.lastCheckedAt
-        && !hasRuntimeError
-        && isRecent(runtime.lastCheckedAt, IDLE_FRESHNESS_WINDOW_MS, now)
-      );
-      const hasRecentWorkSignal = Boolean(
-        hasFreshRuntimeSignal
-        && runtime?.lastCheckedAt
-        && isRecent(runtime.lastCheckedAt, WORKING_WINDOW_MS, now)
-        && (
-          (runtime.newTaskCount || 0) > 0
-          || (runtime.updatedTaskCount || 0) > 0
-          || (runtime.removedTaskCount || 0) > 0
-          || (runtime.latestTaskTitles?.length || 0) > 0
-        )
-      );
 
       if (hasFreshWrite) {
         return {
@@ -183,18 +151,6 @@ export function deriveAgentStatuses({
           title: `${person.name} is writing to MCP`,
           lastSignalAt: recentWriteAt,
           provenance: getAuditEntryProvenance(recentWriteEntry, person.name),
-        };
-      }
-
-      if (hasRecentWorkSignal) {
-        return {
-          personId: person.id,
-          name: person.name,
-          state: 'working' as const,
-          tone: 'success' as const,
-          title: `${person.name} is working`,
-          lastSignalAt: runtime?.lastCheckedAt,
-          provenance: fallbackProvenance,
         };
       }
 

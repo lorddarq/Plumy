@@ -37,8 +37,7 @@ export type McpReadToolName =
   | 'tasks.list'
   | 'tasks.get'
   | 'cards.kanban.list'
-  | 'cards.timeline.list'
-  | 'boards.watch.poll';
+  | 'cards.timeline.list';
 
 export interface McpDiagnosticsResult {
   ok: boolean;
@@ -136,32 +135,4 @@ export interface McpTaskSummary {
 export interface McpCard {
   id: string;
   [key: string]: unknown;
-}
-
-export interface McpBoardWatchChangeSet {
-  newTasks: McpTaskSummary[];
-  updatedTasks: McpTaskSummary[];
-  removedTaskIds: string[];
-}
-
-export interface McpBoardWatchState {
-  watcherId: string;
-  statusId: string;
-  filters?: Record<string, unknown>;
-  lastSeenTaskIds?: string[];
-  lastSeenRevisions?: Record<string, number>;
-  lastProcessedAt?: string;
-}
-
-export interface McpBoardWatchResult {
-  ok: boolean;
-  watcherState?: McpBoardWatchState;
-  board?: {
-    id: string;
-    taskCount: number;
-    currentTaskIds: string[];
-  };
-  changes?: McpBoardWatchChangeSet;
-  error?: string;
-  message?: string;
 }

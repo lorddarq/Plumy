@@ -3,8 +3,6 @@ import { useState } from 'react';
 import { cn } from '../ui/utils';
 import { getMcpStatusSummary, getRecentMcpActivitySignal, type AgentStatusTone } from '../../utils/statusBar';
 import type { Person, Task } from '../../types';
-import type { AgentWatchConfig } from '../../utils/workspaceSanitizers';
-import type { AgentWatchRuntimeState } from '../../hooks/useAgentWatchRuntime';
 import { FiltersIcon } from '../SettingsPanel';
 import { useAgentSessionSupervisor } from '../AgentSessionSupervisor';
 import { getAttentionState, getSessionAttentionState } from '../../utils/attention';
@@ -14,8 +12,6 @@ import { agentRuntimeTurnState, type AgentRuntimeTurnProjection } from '../../ut
 export interface AppStatusBarProps {
   tasks: Task[];
   people: Person[];
-  agentWatchConfigs: AgentWatchConfig[];
-  agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   mcpAuditLog: McpAuditEntry[];
   mcpAgentAccessEnabled: boolean;
   mcpListenerStatus: McpListenerStatus | null;
@@ -25,8 +21,6 @@ export interface AppStatusBarProps {
 export function AppStatusBar({
   tasks,
   people,
-  agentWatchConfigs,
-  agentWatchRuntime,
   mcpAuditLog,
   mcpAgentAccessEnabled,
   mcpListenerStatus,

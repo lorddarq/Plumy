@@ -13,9 +13,7 @@ import {
 } from '../utils/storage.ts';
 import { GOAL_POLICY_KEY, sanitizeGoalPolicy, type GoalPolicyV1 } from '../utils/goalPolicy.ts';
 import {
-  type AgentWatchConfig,
   normalizeTask,
-  sanitizeAgentWatchConfigs,
   sanitizeMilestones,
   sanitizePeople,
   sanitizePreferences,
@@ -27,7 +25,6 @@ import {
 import type { AppPreferences } from './workspaceStore.tsx';
 import { areSerializedValuesEqual, normalizeLoadStatusIds } from './workspaceSelectors.ts';
 import {
-  MCP_AGENT_WATCH_CONFIGS_KEY,
   MILESTONES_KEY,
   PEOPLE_KEY,
   PREFERENCES_KEY,
@@ -45,7 +42,6 @@ export interface WorkspaceSeeds {
 
 export interface InitialWorkspaceState extends WorkspaceSeeds {
   statusColumns: StatusColumnState[];
-  agentWatchConfigs: AgentWatchConfig[];
   preferences: AppPreferences;
   goalPolicy: GoalPolicyV1;
   hasHydratedCanonicalWorkspace: boolean;
@@ -69,17 +65,14 @@ export function readInitialWorkspaceState(seeds: WorkspaceSeeds): InitialWorkspa
     seeds.milestones
   );
   const legacyPreferences = readInitialWorkspaceJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
-  const legacyWatchConfigs = readInitialWorkspaceJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, []);
   const statusColumns = sanitizeStatusColumns(
     readInitialWorkspaceJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes),
     defaultSwimlanes,
     {
       executionLoadStatusIds: legacyPreferences.executionLoadStatusIds,
       pipelineLoadStatusIds: legacyPreferences.pipelineLoadStatusIds,
-      agentWatchConfigs: legacyWatchConfigs,
     }
   );
-  const agentWatchConfigs = readInitialWorkspaceJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, []);
   const storedPreferences = readInitialWorkspaceJSON<Partial<AppPreferences> & {
     executionLoadStatusId?: TaskStatus;
     pipelineLoadStatusId?: TaskStatus;
@@ -129,7 +122,6 @@ export function readInitialWorkspaceState(seeds: WorkspaceSeeds): InitialWorkspa
     people,
     milestones,
     statusColumns,
-    agentWatchConfigs,
     preferences,
     goalPolicy: sanitizeGoalPolicy(readInitialWorkspaceJSON<unknown>(GOAL_POLICY_KEY, undefined)).policy,
     hasHydratedCanonicalWorkspace: shouldBootstrapFromLocalStorage(),
@@ -145,7 +137,6 @@ export function hasCanonicalWorkspaceData(exported: Record<string, unknown>): bo
     STATUS_COLUMNS_KEY,
     PREFERENCES_KEY,
     GOAL_POLICY_KEY,
-    MCP_AGENT_WATCH_CONFIGS_KEY,
   ].some(key => getPortableStoreValue(exported, key) !== undefined);
 }
 
@@ -178,7 +169,6 @@ interface WorkspaceHydrationOptions {
   setStatusColumns: Dispatch<SetStateAction<StatusColumnState[]>>;
   setPreferences: Dispatch<SetStateAction<AppPreferences>>;
   setGoalPolicy: Dispatch<SetStateAction<GoalPolicyV1>>;
-  setAgentWatchConfigs: Dispatch<SetStateAction<AgentWatchConfig[]>>;
   timelineSwimlanesRef: RefObject<TimelineSwimlane[]>;
   statusColumnsRef: RefObject<StatusColumnState[]>;
   preferencesRef: RefObject<AppPreferences>;
@@ -198,7 +188,6 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
     setStatusColumns,
     setPreferences,
     setGoalPolicy,
-    setAgentWatchConfigs,
     timelineSwimlanesRef,
     statusColumnsRef,
     preferencesRef,
@@ -214,7 +203,6 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
     const exportedStatusColumns = getPortableStoreValue<StatusColumnState[]>(exported, STATUS_COLUMNS_KEY);
     const exportedPreferences = getPortableStoreValue<Partial<AppPreferences>>(exported, PREFERENCES_KEY);
     const exportedGoalPolicy = getPortableStoreValue<unknown>(exported, GOAL_POLICY_KEY);
-    const exportedAgentWatchConfigs = getPortableStoreValue<AgentWatchConfig[]>(exported, MCP_AGENT_WATCH_CONFIGS_KEY);
     let nextProjects = timelineSwimlanesRef.current || [];
     let nextStatusColumns = statusColumnsRef.current || defaultSwimlanes;
 
@@ -237,7 +225,6 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
       nextStatusColumns = sanitizeStatusColumns(exportedStatusColumns, defaultSwimlanes, {
         executionLoadStatusIds: exportedPreferences?.executionLoadStatusIds,
         pipelineLoadStatusIds: exportedPreferences?.pipelineLoadStatusIds,
-        agentWatchConfigs: exportedAgentWatchConfigs,
       });
       mirrorCanonicalJsonToLocalStorage(STATUS_COLUMNS_KEY, nextStatusColumns);
       setStatusColumns(previous => areSerializedValuesEqual(previous, nextStatusColumns) ? previous : nextStatusColumns);
@@ -252,17 +239,12 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
       mirrorCanonicalJsonToLocalStorage(GOAL_POLICY_KEY, repairedGoalPolicy);
       setGoalPolicy(previous => areSerializedValuesEqual(previous, repairedGoalPolicy) ? previous : repairedGoalPolicy);
     }
-    if (exportedAgentWatchConfigs !== undefined && !pendingCanonicalWritesRef.current?.[MCP_AGENT_WATCH_CONFIGS_KEY]) {
-      const nextAgentWatchConfigs = sanitizeAgentWatchConfigs(exportedAgentWatchConfigs, []);
-      mirrorCanonicalJsonToLocalStorage(MCP_AGENT_WATCH_CONFIGS_KEY, nextAgentWatchConfigs);
-      setAgentWatchConfigs(previous => areSerializedValuesEqual(previous, nextAgentWatchConfigs) ? previous : nextAgentWatchConfigs);
-    }
     if (exportedTasks !== undefined && !pendingCanonicalWritesRef.current?.[TASKS_KEY]) {
       const nextTasks = sanitizeTasks(exportedTasks, nextProjects, seeds.tasks);
       mirrorCanonicalJsonToLocalStorage(TASKS_KEY, nextTasks);
       setTasks(previous => areSerializedValuesEqual(previous, nextTasks) ? previous : nextTasks);
     }
-  }, [goalPolicyRef, pendingCanonicalWritesRef, preferencesRef, seeds, setAgentWatchConfigs, setGoalPolicy, setMilestones, setPeople, setPreferences, setStatusColumns, setTasks, setTimelineSwimlanes, statusColumnsRef, timelineSwimlanesRef]);
+  }, [goalPolicyRef, pendingCanonicalWritesRef, preferencesRef, seeds, setGoalPolicy, setMilestones, setPeople, setPreferences, setStatusColumns, setTasks, setTimelineSwimlanes, statusColumnsRef, timelineSwimlanesRef]);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,11 +257,9 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
             const migratedProjects = sanitizeTimelineSwimlanes(safeReadLocalStorageJSON(SWIMLANES_KEY, seeds.timelineSwimlanes), seeds.timelineSwimlanes);
             const migratedPeople = sanitizePeople(safeReadLocalStorageJSON(PEOPLE_KEY, seeds.people), seeds.people);
             const storedPreferences = safeReadLocalStorageJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
-            const storedAgentWatchConfigs = safeReadLocalStorageJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, []);
             const migratedStatusColumns = sanitizeStatusColumns(safeReadLocalStorageJSON(STATUS_COLUMNS_KEY, defaultSwimlanes), defaultSwimlanes, {
               executionLoadStatusIds: storedPreferences.executionLoadStatusIds,
               pipelineLoadStatusIds: storedPreferences.pipelineLoadStatusIds,
-              agentWatchConfigs: storedAgentWatchConfigs,
             });
             setTimelineSwimlanes(migratedProjects);
             setPeople(migratedPeople);
@@ -287,7 +267,6 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
             setStatusColumns(migratedStatusColumns);
             setPreferences(sanitizeAppPreferences(storedPreferences, migratedStatusColumns, preferencesRef.current));
             setGoalPolicy(sanitizeGoalPolicy(safeReadLocalStorageJSON(GOAL_POLICY_KEY, undefined)).policy);
-            setAgentWatchConfigs(sanitizeAgentWatchConfigs(storedAgentWatchConfigs, []));
             setTasks(sanitizeTasks(safeReadLocalStorageJSON(TASKS_KEY, seeds.tasks), migratedProjects, seeds.tasks));
             return;
           }
@@ -301,7 +280,7 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
     };
     void hydrateFromCanonicalStore();
     return () => { cancelled = true; };
-  }, [preferencesRef, seeds, setAgentWatchConfigs, setGoalPolicy, setHasHydratedCanonicalWorkspace, setMilestones, setPeople, setPreferences, setStatusColumns, setTasks, setTimelineSwimlanes, syncCanonicalWorkspaceFromExport]);
+  }, [preferencesRef, seeds, setGoalPolicy, setHasHydratedCanonicalWorkspace, setMilestones, setPeople, setPreferences, setStatusColumns, setTasks, setTimelineSwimlanes, syncCanonicalWorkspaceFromExport]);
 
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;

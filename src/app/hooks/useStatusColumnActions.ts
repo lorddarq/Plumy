@@ -35,7 +35,6 @@ export function useStatusColumnActions({
       description: col.description,
       loadClassification: 'none',
       roadmapStage: 'excluded',
-      aiWatchEnabled: false,
       aiAction: 'inspect_and_work',
     };
     setStatusColumns(cols => [...cols, newCol]);

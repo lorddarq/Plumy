@@ -8,8 +8,6 @@ import {
   TimelineSwimlane,
   StatusColumn,
 } from '../types';
-import { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
-import { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import type { MarkdownAppearance } from '../utils/markdownAppearance';
 import type { GoalPolicyV1 } from '../utils/goalPolicy';
@@ -62,8 +60,6 @@ export interface PreferencesPanelState {
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
   showCompletedTimelineTasks: boolean;
-  agentWatchConfigs: AgentWatchConfig[];
-  agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   storageMeter: StorageMeter;
   importFeedback?: {
     type: 'success' | 'error';
@@ -113,9 +109,6 @@ export interface WorkspaceAdminActions {
   onAddPerson: (personData: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions' | 'availableForSubagentDelegation'>) => void;
   onDeletePerson: (personId: string) => void;
-  onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
-  onRemoveAgentWatchConfig: (personId: string) => void;
-  onPollAgentWatch: (personId: string) => void;
   onClosePreferences: () => void;
   onNukeLocalData: () => void;
   onExportWorkspaceBackup: () => Promise<boolean>;
@@ -281,8 +274,6 @@ export function AppPanels({
         people={workspace.people}
         tasks={workspace.tasks}
         timelineSwimlanes={workspace.timelineSwimlanes}
-        agentWatchConfigs={preferences.agentWatchConfigs}
-        agentWatchRuntime={preferences.agentWatchRuntime}
         storageMeter={preferences.storageMeter}
         importFeedback={preferences.importFeedback}
         onNukeLocalData={adminActions.onNukeLocalData}
@@ -304,9 +295,6 @@ export function AppPanels({
         onAddPerson={adminActions.onAddPerson}
         onUpdatePerson={adminActions.onUpdatePerson}
         onDeletePerson={adminActions.onDeletePerson}
-        onSaveAgentWatchConfig={adminActions.onSaveAgentWatchConfig}
-        onRemoveAgentWatchConfig={adminActions.onRemoveAgentWatchConfig}
-        onPollAgentWatch={adminActions.onPollAgentWatch}
         mcpAgentAccessEnabled={preferences.mcpAgentAccessEnabled}
         mcpAddress={preferences.mcpAddress}
         mcpBindHost={preferences.mcpBindHost}

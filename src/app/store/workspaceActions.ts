@@ -9,7 +9,7 @@ import {
   updateGoalPolicy,
   type GoalPolicyV1,
 } from '../utils/goalPolicy.ts';
-import type { AgentWatchConfig, StatusColumnState } from '../utils/workspaceSanitizers.ts';
+import type { StatusColumnState } from '../utils/workspaceSanitizers.ts';
 import {
   deleteMilestoneFromWorkspace,
   linkTaskToMilestones,
@@ -38,7 +38,6 @@ interface WorkspaceActionOptions {
   setPeople: Dispatch<SetStateAction<Person[]>>;
   setMilestones: Dispatch<SetStateAction<ProjectMilestone[]>>;
   setStatusColumns: Dispatch<SetStateAction<StatusColumnState[]>>;
-  setAgentWatchConfigs: Dispatch<SetStateAction<AgentWatchConfig[]>>;
   setPreferences: Dispatch<SetStateAction<AppPreferences>>;
   setGoalPolicy: Dispatch<SetStateAction<GoalPolicyV1>>;
   createDefaultPreferences: (statusColumns?: StatusColumnState[]) => AppPreferences;
@@ -53,7 +52,6 @@ export function useWorkspaceActions(options: WorkspaceActionOptions) {
     setPeople,
     setMilestones,
     setStatusColumns,
-    setAgentWatchConfigs,
     setPreferences,
     setGoalPolicy,
     createDefaultPreferences,
@@ -189,10 +187,9 @@ export function useWorkspaceActions(options: WorkspaceActionOptions) {
     setPeople([]);
     setMilestones([]);
     setStatusColumns(defaultSwimlanes);
-    setAgentWatchConfigs([]);
     setPreferences(createDefaultPreferences(defaultSwimlanes));
     setGoalPolicy(createDefaultGoalPolicy());
-  }, [createDefaultPreferences, setAgentWatchConfigs, setGoalPolicy, setMilestones, setPeople, setPreferences, setStatusColumns, setTasks, setTimelineSwimlanes]);
+  }, [createDefaultPreferences, setGoalPolicy, setMilestones, setPeople, setPreferences, setStatusColumns, setTasks, setTimelineSwimlanes]);
 
   return useMemo(() => ({
     replaceWorkspaceSnapshot,

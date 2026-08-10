@@ -20,7 +20,6 @@ const {
   listAssignedWorkForAgent,
   listKanbanCards,
   listTimelineCards,
-  pollBoardWatcher,
   createTask,
   updateTaskDetails,
   updateTaskDescription,
@@ -225,21 +224,6 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
 
     case 'cards.timeline.list':
       return { result: makeToolResult(listTimelineCards(store, args)) };
-
-    case 'boards.watch.poll': {
-      const result = pollBoardWatcher(store, {
-        watcherId: args.watcherId,
-        statusId: args.statusId,
-        assigneeId: args.assigneeId,
-        projectId: args.projectId,
-        search: args.search,
-        persist: args.persist !== false,
-      });
-      if (!result.ok) {
-        return { error: invalidParams(result.message, result) };
-      }
-      return { result: makeToolResult(result) };
-    }
 
     case 'milestones.list':
       return { result: makeToolResult(listMilestones(store)) };

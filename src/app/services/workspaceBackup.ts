@@ -20,7 +20,7 @@ import {
 import { getTaskProjectIds } from '../utils/roadmap.ts';
 import { getDefaultStatusId, syncLocalMcpServerAddress } from '../utils/mcpPreferences.ts';
 import { flattenPortableStoreEntries, normalizePortableStorageKey } from '../utils/storage.ts';
-import { AI_ACTIONS, LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics.ts';
+import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics.ts';
 import { createDefaultGoalPolicy, sanitizeGoalPolicy, type GoalPolicyV1 } from '../utils/goalPolicy.ts';
 import { normalizeTaskCollaboration } from '../utils/taskCollaboration.ts';
 
@@ -416,10 +416,6 @@ export function sanitizeStatusColumns(
         roadmapStage: ROADMAP_STAGES.some(option => option.value === candidate.roadmapStage)
           ? candidate.roadmapStage as StatusColumn['roadmapStage']
           : defaults.roadmapStage,
-        aiWatchEnabled: candidate.aiWatchEnabled === true,
-        aiAction: AI_ACTIONS.some(option => option.value === candidate.aiAction)
-          ? candidate.aiAction as StatusColumn['aiAction']
-          : defaults.aiAction,
       };
     })
     .filter((column): column is NonNullable<typeof column> => column !== null);

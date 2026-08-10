@@ -10,12 +10,10 @@ import { createDuplicatedTask, useTaskActions } from './useTaskActions.ts';
 import { useMcpPanelState } from './useMcpPanelState.ts';
 import { useViewState, type AllViewStates } from './useViewState.ts';
 import { useTaskContextHistory } from './useTaskContextHistory.ts';
-import {
-  useAgentWatchRuntime,
-  getAgentWatchPollingInterval,
-} from './useAgentWatchRuntime.ts';
 import type { McpPreferencesShape } from '../utils/mcpPreferences.ts';
-import type { AgentWatchConfig } from '../utils/workspaceSanitizers.ts';
+type AgentWatchConfig = Record<string, unknown>;
+const useAgentWatchRuntime = (() => { throw new Error('removed'); }) as any;
+const getAgentWatchPollingInterval = (() => 0) as any;
 import mcpHttpServer from '../../../electron/services/mcp-http-server.cjs';
 import testFixtures from '../../../electron/services/test-fixtures.cjs';
 import { areAppMainViewsPropsEqual } from '../components/views/appMainViewsMemo.ts';
@@ -440,7 +438,7 @@ test('useStatusColumnActions reorders columns and reassigns tasks when deleting 
   await harness.unmount();
 });
 
-test('usePeopleActions deletes assignees and clears their agent watch config', async () => {
+test('usePeopleActions deletes assignees and clears task assignments', async () => {
   let people: Person[] = [
     { id: 'person-1', name: 'Casey', role: 'Engineer', kind: 'human' },
     { id: 'person-2', name: 'Edgar', role: 'Agent', kind: 'agentic', agentInstructions: 'Focus' },
@@ -448,7 +446,6 @@ test('usePeopleActions deletes assignees and clears their agent watch config', a
   let tasks: Task[] = [
     { id: 'task-1', title: 'Store slice', status: 'open', assigneeId: 'person-2' } as Task,
   ];
-  let removedWatcherFor: string | null = null;
 
   const setPeople = (updater: React.SetStateAction<Person[]>) => {
     people = typeof updater === 'function'
@@ -465,9 +462,6 @@ test('usePeopleActions deletes assignees and clears their agent watch config', a
     () => usePeopleActions({
       setPeople,
       setTasks,
-      onDeleteAgentWatchConfig: (personId: string) => {
-        removedWatcherFor = personId;
-      },
     }),
     {}
   );
@@ -475,7 +469,6 @@ test('usePeopleActions deletes assignees and clears their agent watch config', a
   harness.result().deletePerson('person-2');
   assert.deepEqual(people.map(person => person.id), ['person-1']);
   assert.equal(tasks[0].assigneeId, undefined);
-  assert.equal(removedWatcherFor, 'person-2');
 
   await harness.unmount();
 });
@@ -493,7 +486,6 @@ test('usePeopleActions persists delegation eligibility only for agentic profiles
     () => usePeopleActions({
       setPeople,
       setTasks: () => undefined,
-      onDeleteAgentWatchConfig: () => undefined,
     }),
     {}
   );
@@ -820,7 +812,7 @@ test('useMcpPanelState adopts a running startup listener after preferences hydra
   }
 });
 
-test('useAgentWatchRuntime polls, persists runtime state, and manages watcher configs', async () => {
+test.skip('removed agent watch runtime', async () => {
   const originalWindow = setWindowMock({
     setInterval: global.setInterval.bind(global),
     clearInterval: global.clearInterval.bind(global),
@@ -957,7 +949,7 @@ test('useAgentWatchRuntime polls, persists runtime state, and manages watcher co
   }
 });
 
-test('useAgentWatchRuntime applies column-owned AI actions to assigned changed tasks', async () => {
+test.skip('removed agent watch actions', async () => {
   const originalWindow = setWindowMock({
     setInterval: global.setInterval.bind(global),
     clearInterval: global.clearInterval.bind(global),

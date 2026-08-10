@@ -4,13 +4,11 @@ import type { Person, Task } from '../types.ts';
 interface UsePeopleActionsOptions {
   setPeople: React.Dispatch<React.SetStateAction<Person[]>>;
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  onDeleteAgentWatchConfig: (personId: string) => void;
 }
 
 export function usePeopleActions({
   setPeople,
   setTasks,
-  onDeleteAgentWatchConfig,
 }: UsePeopleActionsOptions) {
   const addPerson = useCallback((personData: Omit<Person, 'id'>) => {
     const newPerson: Person = {
@@ -29,8 +27,7 @@ export function usePeopleActions({
   const deletePerson = useCallback((personId: string) => {
     setPeople(prevPeople => prevPeople.filter(p => p.id !== personId));
     setTasks(prevTasks => prevTasks.map(t => (t.assigneeId === personId ? { ...t, assigneeId: undefined } : t)));
-    onDeleteAgentWatchConfig(personId);
-  }, [onDeleteAgentWatchConfig, setPeople, setTasks]);
+  }, [setPeople, setTasks]);
 
   const updatePerson = useCallback((
     personId: string,

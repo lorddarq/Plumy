@@ -2,7 +2,6 @@ import { McpClient, McpClientDisabledError } from './client.ts';
 import { getTaskProjectIds } from '../../utils/roadmap.ts';
 import type {
   McpCard,
-  McpBoardWatchResult,
   McpClientConfig,
   McpDiagnosticsResult,
   McpHealthCheckResult,
@@ -42,7 +41,6 @@ export interface McpReadService {
   getTask: (taskId: string) => Promise<McpTaskSummary | null>;
   listKanbanCards: (filters?: Record<string, unknown>) => Promise<McpCard[]>;
   listTimelineCards: (filters?: Record<string, unknown>) => Promise<McpCard[]>;
-  pollBoardWatcher: (filters: Record<string, unknown>) => Promise<McpBoardWatchResult>;
 }
 
 function normalizeWorkspaceSnapshot(payload: unknown): McpWorkspaceSnapshot | null {
@@ -506,9 +504,6 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
         }));
     },
 
-    pollBoardWatcher: async (filters = {}) => (
-      client.callTool<McpBoardWatchResult>('boards.watch.poll', filters)
-    ),
 
     // TODO(phase-2): expose write operations once auth scopes and audit log are implemented.
   };

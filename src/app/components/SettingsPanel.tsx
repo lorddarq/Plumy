@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, Check, CheckCircle2, Download, Upload } from 'lucide-react';
 import { Person, RoadmapStage, StatusColumn, StorageMeter } from '../types';
 import { getDefaultGoalBudgetDimension, type GoalPolicyBudgetMode, type GoalPolicyDimension, type GoalPolicyV1 } from '../utils/goalPolicy';
-import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
-import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import { AgentBoardWatchSettings } from './settings/AgentBoardWatchSettings';
 import { AgentIcon } from './icons/AgentIcon';
@@ -514,11 +512,6 @@ interface TasksSettingsSectionProps {
   people: Person[];
   statusColumns: StatusColumn[];
   showCompletedTimelineTasks: boolean;
-  agentWatchConfigs: AgentWatchConfig[];
-  agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
-  onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
-  onRemoveAgentWatchConfig: (personId: string) => void;
-  onPollAgentWatch: (personId: string) => void;
   onShowCompletedTimelineTasksChange: (show: boolean) => void;
   onUpdateStatusColumn: (columnId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
 }
@@ -527,43 +520,15 @@ export function TasksSettingsSection({
   people,
   statusColumns,
   showCompletedTimelineTasks,
-  agentWatchConfigs,
-  agentWatchRuntime,
-  onSaveAgentWatchConfig,
-  onRemoveAgentWatchConfig,
-  onPollAgentWatch,
   onShowCompletedTimelineTasksChange,
   onUpdateStatusColumn,
 }: TasksSettingsSectionProps) {
-  const agenticPeople = people.filter(person => person.kind === 'agentic');
-  const [selectedAgentId, setSelectedAgentId] = useState(agenticPeople[0]?.id ?? '');
-  const selectedAgent = agenticPeople.find(agent => agent.id === selectedAgentId) ?? agenticPeople[0];
-
-  useEffect(() => {
-    if (!agenticPeople.length) {
-      setSelectedAgentId('');
-      return;
-    }
-
-    if (!agenticPeople.some(agent => agent.id === selectedAgentId)) {
-      setSelectedAgentId(agenticPeople[0].id);
-    }
-  }, [agenticPeople, selectedAgentId]);
-
-  function getAgentWatchConfig(personId: string): AgentWatchConfig {
-    return agentWatchConfigs.find(config => config.personId === personId) || {
-      personId,
-      enabled: false,
-      intervalSeconds: 60,
-    };
-  }
-
   return (
     <AnchoredPanelSection
       id="task-load"
       title="Tasks"
       icon={TasksIcon}
-      description="Configure agent polling here. Workload, roadmap, and AI watch behavior now belong to each Kanban column."
+      description="Configure workload and roadmap behavior for your tasks."
     >
       <div className="space-y-6">
         <div className="space-y-3">
@@ -608,32 +573,6 @@ export function TasksSettingsSection({
           </div>
         </div>
 
-        <div className="space-y-3 border-t border-black/5 pt-5">
-        <div className="space-y-1">
-          <div className="text-sm font-semibold leading-5 text-[#71717a]">Agent watch runtime</div>
-          <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
-            Choose an agent and polling cadence here. Edit a Kanban column to choose what is watched and what action agents take.
-          </p>
-        </div>
-
-        {selectedAgent ? (
-          <AgentBoardWatchSettings
-            agent={selectedAgent}
-            agents={agenticPeople}
-            selectedAgentId={selectedAgent.id}
-            onAgentChange={setSelectedAgentId}
-            watchConfig={getAgentWatchConfig(selectedAgent.id)}
-            watchRuntime={agentWatchRuntime[selectedAgent.id]}
-            onSave={onSaveAgentWatchConfig}
-            onRemove={onRemoveAgentWatchConfig}
-            onPoll={onPollAgentWatch}
-          />
-        ) : (
-          <p className="rounded-xl border border-dashed border-black/10 px-3 py-4 text-sm text-[#71717a]">
-            Add an agentic person to configure board watching.
-          </p>
-        )}
-        </div>
       </div>
     </AnchoredPanelSection>
   );

@@ -374,7 +374,6 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(response.result.tools.some(tool => tool.name === 'goals_list'));
   assert.ok(response.result.tools.some(tool => tool.name === 'goals_get'));
   assert.ok(response.result.tools.some(tool => tool.name === 'goals_update'));
-  assert.ok(response.result.tools.some(tool => tool.name === 'boards_watch_poll'));
   assert.ok(response.result.tools.some(tool => tool.name === 'milestones_list'));
   assert.ok(response.result.tools.some(tool => tool.name === 'task_write'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_update'));
@@ -2432,48 +2431,4 @@ test('read_only profile rejects task deletion attempts', () => {
   assert.ok(response.error);
   assert.equal(response.error.code, -32003);
   assert.match(response.error.message, /read-only/i);
-});
-
-test('boards.watch.poll exposes board deltas and suppresses duplicate processing', () => {
-  const store = makeStoreFromFixture('workspace-basic');
-  const dispatch = createRequestDispatcher(store);
-  const req = makeReq({}, 'http');
-
-  const first = dispatch({
-    jsonrpc: '2.0',
-    id: '11',
-    method: 'tools/call',
-    params: {
-      name: 'boards.watch.poll',
-      arguments: {
-        statusId: 'in-progress',
-        assigneeId: 'agent-1',
-      },
-    },
-  }, req);
-
-  assert.equal(first.jsonrpc, '2.0');
-  assert.equal(first.id, '11');
-  assert.equal(first.result.structuredContent.ok, true);
-  assert.equal(first.result.structuredContent.changes.newTasks.length, 1);
-  assert.equal(first.result.structuredContent.changes.updatedTasks.length, 0);
-  assert.equal(first.result.structuredContent.changes.removedTaskIds.length, 0);
-
-  const second = dispatch({
-    jsonrpc: '2.0',
-    id: '12',
-    method: 'tools/call',
-    params: {
-      name: 'boards.watch.poll',
-      arguments: {
-        watcherId: first.result.structuredContent.watcherState.watcherId,
-        statusId: 'in-progress',
-        assigneeId: 'agent-1',
-      },
-    },
-  }, req);
-
-  assert.equal(second.result.structuredContent.changes.newTasks.length, 0);
-  assert.equal(second.result.structuredContent.changes.updatedTasks.length, 0);
-  assert.equal(second.result.structuredContent.changes.removedTaskIds.length, 0);
 });

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { AgentWatchAction, LoadClassification, RoadmapStage, StatusColumn } from '../../types';
-import { AI_ACTIONS, LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../../utils/statusColumnSemantics';
+import { LoadClassification, RoadmapStage, StatusColumn } from '../../types';
+import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../../utils/statusColumnSemantics';
 import { Dialog, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { DialogSurface } from './DialogSurface';
@@ -9,7 +9,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Switch } from '../ui/switch';
 
 interface ColumnDialogProps {
   isOpen: boolean;
@@ -51,8 +50,6 @@ export function ColumnDialog({
   const [description, setDescription] = useState('');
   const [loadClassification, setLoadClassification] = useState<LoadClassification>('none');
   const [roadmapStage, setRoadmapStage] = useState<RoadmapStage>('excluded');
-  const [aiWatchEnabled, setAiWatchEnabled] = useState(false);
-  const [aiAction, setAiAction] = useState<AgentWatchAction>('inspect_and_work');
 
   useEffect(() => {
     if (column) {
@@ -62,8 +59,6 @@ export function ColumnDialog({
       const defaults = getDefaultColumnSemantics(column.id);
       setLoadClassification(column.loadClassification ?? defaults.loadClassification);
       setRoadmapStage(column.roadmapStage ?? defaults.roadmapStage);
-      setAiWatchEnabled(column.aiWatchEnabled ?? defaults.aiWatchEnabled);
-      setAiAction(column.aiAction ?? defaults.aiAction);
     } else {
       const defaults = getDefaultColumnSemantics('custom');
       setTitle('');
@@ -71,8 +66,6 @@ export function ColumnDialog({
       setDescription('');
       setLoadClassification(defaults.loadClassification);
       setRoadmapStage(defaults.roadmapStage);
-      setAiWatchEnabled(defaults.aiWatchEnabled);
-      setAiAction(defaults.aiAction);
     }
   }, [column?.id, isOpen]);
 
@@ -87,8 +80,6 @@ export function ColumnDialog({
       description: normalizedDescription || undefined,
       loadClassification,
       roadmapStage,
-      aiWatchEnabled,
-      aiAction,
     });
     onClose();
   };
@@ -184,25 +175,6 @@ export function ColumnDialog({
                 </Select>
               </div>
             </div>
-          </div>
-
-          <div className="space-y-4 border-t border-black/5 pt-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="column-ai-watch">AI watch</Label>
-                <p className="mt-1 text-[13px] leading-4 text-[#71717a]">Allow configured agents to watch tasks entering this column.</p>
-              </div>
-              <Switch id="column-ai-watch" checked={aiWatchEnabled} onCheckedChange={setAiWatchEnabled} />
-            </div>
-            {aiWatchEnabled && (
-              <div className="space-y-2">
-                <Label htmlFor="column-ai-action">Agent action</Label>
-                <Select value={aiAction} onValueChange={value => setAiAction(value as AgentWatchAction)}>
-                  <SelectTrigger id="column-ai-action" className={columnSelectClassName}><SelectValue /></SelectTrigger>
-                  <SelectContent>{AI_ACTIONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
 
           <div className="space-y-2">

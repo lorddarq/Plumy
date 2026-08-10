@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { Person, ProjectMilestone, Task, TimelineSwimlane } from '../types.ts';
 import { GOAL_POLICY_KEY, type GoalPolicyV1 } from '../utils/goalPolicy.ts';
 import { persistJSONWithElectronMirror } from '../utils/storage.ts';
-import type { AgentWatchConfig, StatusColumnState } from '../utils/workspaceSanitizers.ts';
+import type { StatusColumnState } from '../utils/workspaceSanitizers.ts';
 import type { AppPreferences } from './workspaceStore.tsx';
 import { areSerializedValuesEqual } from './workspaceSelectors.ts';
 
@@ -12,7 +12,6 @@ export const PEOPLE_KEY = 'omvra.people.v1';
 export const MILESTONES_KEY = 'omvra.milestones.v1';
 export const STATUS_COLUMNS_KEY = 'omvra.statusColumns.v1';
 export const PREFERENCES_KEY = 'omvra.preferences.v1';
-export const MCP_AGENT_WATCH_CONFIGS_KEY = 'omvra.mcp.agentWatchConfigs.v1';
 
 interface WorkspacePersistenceState {
   tasks: Task[];
@@ -20,7 +19,6 @@ interface WorkspacePersistenceState {
   people: Person[];
   milestones: ProjectMilestone[];
   statusColumns: StatusColumnState[];
-  agentWatchConfigs: AgentWatchConfig[];
   preferences: AppPreferences;
   goalPolicy: GoalPolicyV1;
   hasHydratedCanonicalWorkspace: boolean;
@@ -33,7 +31,6 @@ export function useWorkspacePersistence(state: WorkspacePersistenceState) {
     people,
     milestones,
     statusColumns,
-    agentWatchConfigs,
     preferences,
     goalPolicy,
     hasHydratedCanonicalWorkspace,
@@ -104,11 +101,6 @@ export function useWorkspacePersistence(state: WorkspacePersistenceState) {
       actor: 'workspace-settings',
     });
   }, [goalPolicy, hasHydratedCanonicalWorkspace]);
-  useEffect(() => {
-    if (!hasHydratedCanonicalWorkspace) return;
-    persistWorkspaceJSON(MCP_AGENT_WATCH_CONFIGS_KEY, agentWatchConfigs);
-  }, [agentWatchConfigs, hasHydratedCanonicalWorkspace, persistWorkspaceJSON]);
-
   return {
     tasksRef,
     timelineSwimlanesRef,

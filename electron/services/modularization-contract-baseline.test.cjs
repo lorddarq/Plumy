@@ -20,7 +20,6 @@ const WORKSPACE_FACADE_EXPORTS = [
   'GOAL_MUTATION_COMMANDS_KEY',
   'GOAL_PROJECT_BINDING_AUDIT_KEY',
   'MCP_AUDIT_LOG_KEY',
-  'MCP_BOARD_WATCHERS_KEY',
   'MCP_CAPABILITY_PROFILES',
   'MCP_PROTOCOL_VERSION',
   'MCP_SERVER_NAME',
@@ -60,7 +59,6 @@ const WORKSPACE_FACADE_EXPORTS = [
   'deleteMilestone',
   'deleteTask',
   'evaluateAgentRuntimeGovernance',
-  'getBoardWatcherState',
   'getGoalById',
   'getMcpAccessTokenStatus',
   'getMcpCapabilityProfile',
@@ -75,7 +73,6 @@ const WORKSPACE_FACADE_EXPORTS = [
   'isMcpAgentAccessEnabled',
   'linkMilestoneTasks',
   'listAssignedWorkForAgent',
-  'listBoardWatcherStates',
   'listGoals',
   'listKanbanCards',
   'listMcpAuditLog',
@@ -88,7 +85,6 @@ const WORKSPACE_FACADE_EXPORTS = [
   'moveTaskToReadyForHumanReview',
   'moveTaskToStatus',
   'moveTasksToRequiresHumanReviewBoard',
-  'pollBoardWatcher',
   'prepareAgentExecution',
   'prepareAgentRuntimeSessionArchive',
   'reconcileInterruptedAgentRuntimeSessions',
@@ -115,7 +111,6 @@ const WORKSPACE_FACADE_EXPORTS = [
 
 const ADMIN_MCP_TOOLS = [
   'agent_resolve_task_context',
-  'boards_watch_poll',
   'cards_kanban_list',
   'cards_timeline_list',
   'diagnostics_audit_summary',
@@ -167,7 +162,6 @@ const ADMIN_MCP_TOOLS = [
 ].sort();
 
 const RENDERER_WORKSPACE_KEYS = [
-  'omvra.mcp.agentWatchConfigs.v1',
   'omvra.milestones.v1',
   'omvra.people.v1',
   'omvra.preferences.v1',

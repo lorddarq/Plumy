@@ -7,7 +7,6 @@ const SNAPSHOT_FIELDS: Array<keyof WorkspaceStoreValue> = [
   'people',
   'milestones',
   'statusColumns',
-  'agentWatchConfigs',
   'preferences',
   'goalPolicy',
   'hasHydratedCanonicalWorkspace',

@@ -1167,7 +1167,7 @@ export function AgentsSettingsSection({ children, empty = false, action, seconda
             compact
             icon={<AgentIcon className="size-4" />}
             title="No agents available"
-            description="Add an agentic teammate to configure assignment, load, and watcher behavior."
+            description="Add an agentic teammate to configure assignment and workload behavior."
           />
         ) : children}
         <div className="space-y-3">

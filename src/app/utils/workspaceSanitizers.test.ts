@@ -99,41 +99,33 @@ test('sanitizeStatusColumns preserves trimmed descriptions', () => {
   assert.equal(column.description, 'Incoming work that is ready to be picked up.');
   assert.equal(column.loadClassification, 'open-tasks');
   assert.equal(column.roadmapStage, 'not-started');
-  assert.equal(column.aiWatchEnabled, false);
 });
 
-test('sanitizeStatusColumns preserves explicit semantics and safely excludes custom columns by default', () => {
+test('sanitizeStatusColumns preserves workflow semantics and safely excludes custom columns by default', () => {
   const [configured, custom] = sanitizeStatusColumns([
     {
       id: 'review',
       title: 'Review',
       loadClassification: 'in-review',
       roadmapStage: 'in-review',
-      aiWatchEnabled: true,
-      aiAction: 'inspect_only',
     },
     { id: 'parking-lot', title: 'Parking lot' },
   ], []);
 
   assert.equal(configured.loadClassification, 'in-review');
   assert.equal(configured.roadmapStage, 'in-review');
-  assert.equal(configured.aiWatchEnabled, true);
-  assert.equal(configured.aiAction, 'inspect_only');
   assert.equal(custom.loadClassification, 'none');
   assert.equal(custom.roadmapStage, 'excluded');
 });
 
-test('sanitizeStatusColumns migrates legacy load and watcher ownership once', () => {
+test('sanitizeStatusColumns migrates legacy load ownership once', () => {
   const [column] = sanitizeStatusColumns([
     { id: 'qa', title: 'QA' },
   ], [], {
     executionLoadStatusIds: ['qa'],
-    agentWatchConfigs: [{ personId: 'agent-1', statusId: 'qa', enabled: true, action: 'inspect_only' }],
   });
 
   assert.equal(column.loadClassification, 'in-progress');
-  assert.equal(column.aiWatchEnabled, true);
-  assert.equal(column.aiAction, 'inspect_only');
 });
 
 test('sanitizeTimelineSwimlanes promotes legacy subtitle to description', () => {

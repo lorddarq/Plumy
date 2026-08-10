@@ -1,4 +1,4 @@
-import type { AgentWatchAction, LoadClassification, ProjectMilestone, RoadmapStage, Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn } from '../types.ts';
+import type { LoadClassification, ProjectMilestone, RoadmapStage, Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn } from '../types.ts';
 import { buildLocalMcpAddress, normalizeMcpBindHost, normalizeMcpPort, normalizeMcpServerAddress } from '../constants/mcp.ts';
 import { getTaskProjectIds } from './roadmap.ts';
 import { normalizeTaskCollaboration } from './taskCollaboration.ts';
@@ -33,30 +33,15 @@ export interface AppPreferencesLike {
   mcpAccessTokenTtlMinutes: number;
 }
 
-export type { AgentWatchAction } from '../types.ts';
-
-export interface AgentWatchConfig {
-  personId: string;
-  enabled: boolean;
-  /** @deprecated Column watch ownership now lives on StatusColumn. */
-  statusId?: string;
-  projectId?: string;
-  search?: string;
-  /** @deprecated Column action ownership now lives on StatusColumn. */
-  action?: AgentWatchAction;
-  intervalSeconds: number;
-}
-
 const LOAD_CLASSIFICATIONS = new Set<LoadClassification>(['open-tasks', 'in-progress', 'in-review', 'none']);
 const ROADMAP_STAGES = new Set<RoadmapStage>(['not-started', 'in-progress', 'in-review', 'complete', 'excluded']);
-const AI_ACTIONS = new Set<AgentWatchAction>(['inspect_only', 'inspect_and_work', 'move_to_ready_for_human_review']);
 
 function defaultColumnSemantics(id: string) {
-  if (id === 'open') return { loadClassification: 'open-tasks' as const, roadmapStage: 'not-started' as const, aiAction: 'inspect_and_work' as const };
-  if (id === 'in-progress') return { loadClassification: 'in-progress' as const, roadmapStage: 'in-progress' as const, aiAction: 'inspect_and_work' as const };
-  if (id === 'under-review') return { loadClassification: 'in-review' as const, roadmapStage: 'in-review' as const, aiAction: 'inspect_and_work' as const };
-  if (id === 'done') return { loadClassification: 'none' as const, roadmapStage: 'complete' as const, aiAction: 'inspect_only' as const };
-  return { loadClassification: 'none' as const, roadmapStage: 'excluded' as const, aiAction: 'inspect_and_work' as const };
+  if (id === 'open') return { loadClassification: 'open-tasks' as const, roadmapStage: 'not-started' as const };
+  if (id === 'in-progress') return { loadClassification: 'in-progress' as const, roadmapStage: 'in-progress' as const };
+  if (id === 'under-review') return { loadClassification: 'in-review' as const, roadmapStage: 'in-review' as const };
+  if (id === 'done') return { loadClassification: 'none' as const, roadmapStage: 'complete' as const };
+  return { loadClassification: 'none' as const, roadmapStage: 'excluded' as const };
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -225,7 +210,6 @@ export function sanitizeStatusColumns(
   legacy?: {
     executionLoadStatusIds?: unknown;
     pipelineLoadStatusIds?: unknown;
-    agentWatchConfigs?: unknown;
   }
 ): StatusColumnState[] {
   if (!Array.isArray(columns)) return fallback;
@@ -240,9 +224,6 @@ export function sanitizeStatusColumns(
       const defaults = defaultColumnSemantics(column.id);
       const legacyExecutionIds = Array.isArray(legacy?.executionLoadStatusIds) ? legacy.executionLoadStatusIds : [];
       const legacyPipelineIds = Array.isArray(legacy?.pipelineLoadStatusIds) ? legacy.pipelineLoadStatusIds : [];
-      const legacyWatcher = Array.isArray(legacy?.agentWatchConfigs)
-        ? legacy.agentWatchConfigs.find(item => isObject(item) && item.statusId === column.id && item.enabled !== false)
-        : undefined;
       const migratedLoadClassification = legacyExecutionIds.includes(column.id)
         ? 'in-progress'
         : legacyPipelineIds.includes(column.id) ? 'open-tasks' : defaults.loadClassification;
@@ -258,14 +239,6 @@ export function sanitizeStatusColumns(
         roadmapStage: ROADMAP_STAGES.has(column.roadmapStage as RoadmapStage)
           ? column.roadmapStage as RoadmapStage
           : defaults.roadmapStage,
-        aiWatchEnabled: typeof column.aiWatchEnabled === 'boolean'
-          ? column.aiWatchEnabled
-          : Boolean(legacyWatcher),
-        aiAction: AI_ACTIONS.has(column.aiAction as AgentWatchAction)
-          ? column.aiAction as AgentWatchAction
-          : isObject(legacyWatcher) && AI_ACTIONS.has(legacyWatcher.action as AgentWatchAction)
-            ? legacyWatcher.action as AgentWatchAction
-            : defaults.aiAction,
       };
     })
     .filter((column): column is NonNullable<typeof column> => Boolean(column));
@@ -291,7 +264,6 @@ export function deriveStatusColumnsFromTasks(
       title: `Imported column ${columns.length + 1}`,
       color: '#9ca3af',
       ...defaultColumnSemantics(task.status),
-      aiWatchEnabled: false,
     });
   });
 
@@ -444,38 +416,4 @@ export function sanitizePreferences(
       ? Math.max(1, Math.min(1440, Number(preferences.mcpAccessTokenTtlMinutes)))
       : fallback.mcpAccessTokenTtlMinutes,
   };
-}
-
-export function sanitizeAgentWatchConfigs(
-  value: unknown,
-  fallback: AgentWatchConfig[] = []
-): AgentWatchConfig[] {
-  if (!Array.isArray(value)) return fallback;
-
-  const sanitized = value
-    .filter(isObject)
-    .map(item => {
-      if (typeof item.personId !== 'string') {
-        return null;
-      }
-
-      return {
-        personId: item.personId,
-        enabled: item.enabled !== false,
-        statusId: typeof item.statusId === 'string' ? item.statusId : undefined,
-        projectId: typeof item.projectId === 'string' && item.projectId.trim() ? item.projectId.trim() : undefined,
-        search: typeof item.search === 'string' && item.search.trim() ? item.search.trim() : undefined,
-        action: typeof item.action === 'string' ? (
-          item.action === 'inspect_only' || item.action === 'move_to_ready_for_human_review'
-            ? item.action
-            : 'inspect_and_work'
-        ) as AgentWatchAction : undefined,
-        intervalSeconds: Number.isFinite(Number(item.intervalSeconds))
-          ? Math.max(15, Math.min(3600, Math.floor(Number(item.intervalSeconds))))
-          : 60,
-      };
-    })
-    .filter(item => item !== null) as AgentWatchConfig[];
-
-  return sanitized;
 }

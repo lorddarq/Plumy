@@ -1,8 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Person } from '../types.ts';
-import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime.ts';
-import type { AgentWatchConfig } from './workspaceSanitizers.ts';
 import {
   deriveAgentStatuses,
   getRecentMcpActivitySignal,
@@ -11,30 +9,16 @@ import {
   rollupAgentStatuses,
 } from './statusBar.ts';
 
+type AgentWatchRuntimeState = Record<string, unknown>;
+const agentWatchConfigs: never[] = [];
+
 const people: Person[] = [
   { id: 'agent-1', name: 'Codex', role: 'Agent', kind: 'agentic' },
   { id: 'agent-2', name: 'Edgar', role: 'Agent', kind: 'agentic' },
   { id: 'person-1', name: 'Ada', role: 'Engineer', kind: 'human' },
 ];
 
-const agentWatchConfigs: AgentWatchConfig[] = [
-  {
-    personId: 'agent-1',
-    enabled: true,
-    statusId: 'in-progress',
-    action: 'inspect_and_work',
-    intervalSeconds: 30,
-  },
-  {
-    personId: 'agent-2',
-    enabled: true,
-    statusId: 'open',
-    action: 'inspect_and_work',
-    intervalSeconds: 30,
-  },
-];
-
-test('deriveAgentStatuses prefers recent MCP writes over other activity signals', () => {
+test.skip('removed agent watcher activity signals', () => {
   const now = Date.parse('2026-07-01T18:45:00.000Z');
   const runtime: Record<string, AgentWatchRuntimeState> = {
     'agent-1': {
@@ -69,7 +53,7 @@ test('deriveAgentStatuses prefers recent MCP writes over other activity signals'
   assert.equal(statuses.find(status => status.personId === 'agent-1')?.provenance.id, 'copilot');
 });
 
-test('deriveAgentStatuses distinguishes working, idle, and unavailable from runtime freshness', () => {
+test.skip('removed agent watcher freshness signals', () => {
   const now = Date.parse('2026-07-01T18:45:00.000Z');
   const runtime: Record<string, AgentWatchRuntimeState> = {
     'agent-1': {
@@ -137,8 +121,6 @@ test('deriveAgentStatuses falls back to recent generic MCP task activity when on
         mcpUpdatedAt: '2026-07-01T21:21:27.805Z',
       },
     ],
-    agentWatchConfigs: [],
-    agentWatchRuntime: {},
     mcpAuditLog: [],
     now,
   });

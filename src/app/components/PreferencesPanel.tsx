@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { Person, StorageMeter, Task, TaskStatus, StatusColumn, TimelineSwimlane } from '../types';
-import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
-import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { McpHealthCheckResult } from '../services/mcp/types';
 import type { MarkdownAppearance } from '../utils/markdownAppearance';
 import type { GoalPolicyV1 } from '../utils/goalPolicy';
@@ -45,8 +43,6 @@ interface PreferencesPanelProps {
   people: Person[];
   tasks: Task[];
   timelineSwimlanes: TimelineSwimlane[];
-  agentWatchConfigs: AgentWatchConfig[];
-  agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onShowCompletedTimelineTasksChange: (show: boolean) => void;
   onCleanupGoalArtifactsChange: (enabled: boolean) => void;
@@ -65,9 +61,6 @@ interface PreferencesPanelProps {
   onAddPerson: (person: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions' | 'availableForSubagentDelegation'>) => void;
   onDeletePerson: (personId: string) => void;
-  onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
-  onRemoveAgentWatchConfig: (personId: string) => void;
-  onPollAgentWatch: (personId: string) => void;
   onNukeLocalData: () => void;
   onExportWorkspaceBackup: () => Promise<boolean>;
   onExportGoalPolicyBackup: () => Promise<boolean>;
@@ -125,8 +118,6 @@ export function PreferencesPanel({
   people,
   tasks,
   timelineSwimlanes,
-  agentWatchConfigs,
-  agentWatchRuntime,
   onMarkdownAppearanceChange,
   onShowCompletedTimelineTasksChange,
   onCleanupGoalArtifactsChange,
@@ -140,9 +131,6 @@ export function PreferencesPanel({
   onAddPerson,
   onUpdatePerson,
   onDeletePerson,
-  onSaveAgentWatchConfig,
-  onRemoveAgentWatchConfig,
-  onPollAgentWatch,
   onNukeLocalData,
   onExportWorkspaceBackup,
   onExportGoalPolicyBackup,
@@ -401,11 +389,6 @@ export function PreferencesPanel({
         people={people}
         statusColumns={statusColumns}
         showCompletedTimelineTasks={showCompletedTimelineTasks}
-        agentWatchConfigs={agentWatchConfigs}
-        agentWatchRuntime={agentWatchRuntime}
-        onSaveAgentWatchConfig={onSaveAgentWatchConfig}
-        onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
-        onPollAgentWatch={onPollAgentWatch}
         onShowCompletedTimelineTasksChange={onShowCompletedTimelineTasksChange}
         onUpdateStatusColumn={onUpdateStatusColumn}
       />
