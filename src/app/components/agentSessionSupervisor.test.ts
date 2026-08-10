@@ -102,6 +102,7 @@ test('Timeline scroll does not publish unchanged horizontal metrics', () => {
   const source = readComponent('views/TimelineView.tsx');
   assert.match(source, /HORIZONTAL_METRICS_STEP_PX = 64/);
   assert.match(source, /Math\.abs\(nextMetrics\.scrollLeft - publishedMetrics\.scrollLeft\) >= HORIZONTAL_METRICS_STEP_PX/);
+  assert.match(source, /leftList\.style\.transform = `translate3d\(0, -\$\{scrollTop\}px, 0\)`/);
 });
 
 test('task supervision prefers an in-flight turn or reusable ready session over closed history', () => {

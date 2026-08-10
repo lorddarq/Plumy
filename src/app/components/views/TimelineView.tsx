@@ -967,7 +967,10 @@ export function TimelineView({
           // every vertical wheel frame just to re-check it.
           const scrollTop = rowsContainer.scrollTop;
           const scrollLeft = rowsContainer.scrollLeft;
-          leftList.scrollTop = scrollTop;
+          // The left pane is intentionally not a second scroll container. Move
+          // its labels on the compositor instead of writing scrollTop, which
+          // can trigger a second layout/scroll update during wheel dispatch.
+          leftList.style.transform = `translate3d(0, -${scrollTop}px, 0)`;
 
           if (lastHorizontalScrollLeftRef.current !== scrollLeft) {
             lastHorizontalScrollLeftRef.current = scrollLeft;
