@@ -503,21 +503,23 @@ app.whenReady().then(() => {
   store.onDidAnyChange((nextStore, previousStore) => {
     const hintedRendererKeys = new Set(pendingRendererStoreMutationKeys);
     pendingRendererStoreMutationKeys.clear();
-    try {
-      captureMeaningfulTaskCheckpoints(store, {
-        previousTasks: previousStore?.[TASKS_KEY],
-        nextTasks: nextStore?.[TASKS_KEY],
-        appendTaskContextEntry,
-      });
-    } catch (error) {
-      console.error('[task-context] checkpoint capture failed:', error?.message || error);
-    }
     const changedKeys = hintedRendererKeys.size > 0
       ? hintedRendererKeys
       : new Set([...Object.keys(nextStore || {}), ...Object.keys(previousStore || {})].filter(key => {
         if (Object.is(nextStore?.[key], previousStore?.[key])) return false;
         try { return JSON.stringify(nextStore?.[key]) !== JSON.stringify(previousStore?.[key]); } catch { return true; }
       }));
+    if (changedKeys.has(TASKS_KEY)) {
+      try {
+        captureMeaningfulTaskCheckpoints(store, {
+          previousTasks: previousStore?.[TASKS_KEY],
+          nextTasks: nextStore?.[TASKS_KEY],
+          appendTaskContextEntry,
+        });
+      } catch (error) {
+        console.error('[task-context] checkpoint capture failed:', error?.message || error);
+      }
+    }
     const runtimeOnlyChange = [...changedKeys].length > 0
       && [...changedKeys].every(key => AGENT_RUNTIME_STORE_KEYS.has(key));
     if (!runtimeOnlyChange) broadcastStoreDidChange([...changedKeys]);
