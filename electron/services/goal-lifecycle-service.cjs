@@ -65,6 +65,17 @@ function readArray(store, key) {
 }
 
 function writeExecutionState(store, executions, events) {
+  const storedSnapshot = store?.store;
+  const storeDescriptor = Object.getOwnPropertyDescriptor(store, 'store')
+    || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(store) || {}, 'store');
+  if (storedSnapshot && typeof storedSnapshot === 'object' && storeDescriptor?.set) {
+    store.store = {
+      ...storedSnapshot,
+      [EXECUTIONS_KEY]: executions,
+      [EVENTS_KEY]: events,
+    };
+    return;
+  }
   store.set(EXECUTIONS_KEY, executions);
   store.set(EVENTS_KEY, events);
 }

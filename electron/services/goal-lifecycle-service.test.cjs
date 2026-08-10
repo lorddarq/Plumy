@@ -58,6 +58,34 @@ test('lifecycle transitions require evidence, acceptance, and revisions', () => 
   assert.equal(store.get(EXECUTIONS_KEY)[0].state, 'complete');
 });
 
+test('lifecycle execution and event state share one Electron-store write', () => {
+  const values = new Map([
+    ['omvra.goals.v1', [{ id: 'goal-1', title: 'Ship it' }]],
+  ]);
+  let snapshotWrites = 0;
+  const store = {
+    get: key => values.get(key),
+    set: (key, value) => values.set(key, value),
+  };
+  Object.defineProperty(store, 'store', {
+    get: () => Object.fromEntries(values),
+    set: next => {
+      snapshotWrites += 1;
+      values.clear();
+      Object.entries(next).forEach(([key, value]) => values.set(key, value));
+    },
+    configurable: true,
+  });
+
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'batch-start' });
+
+  assert.equal(started.ok, true);
+  assert.equal(snapshotWrites, 1);
+  assert.equal(values.get(EXECUTIONS_KEY).length, 1);
+  assert.equal(values.get(EVENTS_KEY).length, 1);
+});
+
 test('projectless Goals carry typed requirements into the contract packet', () => {
   const store = makeStore();
   store.set('omvra.goals.v1', [{
