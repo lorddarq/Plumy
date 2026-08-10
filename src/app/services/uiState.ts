@@ -12,7 +12,7 @@ import {
   sanitizeKanbanTaskFilters,
   type KanbanTaskFilters,
 } from '../utils/taskFilters.ts';
-import { getJSON, persistJSONWithElectronMirror } from '../utils/storage.ts';
+import { getJSONBatch, persistJSONBatchWithElectronMirror } from '../utils/storage.ts';
 
 export const TIMELINE_VIEW_STATE_KEY = 'omvra_viewstate_timeline';
 export const KANBAN_VIEW_STATE_KEY = 'omvra_viewstate_kanban';
@@ -130,16 +130,24 @@ export async function loadUiStateSnapshot(
   projects: TimelineSwimlane[],
   people: Person[]
 ): Promise<UiStateSnapshot> {
-  const [timelineState, kanbanState, roadmapState, loopsState, leftColWidth, monthWidths, showCompleted, kanbanFilters] = await Promise.all([
-    getJSON<Record<string, unknown>>(TIMELINE_VIEW_STATE_KEY, null),
-    getJSON<Record<string, unknown>>(KANBAN_VIEW_STATE_KEY, null),
-    getJSON<Record<string, unknown>>(ROADMAP_VIEW_STATE_KEY, null),
-    getJSON<Record<string, unknown>>(LOOPS_VIEW_STATE_KEY, null),
-    getJSON<number>(TIMELINE_LEFT_COL_WIDTH_KEY, null),
-    getJSON<Record<string, number>>(TIMELINE_MONTH_WIDTHS_KEY, null),
-    getJSON<boolean>(TIMELINE_SHOW_COMPLETED_KEY, null),
-    getJSON<unknown>('omvra.filters.v1', null),
+  const stored = await getJSONBatch([
+    TIMELINE_VIEW_STATE_KEY,
+    KANBAN_VIEW_STATE_KEY,
+    ROADMAP_VIEW_STATE_KEY,
+    LOOPS_VIEW_STATE_KEY,
+    TIMELINE_LEFT_COL_WIDTH_KEY,
+    TIMELINE_MONTH_WIDTHS_KEY,
+    TIMELINE_SHOW_COMPLETED_KEY,
+    'omvra.filters.v1',
   ]);
+  const timelineState = stored[TIMELINE_VIEW_STATE_KEY] as Record<string, unknown> | null | undefined;
+  const kanbanState = stored[KANBAN_VIEW_STATE_KEY] as Record<string, unknown> | null | undefined;
+  const roadmapState = stored[ROADMAP_VIEW_STATE_KEY] as Record<string, unknown> | null | undefined;
+  const loopsState = stored[LOOPS_VIEW_STATE_KEY] as Record<string, unknown> | null | undefined;
+  const leftColWidth = stored[TIMELINE_LEFT_COL_WIDTH_KEY] as number | null | undefined;
+  const monthWidths = stored[TIMELINE_MONTH_WIDTHS_KEY] as Record<string, number> | null | undefined;
+  const showCompleted = stored[TIMELINE_SHOW_COMPLETED_KEY] as boolean | null | undefined;
+  const kanbanFilters = stored['omvra.filters.v1'];
 
   return {
     viewStates: sanitizeViewStates({
@@ -158,7 +166,9 @@ export async function loadUiStateSnapshot(
 }
 
 export function persistTimelineLayoutState(layout: TimelineLayoutState): void {
-  persistJSONWithElectronMirror(TIMELINE_LEFT_COL_WIDTH_KEY, layout.leftColWidth);
-  persistJSONWithElectronMirror(TIMELINE_MONTH_WIDTHS_KEY, layout.monthWidths);
-  persistJSONWithElectronMirror(TIMELINE_SHOW_COMPLETED_KEY, layout.showCompleted);
+  void persistJSONBatchWithElectronMirror({
+    [TIMELINE_LEFT_COL_WIDTH_KEY]: layout.leftColWidth,
+    [TIMELINE_MONTH_WIDTHS_KEY]: layout.monthWidths,
+    [TIMELINE_SHOW_COMPLETED_KEY]: layout.showCompleted,
+  });
 }

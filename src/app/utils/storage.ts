@@ -23,6 +23,20 @@ export async function getJSON<T = any>(key: string, fallback: T | null = null): 
   }
 }
 
+export async function getJSONBatch(keys: string[]): Promise<Record<string, unknown>> {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const storeGetMany = window.electron?.storeGetMany;
+    if (typeof storeGetMany === 'function') return await storeGetMany(keys);
+  } catch {
+    // Fall through to the per-key/localStorage path.
+  }
+
+  const values = await Promise.all(keys.map(async key => [key, await getJSON(key)] as const));
+  return Object.fromEntries(values);
+}
+
 export async function setJSON<T = any>(key: string, value: T): Promise<void> {
   try {
     // @ts-ignore
