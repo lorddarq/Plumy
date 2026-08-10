@@ -941,12 +941,19 @@ export function TimelineView({
 
   // Keep the timeline grid as the single vertical scroller. Wheel events over
   // the fixed Projects column proxy into it so the two panes cannot fight.
-  const handleLeftWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    if (!rowsContainerRef.current) return;
-    rowsContainerRef.current.scrollTop += event.deltaY;
-    if (event.deltaX) {
-      rowsContainerRef.current.scrollLeft += event.deltaX;
-    }
+  useEffect(() => {
+    const leftList = leftListRef.current;
+    if (!leftList) return;
+
+    const handleLeftWheel = (event: WheelEvent) => {
+      const rowsContainer = rowsContainerRef.current;
+      if (!rowsContainer) return;
+      rowsContainer.scrollTop += event.deltaY;
+      if (event.deltaX) rowsContainer.scrollLeft += event.deltaX;
+    };
+
+    leftList.addEventListener('wheel', handleLeftWheel, { passive: true });
+    return () => leftList.removeEventListener('wheel', handleLeftWheel);
   }, []);
 
   const handleRowsVerticalScroll = useCallback(() => {
@@ -1146,7 +1153,7 @@ export function TimelineView({
               />
             </div>
 
-            <div className="timeline-left-list" ref={leftListRef} onWheel={handleLeftWheel}>
+            <div className="timeline-left-list" ref={leftListRef}>
               {displaySwimlanes.map((swimlane, index) => {
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
                 const isDraggedRowCollapsed = Boolean(
