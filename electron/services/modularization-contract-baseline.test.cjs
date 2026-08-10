@@ -226,6 +226,7 @@ const IPC_INVOKE_CHANNELS = [
   'store/export',
   'store/get',
   'store/set',
+  'store/set-many',
   'task-context/append-checkpoint',
   'task-context/get',
   'task-context/list',

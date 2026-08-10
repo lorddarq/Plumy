@@ -40,7 +40,25 @@ test('store registrar preserves channels and reports preference writes after per
   assert.equal(handlers.get('store/set')(null, 'preferences', value), value);
   assert.equal(store.get('preferences'), value);
   assert.equal(persistedValue, value);
-  assert.deepEqual([...handlers.keys()].sort(), ['store/delete', 'store/export', 'store/get', 'store/set']);
+  assert.deepEqual([...handlers.keys()].sort(), ['store/delete', 'store/export', 'store/get', 'store/set', 'store/set-many']);
+});
+
+test('store registrar batches workspace writes into one store assignment', () => {
+  const { handlers, ipcMain } = createIpcHarness();
+  let persistedStore = { existing: true };
+  let writes = 0;
+  const store = {
+    get: key => persistedStore[key],
+    set: (key, value) => { persistedStore[key] = value; writes += 1; return value; },
+    delete: key => delete persistedStore[key],
+    get store() { return persistedStore; },
+    set store(value) { persistedStore = value; writes += 1; },
+  };
+  registerStoreIpcHandlers({ ipcMain, store, preferencesKey: 'preferences' });
+
+  assert.deepEqual(handlers.get('store/set-many')(null, { tasks: [1], people: [2] }), { count: 2 });
+  assert.deepEqual(persistedStore, { existing: true, tasks: [1], people: [2] });
+  assert.equal(writes, 1);
 });
 
 test('performance registrar delegates timing records and local log controls', async () => {

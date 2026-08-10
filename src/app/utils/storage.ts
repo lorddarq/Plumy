@@ -113,6 +113,32 @@ export function persistJSONWithElectronMirror<T = any>(key: string, value: T): P
   });
 }
 
+export function persistJSONBatchWithElectronMirror(entries: Record<string, unknown>): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+
+  return measurePerformanceOperation('storage', 'persist.workspace-batch', async () => {
+    const values = Object.entries(entries);
+    values.forEach(([key, value]) => {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(value));
+      } catch {
+        // ignore
+      }
+    });
+
+    try {
+      const electron = window.electron;
+      if (typeof electron?.storeSetMany === 'function') {
+        await electron.storeSetMany(Object.fromEntries(values));
+      } else if (typeof electron?.storeSet === 'function') {
+        await Promise.all(values.map(([key, value]) => electron.storeSet(key, value)));
+      }
+    } catch {
+      // Ignore mirror failures to keep renderer persistence non-breaking.
+    }
+  });
+}
+
 export function persistRawWithElectronMirror(key: string, value: string): void {
   if (typeof window === 'undefined') return;
 

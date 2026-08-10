@@ -200,6 +200,7 @@ declare global {
     electron: {
       storeGet: (key: string) => Promise<any>;
       storeSet: (key: string, value: any) => Promise<void>;
+      storeSetMany: (values: Record<string, any>) => Promise<{ count: number }>;
       storeDelete: (key: string) => Promise<void>;
       storeExport: () => Promise<Record<string, any>>;
       recordGoalPolicyImpact: (payload: { previousPolicy: any; nextPolicy: any; actor?: string }) => Promise<{ ok: boolean; changed?: boolean; impacts?: any[] }>;

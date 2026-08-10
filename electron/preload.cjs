@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electron', {
   // Store
   storeGet: (key) => ipcRenderer.invoke('store/get', key),
   storeSet: (key, value) => ipcRenderer.invoke('store/set', key, value),
+  storeSetMany: (values) => ipcRenderer.invoke('store/set-many', values),
   storeDelete: (key) => ipcRenderer.invoke('store/delete', key),
   storeExport: () => ipcRenderer.invoke('store/export'),
   recordGoalPolicyImpact: (payload) => ipcRenderer.invoke('goal-policy/record-impact', payload),

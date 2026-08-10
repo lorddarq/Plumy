@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { Person, ProjectMilestone, Task, TimelineSwimlane } from '../types.ts';
 import { GOAL_POLICY_KEY, type GoalPolicyV1 } from '../utils/goalPolicy.ts';
-import { persistJSONWithElectronMirror } from '../utils/storage.ts';
+import { persistJSONBatchWithElectronMirror } from '../utils/storage.ts';
 import type { StatusColumnState } from '../utils/workspaceSanitizers.ts';
 import type { AppPreferences } from './workspaceStore.tsx';
 import { areSerializedValuesEqual } from './workspaceSelectors.ts';
@@ -43,12 +43,30 @@ export function useWorkspacePersistence(state: WorkspacePersistenceState) {
   const previousGoalPolicyForImpactRef = useRef(goalPolicy);
   const goalPolicyImpactInitializedRef = useRef(false);
   const pendingCanonicalWritesRef = useRef<Record<string, number>>({});
+  const pendingWorkspaceWritesRef = useRef<Record<string, unknown>>({});
+  const pendingWorkspaceFlushRef = useRef<Promise<void> | null>(null);
 
   const persistWorkspaceJSON = useCallback((key: string, value: unknown) => {
-    pendingCanonicalWritesRef.current[key] = (pendingCanonicalWritesRef.current[key] ?? 0) + 1;
-    void persistJSONWithElectronMirror(key, value).finally(() => {
-      pendingCanonicalWritesRef.current[key] = Math.max(0, (pendingCanonicalWritesRef.current[key] ?? 1) - 1);
-    });
+    if (!(key in pendingWorkspaceWritesRef.current)) {
+      pendingCanonicalWritesRef.current[key] = (pendingCanonicalWritesRef.current[key] ?? 0) + 1;
+    }
+    pendingWorkspaceWritesRef.current[key] = value;
+    if (pendingWorkspaceFlushRef.current) return;
+
+    const scheduleFlush = () => {
+      pendingWorkspaceFlushRef.current = Promise.resolve().then(async () => {
+        const batch = pendingWorkspaceWritesRef.current;
+        pendingWorkspaceWritesRef.current = {};
+        await persistJSONBatchWithElectronMirror(batch);
+        Object.keys(batch).forEach(batchKey => {
+          pendingCanonicalWritesRef.current[batchKey] = Math.max(0, (pendingCanonicalWritesRef.current[batchKey] ?? 1) - 1);
+        });
+      }).finally(() => {
+        pendingWorkspaceFlushRef.current = null;
+        if (Object.keys(pendingWorkspaceWritesRef.current).length > 0) scheduleFlush();
+      });
+    };
+    scheduleFlush();
   }, []);
 
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
