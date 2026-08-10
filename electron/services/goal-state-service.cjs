@@ -1,4 +1,5 @@
 const { randomUUID } = require('crypto');
+const { isDeepStrictEqual } = require('node:util');
 
 const GOAL_SCHEMA_VERSION = 1;
 const GOALS_KEY = 'omvra.goals.v1';
@@ -384,7 +385,7 @@ function readGoalRecords(store) {
 function migrateGoalRecords(store) {
   const current = readArray(store, GOALS_KEY);
   const migrated = current.map(normalizeGoal).filter(Boolean);
-  const changed = JSON.stringify(current) !== JSON.stringify(migrated);
+  const changed = !isDeepStrictEqual(current, migrated);
   if (changed) store.set(GOALS_KEY, migrated);
   return { changed, goals: migrated };
 }

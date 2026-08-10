@@ -1,4 +1,5 @@
 const { randomUUID } = require('crypto');
+const { isDeepStrictEqual } = require('node:util');
 
 function createMilestoneService({
   dependencyRules,
@@ -405,7 +406,7 @@ function createMilestoneService({
       const shouldLink = linkedTaskIdSet.has(task.id);
       const milestoneChanged = shouldLink && task.milestoneId !== currentMilestone.id;
       const dependencyChanged = dependencyUpdatesByTaskId.has(task.id)
-        && JSON.stringify(nextDependencyIds) !== JSON.stringify(task.dependencyIds || []);
+        && !isDeepStrictEqual(nextDependencyIds, task.dependencyIds || []);
 
       if (!milestoneChanged && !dependencyChanged) return rawTask;
 
@@ -420,7 +421,7 @@ function createMilestoneService({
       };
     });
 
-    const milestoneChanged = JSON.stringify(linkedTaskIds) !== JSON.stringify(currentMilestone.linkedTaskIds || []);
+    const milestoneChanged = !isDeepStrictEqual(linkedTaskIds, currentMilestone.linkedTaskIds || []);
     const nextMilestone = {
       ...currentMilestone,
       linkedTaskIds,

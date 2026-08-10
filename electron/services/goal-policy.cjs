@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { isDeepStrictEqual } = require('node:util');
 const { getGoalScopedRequirements } = require('./goal-state-service.cjs');
 
 const GOAL_POLICY_KEY = 'omvra.goalPolicy.v1';
@@ -191,7 +192,7 @@ function isAgentMutationAllowed(store, confirmed = false) {
 }
 
 function policyChanged(previous, next) {
-  return JSON.stringify(previous || {}) !== JSON.stringify(next || {});
+  return !isDeepStrictEqual(previous || {}, next || {});
 }
 
 function isWidening(previous, next) {
