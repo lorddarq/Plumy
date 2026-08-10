@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 const {
   buildGoalContractPacket,
   isAgentMutationAllowed,
+  getPendingGoalPolicyImpact,
   recordGoalPolicyChangeImpact,
+  resolveGoalPolicyImpact,
   resolveGoalPolicy,
 } = require('./goal-policy.cjs');
 
@@ -105,4 +107,35 @@ test('widening an active policy requires explicit confirmation', () => {
 
   assert.equal(result.impacts[0].decision, 'confirmation-required');
   assert.equal(result.impacts[0].requiresUserConfirmation, true);
+});
+
+test('policy impact reads each JSON store key once per operation', () => {
+  const values = new Map([
+    ['omvra.goals.v1', [{ id: 'goal-1', title: 'Ship it', elements: [] }]],
+    ['omvra.goalExecutions.v1', [{ id: 'execution-1', goalId: 'goal-1', state: 'working' }]],
+    ['omvra.goalPolicyImpacts.v1', [{ goalId: 'goal-1', status: 'pending' }]],
+  ]);
+  const reads = new Map();
+  const store = {
+    get: key => {
+      reads.set(key, (reads.get(key) || 0) + 1);
+      return values.get(key);
+    },
+    set: (key, value) => values.set(key, value),
+  };
+
+  recordGoalPolicyChangeImpact(store, {
+    previousPolicy: { policyRevision: 2 },
+    nextPolicy: { policyRevision: 3 },
+  });
+  assert.equal(reads.get('omvra.goals.v1'), 1);
+  assert.equal(reads.get('omvra.goalExecutions.v1'), 1);
+  assert.equal(reads.get('omvra.goalPolicyImpacts.v1'), 1);
+
+  reads.clear();
+  assert.ok(getPendingGoalPolicyImpact(store, 'goal-1'));
+  assert.equal(reads.get('omvra.goalPolicyImpacts.v1'), 1);
+  reads.clear();
+  resolveGoalPolicyImpact(store, 'goal-1', 'paused');
+  assert.equal(reads.get('omvra.goalPolicyImpacts.v1'), 1);
 });

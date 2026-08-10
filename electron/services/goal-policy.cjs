@@ -211,8 +211,10 @@ function recordGoalPolicyChangeImpact(store, { previousPolicy, nextPolicy, actor
     return { ok: false, error: 'STORE_REQUIRED', message: 'A synchronous store with get/set methods is required.' };
   }
   if (!policyChanged(previousPolicy, nextPolicy)) return { ok: true, changed: false, impacts: [] };
-  const goals = Array.isArray(store.get('omvra.goals.v1')) ? store.get('omvra.goals.v1') : [];
-  const executions = Array.isArray(store.get('omvra.goalExecutions.v1')) ? store.get('omvra.goalExecutions.v1') : [];
+  const storedGoals = store.get('omvra.goals.v1');
+  const goals = Array.isArray(storedGoals) ? storedGoals : [];
+  const storedExecutions = store.get('omvra.goalExecutions.v1');
+  const executions = Array.isArray(storedExecutions) ? storedExecutions : [];
   const activeStates = new Set(['ready', 'working', 'evidence-required', 'handoff-pending', 'paused', 'approval-required', 'blocked']);
   const impacts = executions.filter(execution => activeStates.has(execution?.state)).map(execution => {
     const goal = goals.find(item => item?.id === execution.goalId);
@@ -234,18 +236,21 @@ function recordGoalPolicyChangeImpact(store, { previousPolicy, nextPolicy, actor
       createdAt: now(),
     };
   });
-  const records = Array.isArray(store.get(GOAL_POLICY_IMPACTS_KEY)) ? store.get(GOAL_POLICY_IMPACTS_KEY) : [];
+  const storedRecords = store.get(GOAL_POLICY_IMPACTS_KEY);
+  const records = Array.isArray(storedRecords) ? storedRecords : [];
   store.set(GOAL_POLICY_IMPACTS_KEY, records.concat(impacts).slice(-200));
   return { ok: true, changed: true, impacts };
 }
 
 function getPendingGoalPolicyImpact(store, goalId) {
-  const impacts = Array.isArray(store?.get?.(GOAL_POLICY_IMPACTS_KEY)) ? store.get(GOAL_POLICY_IMPACTS_KEY) : [];
+  const storedImpacts = store?.get?.(GOAL_POLICY_IMPACTS_KEY);
+  const impacts = Array.isArray(storedImpacts) ? storedImpacts : [];
   return impacts.find(impact => impact?.goalId === goalId && impact.status === 'pending') || null;
 }
 
 function resolveGoalPolicyImpact(store, goalId, decision, now = () => new Date().toISOString()) {
-  const impacts = Array.isArray(store?.get?.(GOAL_POLICY_IMPACTS_KEY)) ? store.get(GOAL_POLICY_IMPACTS_KEY) : [];
+  const storedImpacts = store?.get?.(GOAL_POLICY_IMPACTS_KEY);
+  const impacts = Array.isArray(storedImpacts) ? storedImpacts : [];
   let changed = false;
   const next = impacts.map(impact => {
     if (impact?.goalId !== goalId || impact.status !== 'pending') return impact;
