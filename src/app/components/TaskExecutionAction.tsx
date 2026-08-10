@@ -242,6 +242,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       if (nextBinding?.scope?.taskId === task.id) {
         refreshSequence.current += 1;
         setBinding(nextBinding);
+        if (['interrupted', 'closed', 'failed'].includes(nextBinding.state)) {
+          setPendingRequests([]);
+          setRequestValues({});
+        }
       }
       if (nextEvent?.bindingId && (nextBinding?.scope?.taskId === task.id || binding?.id === nextEvent.bindingId)) {
         setEvents(current => current.some(event => event.id === nextEvent.id) ? current : [...current, nextEvent].slice(-100));
@@ -359,14 +363,17 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       return null;
     }
     const detail = await window.electron?.agentRuntime?.sessions?.list?.({ bindingId: nextBinding.id, limit: 100 });
-    const requests = await window.electron?.agentRuntime?.sessions?.requests?.(nextBinding.id);
+    const resolvedBinding = (detail?.bindings || [nextBinding])[0] || nextBinding;
+    const requests = agentRuntimeTurnState(resolvedBinding) === 'waiting-input'
+      ? await window.electron?.agentRuntime?.sessions?.requests?.(nextBinding.id)
+      : [];
     if (sequence !== refreshSequence.current) return null;
-    setBinding((detail?.bindings || [nextBinding])[0] || nextBinding);
+    setBinding(resolvedBinding);
     setEvents((detail?.events || []) as SessionEvent[]);
     setPendingRequests(Array.isArray(requests) ? requests as PendingRuntimeRequest[] : []);
     setHasMoreEvents(Boolean(detail?.hasMore));
     setSessionLoaded(true);
-    return (detail?.bindings || [nextBinding])[0] || nextBinding;
+    return resolvedBinding;
   };
 
   const recoverOrphanedSession = async (bindingId: string) => {
@@ -676,7 +683,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   </div>) : <div className="px-1.5 py-1">The agent has not started work yet.</div>}
                 </div>
                 <div className="mt-3">
-                  {pendingRequests.length > 0 ? <div className="space-y-2">{pendingRequests.map(request => {
+                  {!terminalBinding && pendingRequests.length > 0 ? <div className="space-y-2">{pendingRequests.map(request => {
                     const missingRequired = request.fields.some(field => requestFieldIsMissing(request, field, requestValues));
                     return <ExecutionNotice key={`${request.method}-${request.requestId}`} tone="warning" title={getAttentionState('needs-input').label} nextStep={getAttentionState('needs-input').nextStep} assertive>
                       <div>{request.message}</div>

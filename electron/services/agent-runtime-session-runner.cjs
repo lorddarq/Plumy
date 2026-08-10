@@ -147,6 +147,19 @@ function createAgentRuntimeSessionRunner({
     return [...pendingRequests.values()].filter(request => request.bindingId === bindingId).map(request => JSON.parse(JSON.stringify(request)));
   }
 
+  function advertisedApprovalContent(params = {}) {
+    const properties = params.requestedSchema?.properties;
+    if (!properties || typeof properties !== 'object' || Array.isArray(properties)) return {};
+    for (const [name, definition] of Object.entries(properties)) {
+      if (!definition || typeof definition !== 'object' || !Array.isArray(definition.enum) || definition.enum.length === 0) continue;
+      const preferred = definition.default !== undefined && definition.enum.includes(definition.default)
+        ? definition.default
+        : definition.enum.find(option => /^(?:allow|approve|approved|accept|yes)$/i.test(String(option))) ?? definition.enum[0];
+      return { [String(name).slice(0, 128)]: preferred };
+    }
+    return {};
+  }
+
   function buildCurrentTaskContext(binding) {
     if (!buildContextPack || typeof getTaskById !== 'function' || binding.scope?.kind !== 'task') return { ok: true, pack: null, text: '' };
     const task = getTaskById(store, binding.scope.taskId);
@@ -360,6 +373,26 @@ function createAgentRuntimeSessionRunner({
       error: errorMessage ? errorMessage.slice(0, 500) : null,
     };
     log(summary.state === 'failed' ? 'warn' : 'debug', 'notification', summary);
+    const activeClient = clients.get(binding.id)?.client;
+    const policyApprovedOmvraCall = message?.method === 'mcpServer/elicitation/request'
+      && message.params?.serverName === 'omvra'
+      && message.params?._meta?.codex_approval_kind === 'mcp_tool_call'
+      && activeClient?.profile?.approvalPolicy === 'never';
+    if (policyApprovedOmvraCall) {
+      activeClient.respond(message.id, { action: 'accept', content: advertisedApprovalContent(message.params) });
+      return appendRuntimeEvent({
+        bindingId: binding.id,
+        runtimeProfileId: binding.runtimeProfileId,
+        kind: 'permission',
+        nativeEventType: 'omvra/mcpToolApproval/policy-accepted',
+        state: 'allowed',
+        outcome: 'runtime-profile-policy',
+        requestId: message.id,
+        toolName: 'omvra',
+        permissionState: 'allowed',
+        idempotencyKey: `runtime:${binding.id}:mcp-policy-approval:${String(message.id)}`,
+      });
+    }
     const elicitation = sanitizedElicitation(binding.id, message);
     if (elicitation) pendingRequests.set(requestKey(binding.id, elicitation.requestId), elicitation);
     const appended = appendRuntimeEvent({

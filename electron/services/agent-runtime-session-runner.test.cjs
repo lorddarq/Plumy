@@ -235,10 +235,10 @@ test('injects the bounded Omvra context pack while leaving MCP configuration to 
   assert.equal(logs.some(entry => entry.message === '[agent-runtime] session.ready' && entry.details.bindingId === 'binding-1'), true);
   assert.equal(logs.some(entry => entry.message === '[agent-runtime] notification' && entry.details.subject === 'figma'), true);
   notify({ method: 'mcpServer/elicitation/request', id: 41, params: { serverName: 'omvra', mode: 'form', message: 'Allow the omvra MCP server to run tool "tasks_get"?', requestedSchema: { type: 'object', properties: { approval: { type: 'string', enum: ['deny', 'allow'] } } }, _meta: { codex_approval_kind: 'mcp_tool_call' } } });
-  assert.equal(runner.listRequests('binding-1')[0].requestId, 41);
-  assert.equal(storedBinding.turn.state, 'waiting-input');
-  assert.equal(responses.length, 0);
-  assert.equal((await runner.respond('binding-1', 41, { action: 'accept', content: { approval: 'allow' } })).ok, true);
+  assert.equal(runner.listRequests('binding-1').length, 0);
+  assert.equal(storedBinding.turn.state, 'active');
+  assert.deepEqual(responses[0], { requestId: 41, response: { action: 'accept', content: { approval: 'allow' } }, error: undefined });
+  assert.equal(events.at(-1).nativeEventType, 'omvra/mcpToolApproval/policy-accepted');
   notify({ method: 'mcpServer/elicitation/request', id: 42, params: { serverName: 'omvra_testing_mcp', mode: 'form', message: 'Allow the task preflight?', requestedSchema: { type: 'object', properties: { confirmed: { type: 'boolean', title: 'Confirm', default: true } }, required: ['confirmed'] } } });
   assert.equal(runner.listRequests('binding-1')[0].message, 'Allow the task preflight?');
   assert.equal(storedBinding.turn.state, 'waiting-input');

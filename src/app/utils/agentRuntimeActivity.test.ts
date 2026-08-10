@@ -50,6 +50,14 @@ test('a ready provider session reports work only from its canonical turn project
   assert.equal(describeAgentRuntimeSession('ready', [], undefined, agentRuntimeTurnState(working)).label, 'Agent is working');
 });
 
+test('terminal provider sessions ignore stale in-flight turn projections', () => {
+  for (const state of ['interrupted', 'closed', 'failed']) {
+    const binding = { state, turn: { id: 'stale-turn', state: 'waiting-input' } };
+    assert.equal(agentRuntimeTurnState(binding), undefined);
+    assert.equal(isAgentRuntimeTurnInFlight(binding), false);
+  }
+});
+
 test('runtime activity identifies tool connections when the provider reports their names', () => {
   const activity = summarizeAgentRuntimeActivity([
     { id: '1', type: 'session-state', nativeEventType: 'mcpServer/startupStatus/updated', state: 'failed', outcome: 'reauthenticationRequired', toolName: 'figma', observedAt: '2026-08-02T12:00:00.000Z' },

@@ -27,8 +27,10 @@ export interface AgentRuntimeTurnProjection {
 }
 
 export const IN_FLIGHT_AGENT_RUNTIME_TURN_STATES = new Set(['queued', 'starting', 'active', 'waiting-input', 'cancelling']);
+const TERMINAL_AGENT_RUNTIME_SESSION_STATES = new Set(['interrupted', 'closed', 'failed', 'complete', 'completed']);
 
 export function agentRuntimeTurnState(binding?: { state?: string; turn?: AgentRuntimeTurnProjection }): string | undefined {
+  if (TERMINAL_AGENT_RUNTIME_SESSION_STATES.has(binding?.state || '')) return undefined;
   return binding?.turn?.state || ({ active: 'active', 'needs-input': 'waiting-input', cancelling: 'cancelling' } as Record<string, string>)[binding?.state || ''];
 }
 
