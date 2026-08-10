@@ -95,18 +95,19 @@ export function persistJSONWithElectronMirror<T = any>(key: string, value: T): P
 
   return measurePerformanceOperation('storage', `persist.${key}`, async () => {
     try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch (err) {
-      // ignore
-    }
-
-    try {
       const storeSet = window.electron?.storeSet;
       if (typeof storeSet === 'function') {
         await storeSet(key, value).catch(() => {
           // Ignore mirror failures to keep renderer persistence non-breaking.
         });
+        return;
       }
+    } catch (err) {
+      // ignore
+    }
+
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
     } catch (err) {
       // ignore
     }
@@ -118,23 +119,21 @@ export function persistJSONBatchWithElectronMirror(entries: Record<string, unkno
 
   return measurePerformanceOperation('storage', 'persist.workspace-batch', async () => {
     const values = Object.entries(entries);
-    values.forEach(([key, value]) => {
-      try {
-        window.localStorage.setItem(key, JSON.stringify(value));
-      } catch {
-        // ignore
-      }
-    });
-
     try {
       const electron = window.electron;
       if (typeof electron?.storeSetMany === 'function') {
         await electron.storeSetMany(Object.fromEntries(values));
       } else if (typeof electron?.storeSet === 'function') {
         await Promise.all(values.map(([key, value]) => electron.storeSet(key, value)));
+      } else {
+        values.forEach(([key, value]) => {
+          try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+        });
       }
     } catch {
-      // Ignore mirror failures to keep renderer persistence non-breaking.
+      values.forEach(([key, value]) => {
+        try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+      });
     }
   });
 }
@@ -143,18 +142,19 @@ export function persistRawWithElectronMirror(key: string, value: string): void {
   if (typeof window === 'undefined') return;
 
   try {
-    window.localStorage.setItem(key, value);
-  } catch (err) {
-    // ignore
-  }
-
-  try {
     const storeSet = window.electron?.storeSet;
     if (typeof storeSet === 'function') {
       void storeSet(key, value).catch(() => {
         // Ignore mirror failures to keep renderer persistence non-breaking.
       });
+      return;
     }
+  } catch (err) {
+    // ignore
+  }
+
+  try {
+    window.localStorage.setItem(key, value);
   } catch (err) {
     // ignore
   }
