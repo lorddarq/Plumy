@@ -61,6 +61,25 @@ test('store registrar batches workspace writes into one store assignment', () =>
   assert.equal(writes, 1);
 });
 
+test('store registrar reports renderer mutation keys without reading the whole store', () => {
+  const { handlers, ipcMain } = createIpcHarness();
+  const mutations = [];
+  const store = {
+    get: () => undefined,
+    set: (key, value) => value,
+    delete: () => true,
+    get store() { return {}; },
+    set store(value) { void value; },
+  };
+  registerStoreIpcHandlers({ ipcMain, store, preferencesKey: 'preferences', onStoreMutation: keys => mutations.push(keys) });
+
+  handlers.get('store/set')(null, 'tasks', [1]);
+  handlers.get('store/set-many')(null, { people: [2], projects: [3] });
+  handlers.get('store/delete')(null, 'filters');
+
+  assert.deepEqual(mutations, [['tasks'], ['people', 'projects'], ['filters']]);
+});
+
 test('store registrar reads only requested keys', () => {
   const { handlers, ipcMain } = createIpcHarness();
   const store = {
