@@ -4,9 +4,11 @@ import {
   type PropsWithChildren,
   type SetStateAction,
   useContext,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import type { Person, ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types.ts';
 import { initialTasks, initialTimelineSwimlanes } from '../data/sampleData.ts';
@@ -38,6 +40,10 @@ import {
   type WorkspaceSeeds,
 } from './workspaceHydration.ts';
 import { useWorkspacePersistence } from './workspacePersistence.ts';
+import {
+  createWorkspaceSubscriptionStore,
+  type WorkspaceSubscriptionStore,
+} from './workspaceSubscriptionStore.ts';
 
 const ENABLE_SAMPLE_WORKSPACE = Boolean(import.meta.env.DEV);
 const WORKSPACE_SEEDS: WorkspaceSeeds = {
@@ -55,6 +61,7 @@ export interface AppPreferences {
   skillRoots: Array<{ root: string; source?: string }>;
   customScrollbarsEnabled: boolean;
   condensedUI: boolean;
+  performanceLoggingEnabled: boolean;
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
   mcpAgentAccessEnabled: boolean;
@@ -67,7 +74,7 @@ export interface AppPreferences {
   mcpAccessTokenTtlMinutes: number;
 }
 
-interface WorkspaceStoreValue {
+export interface WorkspaceStoreValue {
   tasks: Task[];
   setTasks: Dispatch<SetStateAction<Task[]>>;
   timelineSwimlanes: TimelineSwimlane[];
@@ -98,6 +105,7 @@ interface WorkspaceStoreValue {
   setExternalSkillsDirectory: (directory: string) => void;
   setCustomScrollbarsEnabled: (enabled: boolean) => void;
   setCondensedUI: (enabled: boolean) => void;
+  setPerformanceLoggingEnabled: (enabled: boolean) => void;
   updateGoalPolicy: (updates: Parameters<typeof updateGoalPolicy>[1]) => void;
   resetGoalPolicy: () => void;
   setUpdateChannel: (channel: AppPreferences['updateChannel']) => void;
@@ -113,7 +121,7 @@ interface WorkspaceStoreValue {
   resetWorkspaceData: () => void;
 }
 
-const WorkspaceStoreContext = createContext<WorkspaceStoreValue | null>(null);
+const WorkspaceStoreContext = createContext<WorkspaceSubscriptionStore | null>(null);
 
 export function createDefaultAppPreferences(
   statusColumns: StatusColumnState[] = defaultSwimlanes
@@ -126,6 +134,7 @@ export function createDefaultAppPreferences(
     skillRoots: [],
     customScrollbarsEnabled: true,
     condensedUI: false,
+    performanceLoggingEnabled: false,
     updateChannel: 'stable',
     markdownAppearance: { ...DEFAULT_MARKDOWN_APPEARANCE },
     mcpAgentAccessEnabled: false,
@@ -235,17 +244,55 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     timelineSwimlanes,
   ]);
 
+  const subscriptionStoreRef = useRef<WorkspaceSubscriptionStore | null>(null);
+  if (!subscriptionStoreRef.current) {
+    subscriptionStoreRef.current = createWorkspaceSubscriptionStore(value);
+  }
+  const subscriptionStore = subscriptionStoreRef.current;
+
+  useLayoutEffect(() => {
+    subscriptionStore.publish(value);
+  }, [subscriptionStore, value]);
+
   return (
-    <WorkspaceStoreContext.Provider value={value}>
+    <WorkspaceStoreContext.Provider value={subscriptionStore}>
       {children}
     </WorkspaceStoreContext.Provider>
   );
 }
 
-export function useWorkspaceStore(): WorkspaceStoreValue {
-  const context = useContext(WorkspaceStoreContext);
-  if (!context) {
-    throw new Error('useWorkspaceStore must be used within WorkspaceStoreProvider.');
+export function useWorkspaceSelector<T>(
+  selector: (value: WorkspaceStoreValue) => T,
+  isEqual: (left: T, right: T) => boolean = Object.is,
+): T {
+  const store = useContext(WorkspaceStoreContext);
+  if (!store) {
+    throw new Error('useWorkspaceSelector must be used within WorkspaceStoreProvider.');
   }
-  return context;
+
+  const cacheRef = useRef<{
+    snapshot: WorkspaceStoreValue;
+    selector: (value: WorkspaceStoreValue) => T;
+    selection: T;
+  } | null>(null);
+  const getSelection = useMemo(() => () => {
+    const snapshot = store.getSnapshot();
+    const cached = cacheRef.current;
+    if (cached && cached.selector === selector && Object.is(cached.snapshot, snapshot)) return cached.selection;
+
+    const selection = selector(snapshot);
+    if (cached && isEqual(cached.selection, selection)) {
+      cacheRef.current = { snapshot, selector, selection: cached.selection };
+      return cached.selection;
+    }
+
+    cacheRef.current = { snapshot, selector, selection };
+    return selection;
+  }, [isEqual, selector, store]);
+
+  return useSyncExternalStore(store.subscribe, getSelection, getSelection);
+}
+
+export function useWorkspaceStore(): WorkspaceStoreValue {
+  return useWorkspaceSelector(value => value);
 }

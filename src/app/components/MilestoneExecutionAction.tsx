@@ -10,6 +10,7 @@ import { OverflowActionMenu } from './OverflowActionMenu';
 import { ExecutionNotice } from './ExecutionNotice';
 import { getAttentionState, getSessionAttentionState, type AttentionState } from '../utils/attention';
 import { agentRuntimeTurnState, isAgentRuntimeTurnInFlight } from '../utils/agentRuntimeActivity';
+import { measurePerformanceOperation } from '../services/performanceLogging.ts';
 
 interface MilestoneExecutionActionProps {
   milestone: ProjectMilestone;
@@ -60,7 +61,9 @@ export function MilestoneExecutionAction({ milestone, tasks, projects, trigger, 
       try {
         const runtime = await window.electron?.agentRuntime?.getState?.();
         if (!runtime?.ok || !runtime.value) throw new Error(runtime?.error || 'Runtime profiles could not be loaded.');
-        const sessions = await window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 });
+        const sessions = await measurePerformanceOperation('acp', 'milestone.sessions.list', async () => (
+          window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 })
+        ));
           const activeBindings = sessions?.bindings || [];
           const sessionEvents = sessions?.events || [];
         const nextRows = await Promise.all(linkedTasks.map(async task => {

@@ -2,34 +2,23 @@ import React, { type RefObject } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../../types';
-import type { GoalPolicyV1 } from '../../utils/goalPolicy';
 import { ViewType } from '../../hooks/useViewState';
 import type { KanbanTaskFilters } from '../../utils/taskFilters';
-import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
 import type { TimelineLayoutState } from '../../services/uiState';
-import { TimelineView } from './TimelineView';
-import { KanbanView } from './KanbanView';
-import { RoadmapView } from './RoadmapView';
-import { GoalsView } from './GoalsView';
+import { buildWorkspaceReadModel } from '../../domain/workspaceReadModel';
+import { useWorkspaceSelector } from '../../store/workspaceStore';
+import { areShallowValuesEqual } from '../../store/workspaceSelectors.ts';
+import { areAppMainViewsPropsEqual } from './appMainViewsMemo';
+
+const TimelineView = React.lazy(() => import('./TimelineView').then(module => ({ default: module.TimelineView })));
+const KanbanView = React.lazy(() => import('./KanbanView').then(module => ({ default: module.KanbanView })));
+const RoadmapView = React.lazy(() => import('./RoadmapView').then(module => ({ default: module.RoadmapView })));
+const GoalsView = React.lazy(() => import('./GoalsView').then(module => ({ default: module.GoalsView })));
 
 export interface AppViewFrameProps {
   timelineContainerRef: RefObject<HTMLDivElement>;
   kanbanContainerRef: RefObject<HTMLDivElement>;
   viewRefreshKey: number;
-}
-
-export interface AppViewDataProps {
-  tasks: Task[];
-  timelineSwimlanes: TimelineSwimlane[];
-  people: Person[];
-  statusColumns: StatusColumn[];
-  milestones: ProjectMilestone[];
-  goalPolicy: GoalPolicyV1;
-  goalAuditArchiveDirectory: string;
-  onGoalAuditArchiveDirectoryChange: (directory: string) => void;
-  customScrollbarsEnabled: boolean;
-  condensedUI: boolean;
-  readModel: WorkspaceReadModel;
 }
 
 export interface TimelineViewController {
@@ -75,97 +64,128 @@ export interface RoadmapViewController {
 export interface AppMainViewsProps {
   currentView: ViewType;
   frame: AppViewFrameProps;
-  data: AppViewDataProps;
   timeline: TimelineViewController;
   kanban: KanbanViewController;
   roadmap: RoadmapViewController;
 }
 
-export function AppMainViews({
+export const AppMainViews = React.memo(function AppMainViews({
   currentView,
   frame,
-  data,
   timeline,
   kanban,
   roadmap,
 }: AppMainViewsProps) {
+  const {
+    tasks,
+    timelineSwimlanes,
+    people,
+    statusColumns,
+    milestones,
+    goalPolicy,
+    goalAuditArchiveDirectory,
+    customScrollbarsEnabled,
+    condensedUI,
+    onGoalAuditArchiveDirectoryChange,
+  } = useWorkspaceSelector(state => ({
+    tasks: state.tasks,
+    timelineSwimlanes: state.timelineSwimlanes,
+    people: state.people,
+    statusColumns: state.statusColumns,
+    milestones: state.milestones,
+    goalPolicy: state.goalPolicy,
+    goalAuditArchiveDirectory: state.preferences.goalAuditArchiveDirectory,
+    customScrollbarsEnabled: state.preferences.customScrollbarsEnabled,
+    condensedUI: state.preferences.condensedUI,
+    onGoalAuditArchiveDirectoryChange: state.setGoalAuditArchiveDirectory,
+  }), areShallowValuesEqual);
+  const readModel = React.useMemo(() => buildWorkspaceReadModel({
+    tasks,
+    milestones,
+    projects: timelineSwimlanes,
+    people,
+    statusColumns,
+  }), [milestones, people, statusColumns, tasks, timelineSwimlanes]);
+
   return (
     <div className="flex-1 min-h-0 overflow-hidden">
-      {currentView === 'timeline' && (
-        <div key={`timeline-${frame.viewRefreshKey}`} ref={frame.timelineContainerRef} className="h-full w-full">
-          <TimelineView
-            tasks={data.tasks}
-            swimlanes={data.timelineSwimlanes}
-            people={data.people}
-            statusColumns={data.statusColumns}
-            customScrollbarsEnabled={data.customScrollbarsEnabled}
-            condensedUI={data.condensedUI}
-            initialScrollLeft={timeline.timelineInitialScrollLeft}
-            initialLayoutState={timeline.timelineInitialLayoutState}
-            onLayoutStateChange={timeline.onTimelineLayoutStateChange}
-            onTaskClick={timeline.onTimelineTaskClick}
-            onTaskEdit={timeline.onTimelineTaskEdit}
-            onTaskDelete={timeline.onTimelineTaskDelete}
-            onTaskDuplicate={timeline.onTimelineTaskDuplicate}
-            onAddTask={timeline.onTimelineAddTask}
-            onUpdateTaskDates={timeline.onTimelineUpdateTaskDates}
-            onEditSwimlane={timeline.onTimelineEditSwimlane}
-            onAddSwimlane={timeline.onTimelineAddSwimlane}
-            onReorderSwimlanes={timeline.onTimelineReorderSwimlanes}
-            onReorderPeople={timeline.onTimelineReorderPeople}
-            onReorderTasks={timeline.onTimelineReorderTasks}
-            onTimelineScroll={timeline.onTimelineScroll}
-          />
-        </div>
-      )}
-
-      {currentView === 'kanban' && (
-        <div key={`kanban-${frame.viewRefreshKey}`} className="flex h-full min-h-0 w-full">
-          <DndProvider backend={HTML5Backend}>
-            <KanbanView
-              tasks={data.tasks}
-              swimlanes={data.statusColumns}
-              projects={data.timelineSwimlanes}
-              people={data.people}
-              customScrollbarsEnabled={data.customScrollbarsEnabled}
-              condensedUI={data.condensedUI}
-              initialFilters={kanban.kanbanInitialFilters}
-              scrollContainerRef={frame.kanbanContainerRef}
-              initialScrollLeft={kanban.kanbanInitialScrollLeft}
-              initialScrollTop={kanban.kanbanInitialScrollTop}
-              onTaskClick={kanban.onKanbanTaskClick}
-              onEditTask={kanban.onKanbanEditTask}
-              onAddTask={kanban.onKanbanAddTask}
-              onMoveTask={kanban.onKanbanMoveTask}
-              onReorderTasks={kanban.onKanbanReorderTasks}
-              onReorderColumns={kanban.onKanbanReorderColumns}
-              onUpdateColumn={kanban.onKanbanUpdateColumn}
-              onAddColumn={kanban.onKanbanAddColumn}
-              onDeleteColumn={kanban.onKanbanDeleteColumn}
+      <React.Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-gray-500" role="status">Loading view...</div>}>
+        {currentView === 'timeline' && (
+          <div key={`timeline-${frame.viewRefreshKey}`} ref={frame.timelineContainerRef} className="h-full w-full">
+            <TimelineView
+              tasks={tasks}
+              swimlanes={timelineSwimlanes}
+              people={people}
+              statusColumns={statusColumns}
+              customScrollbarsEnabled={customScrollbarsEnabled}
+              condensedUI={condensedUI}
+              initialScrollLeft={timeline.timelineInitialScrollLeft}
+              initialLayoutState={timeline.timelineInitialLayoutState}
+              onLayoutStateChange={timeline.onTimelineLayoutStateChange}
+              onTaskClick={timeline.onTimelineTaskClick}
+              onTaskEdit={timeline.onTimelineTaskEdit}
+              onTaskDelete={timeline.onTimelineTaskDelete}
+              onTaskDuplicate={timeline.onTimelineTaskDuplicate}
+              onAddTask={timeline.onTimelineAddTask}
+              onUpdateTaskDates={timeline.onTimelineUpdateTaskDates}
+              onEditSwimlane={timeline.onTimelineEditSwimlane}
+              onAddSwimlane={timeline.onTimelineAddSwimlane}
+              onReorderSwimlanes={timeline.onTimelineReorderSwimlanes}
+              onReorderPeople={timeline.onTimelineReorderPeople}
+              onReorderTasks={timeline.onTimelineReorderTasks}
+              onTimelineScroll={timeline.onTimelineScroll}
             />
-          </DndProvider>
-        </div>
-      )}
+          </div>
+        )}
 
-      {currentView === 'roadmap' && (
-        <div key={`roadmap-${frame.viewRefreshKey}`} className="flex h-full min-h-0 w-full">
-          <RoadmapView
-            milestones={data.milestones}
-            tasks={data.tasks}
-            projects={data.timelineSwimlanes}
-            statusColumns={data.statusColumns}
-            customScrollbarsEnabled={data.customScrollbarsEnabled}
-            condensedUI={data.condensedUI}
-            readModel={data.readModel}
-            showCompleted={roadmap.showCompleted}
-            onAddMilestone={roadmap.onRoadmapAddMilestone}
-            onMilestoneClick={roadmap.onRoadmapMilestoneClick}
-            onTaskClick={roadmap.onRoadmapTaskClick}
-          />
-        </div>
-      )}
+        {currentView === 'kanban' && (
+          <div key={`kanban-${frame.viewRefreshKey}`} className="flex h-full min-h-0 w-full">
+            <DndProvider backend={HTML5Backend}>
+              <KanbanView
+                tasks={tasks}
+                swimlanes={statusColumns}
+                projects={timelineSwimlanes}
+                people={people}
+                customScrollbarsEnabled={customScrollbarsEnabled}
+                condensedUI={condensedUI}
+                initialFilters={kanban.kanbanInitialFilters}
+                scrollContainerRef={frame.kanbanContainerRef}
+                initialScrollLeft={kanban.kanbanInitialScrollLeft}
+                initialScrollTop={kanban.kanbanInitialScrollTop}
+                onTaskClick={kanban.onKanbanTaskClick}
+                onEditTask={kanban.onKanbanEditTask}
+                onAddTask={kanban.onKanbanAddTask}
+                onMoveTask={kanban.onKanbanMoveTask}
+                onReorderTasks={kanban.onKanbanReorderTasks}
+                onReorderColumns={kanban.onKanbanReorderColumns}
+                onUpdateColumn={kanban.onKanbanUpdateColumn}
+                onAddColumn={kanban.onKanbanAddColumn}
+                onDeleteColumn={kanban.onKanbanDeleteColumn}
+              />
+            </DndProvider>
+          </div>
+        )}
 
-      {currentView === 'loops' && <GoalsView people={data.people} tasks={data.tasks} milestones={data.milestones} projects={data.timelineSwimlanes} workspacePolicy={data.goalPolicy} goalAuditArchiveDirectory={data.goalAuditArchiveDirectory} onGoalAuditArchiveDirectoryChange={data.onGoalAuditArchiveDirectoryChange} />}
+        {currentView === 'roadmap' && (
+          <div key={`roadmap-${frame.viewRefreshKey}`} className="flex h-full min-h-0 w-full">
+            <RoadmapView
+              milestones={milestones}
+              tasks={tasks}
+              projects={timelineSwimlanes}
+              statusColumns={statusColumns}
+              customScrollbarsEnabled={customScrollbarsEnabled}
+              condensedUI={condensedUI}
+              readModel={readModel}
+              showCompleted={roadmap.showCompleted}
+              onAddMilestone={roadmap.onRoadmapAddMilestone}
+              onMilestoneClick={roadmap.onRoadmapMilestoneClick}
+              onTaskClick={roadmap.onRoadmapTaskClick}
+            />
+          </div>
+        )}
+
+        {currentView === 'loops' && <GoalsView people={people} tasks={tasks} milestones={milestones} projects={timelineSwimlanes} workspacePolicy={goalPolicy} goalAuditArchiveDirectory={goalAuditArchiveDirectory} onGoalAuditArchiveDirectoryChange={onGoalAuditArchiveDirectoryChange} />}
+      </React.Suspense>
     </div>
   );
-}
+}, areAppMainViewsPropsEqual);

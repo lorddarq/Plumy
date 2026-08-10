@@ -54,6 +54,7 @@ test('sanitizePreferences preserves rc update channel and falls back to stable',
     mcpAccessToken: '',
     mcpAccessTokenIssuedAt: undefined,
     mcpAccessTokenTtlMinutes: 60,
+    performanceLoggingEnabled: false,
   };
   const statusColumns = [
     { id: 'open', title: 'Open' },
@@ -65,6 +66,7 @@ test('sanitizePreferences preserves rc update channel and falls back to stable',
       updateChannel: 'rc',
       executionLoadStatusIds: ['in-progress'],
       pipelineLoadStatusIds: ['open'],
+      performanceLoggingEnabled: true,
     },
     statusColumns,
     fallback
@@ -80,6 +82,7 @@ test('sanitizePreferences preserves rc update channel and falls back to stable',
   );
 
   assert.equal(rcPreferences.updateChannel, 'rc');
+  assert.equal(rcPreferences.performanceLoggingEnabled, true);
   assert.equal(stablePreferences.updateChannel, 'stable');
 });
 

@@ -104,6 +104,7 @@ export function readInitialWorkspaceState(seeds: WorkspaceSeeds): InitialWorkspa
       : [],
     customScrollbarsEnabled: storedPreferences.customScrollbarsEnabled !== false,
     condensedUI: storedPreferences.condensedUI === true,
+    performanceLoggingEnabled: storedPreferences.performanceLoggingEnabled === true,
     updateChannel: storedPreferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(storedPreferences.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
     mcpAgentAccessEnabled: Boolean(storedPreferences.mcpAgentAccessEnabled),

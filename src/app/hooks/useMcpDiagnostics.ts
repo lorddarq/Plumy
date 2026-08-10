@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { createMcpReadService } from '../services/mcp/service';
+import { measurePerformanceOperation } from '../services/performanceLogging.ts';
 
 interface UseMcpDiagnosticsOptions {
   enabled: boolean;
@@ -22,7 +23,7 @@ export function useMcpDiagnostics({ enabled, endpoint }: UseMcpDiagnosticsOption
         endpoint,
       });
 
-      const result = await mcp.diagnostics();
+      const result = await measurePerformanceOperation('mcp', 'diagnostics', () => mcp.diagnostics());
       if (cancelled) return;
 
       if (result.ok) {

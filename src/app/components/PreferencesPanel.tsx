@@ -22,7 +22,9 @@ import { McpCommandSettingsSection } from './settings/McpCommandSettingsSection'
 import { McpActivityLogSection } from './settings/McpDiagnosticsSections';
 import { PeopleManagementSections } from './settings/PeopleSettingsSections';
 import { Switch } from './ui/switch';
+import { Button } from './ui/button';
 import { AgentRuntimeSettings } from './settings/AgentRuntimeSettings';
+import { useWorkspaceSelector } from '../store/workspaceStore.tsx';
 
 interface PreferencesPanelProps {
   isOpen: boolean;
@@ -175,6 +177,8 @@ export function PreferencesPanel({
   onRefreshMcpAuditLog,
   storageMeter,
 }: PreferencesPanelProps) {
+  const performanceLoggingEnabled = useWorkspaceSelector(state => state.preferences.performanceLoggingEnabled);
+  const onPerformanceLoggingEnabledChange = useWorkspaceSelector(state => state.setPerformanceLoggingEnabled);
   const [copied, setCopied] = useState(false);
   const [copiedCommand, setCopiedCommand] = useState(false);
   const [copiedWriteCommand, setCopiedWriteCommand] = useState(false);
@@ -350,6 +354,27 @@ export function PreferencesPanel({
             aria-label="Use custom horizontal scrollbars"
             checked={customScrollbarsEnabled}
             onCheckedChange={onCustomScrollbarsEnabledChange}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-4 border-b border-black/5 pb-4">
+          <div>
+            <div className="text-sm font-semibold leading-5 text-[#71717a]">Performance logging</div>
+            <p className="mt-1 text-xs leading-4 text-[#6a7282]">
+              Write private timing-only diagnostics to a local file for this and future app runs.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => { void window.electron?.performance?.openLogsFolder(); }}>
+                Open logs folder
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => { void window.electron?.performance?.clearLogs(); }}>
+                Clear logs
+              </Button>
+            </div>
+          </div>
+          <Switch
+            aria-label="Performance logging"
+            checked={performanceLoggingEnabled}
+            onCheckedChange={onPerformanceLoggingEnabledChange}
           />
         </div>
         <MarkdownAppearanceSettings

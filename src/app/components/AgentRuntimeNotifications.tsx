@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import type { Task } from '../types.ts';
 import { findNewCompletedTaskRuns } from '../utils/agentRuntimeNotifications.ts';
+import { measurePerformanceOperation } from '../services/performanceLogging.ts';
 
 export function AgentRuntimeNotifications({ tasks }: { tasks: Task[] }) {
   const tasksRef = useRef(tasks);
@@ -23,7 +24,9 @@ export function AgentRuntimeNotifications({ tasks }: { tasks: Task[] }) {
       }
       refreshRunning = true;
       try {
-        const result = await runtime.sessions.list({ limit: 100 });
+        const result = await measurePerformanceOperation('acp', 'notifications.sessions.list', () => (
+          runtime.sessions.list({ limit: 100 })
+        ));
         if (disposed || !result?.ok) return;
         const events = Array.isArray(result.events) ? result.events : [];
         if (!initialized) {

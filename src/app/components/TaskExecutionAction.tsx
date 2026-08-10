@@ -18,6 +18,7 @@ import { StateBadge } from './statuses/AppStatusBar';
 import { getAttentionState } from '../utils/attention';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from './ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { measurePerformanceOperation } from '../services/performanceLogging.ts';
 
 interface RuntimeState {
   profiles?: Array<{ id: string; name: string; integrationMode: string; enabled: boolean }>;
@@ -344,7 +345,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
 
   const refreshSession = async () => {
     const sequence = ++refreshSequence.current;
-    const index = await window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 });
+    const index = await measurePerformanceOperation('acp', 'task-execution.sessions.index', async () => (
+      window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 })
+    ));
     if (sequence !== refreshSequence.current) return null;
     if (!index?.ok) {
       console.warn('[agent-runtime:ui] session-refresh.rejected', { taskId: task.id, error: index?.error || 'Session list unavailable.' });
@@ -364,10 +367,14 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       setSessionLoaded(true);
       return null;
     }
-    const detail = await window.electron?.agentRuntime?.sessions?.list?.({ bindingId: nextBinding.id, limit: 100 });
+    const detail = await measurePerformanceOperation('acp', 'task-execution.sessions.detail', async () => (
+      window.electron?.agentRuntime?.sessions?.list?.({ bindingId: nextBinding.id, limit: 100 })
+    ));
     const resolvedBinding = (detail?.bindings || [nextBinding])[0] || nextBinding;
     const requests = agentRuntimeTurnState(resolvedBinding) === 'waiting-input'
-      ? await window.electron?.agentRuntime?.sessions?.requests?.(nextBinding.id)
+      ? await measurePerformanceOperation('acp', 'task-execution.requests.list', async () => (
+          window.electron?.agentRuntime?.sessions?.requests?.(nextBinding.id)
+        ))
       : [];
     if (sequence !== refreshSequence.current) return null;
     setBinding(resolvedBinding);

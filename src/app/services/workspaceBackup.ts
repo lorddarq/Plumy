@@ -51,6 +51,7 @@ export interface WorkspacePreferences {
   markdownAppearance: MarkdownAppearance;
   skillRoots?: Array<{ root: string; source?: string }>;
   condensedUI?: boolean;
+  performanceLoggingEnabled?: boolean;
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -495,6 +496,7 @@ export function sanitizePreferences(
           .map(item => ({ root: item.root.trim(), source: typeof item.source === 'string' ? item.source : 'omvra-configured' }))
       : (fallback.skillRoots || []),
     condensedUI: preferences.condensedUI === true,
+    performanceLoggingEnabled: preferences.performanceLoggingEnabled === true,
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'
@@ -899,6 +901,7 @@ export function createDefaultWorkspacePreferences(
           .map(item => ({ root: item.root.trim(), source: typeof item.source === 'string' ? item.source : 'omvra-configured' }))
       : [],
     condensedUI: overrides.condensedUI === true,
+    performanceLoggingEnabled: overrides.performanceLoggingEnabled === true,
     mcpAgentAccessEnabled: Boolean(overrides.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       overrides.mcpCapabilityProfile === 'task_write' || overrides.mcpCapabilityProfile === 'admin'

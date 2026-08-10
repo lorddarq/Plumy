@@ -141,6 +141,9 @@ export function useWorkspaceActions(options: WorkspaceActionOptions) {
   const setCondensedUI = useCallback((enabled: boolean) => {
     setPreferences(previous => ({ ...previous, condensedUI: enabled }));
   }, [setPreferences]);
+  const setPerformanceLoggingEnabled = useCallback((enabled: boolean) => {
+    setPreferences(previous => ({ ...previous, performanceLoggingEnabled: enabled }));
+  }, [setPreferences]);
   const handleUpdateGoalPolicy = useCallback((updates: Parameters<typeof updateGoalPolicy>[1]) => {
     setGoalPolicy(previous => updateGoalPolicy(previous, updates));
   }, [setGoalPolicy]);
@@ -206,6 +209,7 @@ export function useWorkspaceActions(options: WorkspaceActionOptions) {
     setExternalSkillsDirectory,
     setCustomScrollbarsEnabled,
     setCondensedUI,
+    setPerformanceLoggingEnabled,
     updateGoalPolicy: handleUpdateGoalPolicy,
     resetGoalPolicy,
     setUpdateChannel,
@@ -231,6 +235,7 @@ export function useWorkspaceActions(options: WorkspaceActionOptions) {
     saveMilestone,
     setCleanupGoalArtifacts,
     setCondensedUI,
+    setPerformanceLoggingEnabled,
     setCustomScrollbarsEnabled,
     setExternalSkillsDirectory,
     setGoalAuditArchiveDirectory,

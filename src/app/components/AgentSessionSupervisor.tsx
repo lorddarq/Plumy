@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Task, TimelineSwimlane } from '../types';
 import { TaskExecutionAction } from './TaskExecutionAction';
 import { agentRuntimeTurnState, isAgentRuntimeTurnInFlight, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
+import { measurePerformanceOperation } from '../services/performanceLogging.ts';
 
 export const CONNECTED_SESSION_STATES = new Set(['starting', 'ready']);
 const HISTORY_SESSION_STATES = new Set(['interrupted', 'failed', 'closed', 'complete', 'completed']);
@@ -73,13 +74,17 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       if (refreshRunning || disposed) return;
       refreshRunning = true;
       try {
-        const result = await window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 });
+        const result = await measurePerformanceOperation('acp', 'supervisor.sessions.list', async () => (
+          window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 })
+        ));
         if (!result?.ok || !Array.isArray(result.bindings)) return;
         const nextBindings = result.bindings as SessionBinding[];
         const requestEntries = await Promise.all(nextBindings
           .filter(binding => agentRuntimeTurnState(binding) === 'waiting-input')
           .map(async binding => {
-            const requests = await window.electron?.agentRuntime?.sessions?.requests?.(binding.id);
+            const requests = await measurePerformanceOperation('acp', 'supervisor.requests.list', async () => (
+              window.electron?.agentRuntime?.sessions?.requests?.(binding.id)
+            ));
             const request = Array.isArray(requests) ? requests[0] : undefined;
             return [binding.id, request && typeof request.message === 'string' ? { requestId: request.requestId, message: request.message } : undefined] as const;
           }));

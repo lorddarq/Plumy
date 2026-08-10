@@ -58,6 +58,12 @@ contextBridge.exposeInMainWorld('electron', {
     getRuntimeInfo: () => ipcRenderer.invoke('app/get-runtime-info'),
   },
 
+  performance: {
+    record: (event) => ipcRenderer.invoke('performance/record', event),
+    openLogsFolder: () => ipcRenderer.invoke('performance/open-logs-folder'),
+    clearLogs: () => ipcRenderer.invoke('performance/clear-logs'),
+  },
+
   updates: {
     getState: () => ipcRenderer.invoke('updates/get-state'),
     check: () => ipcRenderer.invoke('updates/check'),

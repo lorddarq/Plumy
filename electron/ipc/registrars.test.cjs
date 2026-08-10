@@ -9,6 +9,7 @@ const { registerExternalLinkIpcHandlers } = require('./external-links.cjs');
 const { registerRuntimeIpcHandlers } = require('./runtime.cjs');
 const { registerAgentRuntimeIpcHandlers } = require('./agent-runtime.cjs');
 const { registerTaskContextIpcHandlers } = require('./task-context.cjs');
+const { registerPerformanceIpcHandlers } = require('./performance.cjs');
 
 function createIpcHarness() {
   const handlers = new Map();
@@ -40,6 +41,24 @@ test('store registrar preserves channels and reports preference writes after per
   assert.equal(store.get('preferences'), value);
   assert.equal(persistedValue, value);
   assert.deepEqual([...handlers.keys()].sort(), ['store/delete', 'store/export', 'store/get', 'store/set']);
+});
+
+test('performance registrar delegates timing records and local log controls', async () => {
+  const { handlers, ipcMain } = createIpcHarness();
+  const calls = [];
+  registerPerformanceIpcHandlers({
+    ipcMain,
+    performanceLog: {
+      record: details => { calls.push(['record', details]); return { ok: true }; },
+      openFolder: () => { calls.push(['open']); return { ok: true }; },
+      clear: () => { calls.push(['clear']); return { ok: true }; },
+    },
+  });
+
+  assert.deepEqual(await handlers.get('performance/record')(null, { operation: 'render' }), { ok: true });
+  assert.deepEqual(await handlers.get('performance/open-logs-folder')(), { ok: true });
+  assert.deepEqual(await handlers.get('performance/clear-logs')(), { ok: true });
+  assert.deepEqual(calls, [['record', { operation: 'render' }], ['open'], ['clear']]);
 });
 
 test('Goal registrar rejects missing reset ids before creating a lifecycle service', () => {

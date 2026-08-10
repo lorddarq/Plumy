@@ -18,6 +18,7 @@ export interface AppPreferencesLike {
   skillRoots?: Array<{ root: string; source?: string }>;
   customScrollbarsEnabled: boolean;
   condensedUI?: boolean;
+  performanceLoggingEnabled?: boolean;
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
   updateChannel: 'stable' | 'rc';
@@ -423,6 +424,7 @@ export function sanitizePreferences(
       : (fallback.skillRoots || []),
     customScrollbarsEnabled: preferences.customScrollbarsEnabled !== false,
     condensedUI: preferences.condensedUI === true,
+    performanceLoggingEnabled: preferences.performanceLoggingEnabled === true,
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),

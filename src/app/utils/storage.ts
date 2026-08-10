@@ -1,4 +1,5 @@
 import { shouldBootstrapFromLocalStorage } from './canonicalHydration.js';
+import { measurePerformanceOperation } from '../services/performanceLogging.ts';
 
 export async function getJSON<T = any>(key: string, fallback: T | null = null): Promise<T | null> {
   // In Electron we have window.electron.storeGet available via preload
@@ -92,24 +93,24 @@ export async function deleteStoredValue(key: string): Promise<void> {
 export function persistJSONWithElectronMirror<T = any>(key: string, value: T): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve();
 
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch (err) {
-    // ignore
-  }
-
-  try {
-    const storeSet = window.electron?.storeSet;
-    if (typeof storeSet === 'function') {
-      return storeSet(key, value).catch(() => {
-        // Ignore mirror failures to keep renderer persistence non-breaking.
-      });
+  return measurePerformanceOperation('storage', `persist.${key}`, async () => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (err) {
+      // ignore
     }
-  } catch (err) {
-    // ignore
-  }
 
-  return Promise.resolve();
+    try {
+      const storeSet = window.electron?.storeSet;
+      if (typeof storeSet === 'function') {
+        await storeSet(key, value).catch(() => {
+          // Ignore mirror failures to keep renderer persistence non-breaking.
+        });
+      }
+    } catch (err) {
+      // ignore
+    }
+  });
 }
 
 export function persistRawWithElectronMirror(key: string, value: string): void {

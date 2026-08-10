@@ -1,5 +1,11 @@
 import type { TaskStatus } from '../types.ts';
 
+export function areShallowValuesEqual<T extends object>(left: T, right: T): boolean {
+  const keys = Object.keys(left) as Array<keyof T>;
+  return keys.length === Object.keys(right).length
+    && keys.every(key => Object.is(left[key], right[key]));
+}
+
 export function normalizeLoadStatusIds(
   value: unknown,
   fallback: TaskStatus[],

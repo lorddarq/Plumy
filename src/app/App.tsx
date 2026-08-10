@@ -6,13 +6,16 @@ import { DeleteConfirmDialog } from './components/dialogs/DeleteConfirmDialog';
 import { UpdateAvailablePopup } from './components/UpdateAvailablePopup';
 import { useAppShell } from './hooks/useAppShell.ts';
 import { UiLayoutStoreProvider } from './store/uiLayoutStore.tsx';
-import { WorkspaceStoreProvider, useWorkspaceStore } from './store/workspaceStore.tsx';
+import { WorkspaceStoreProvider, useWorkspaceSelector } from './store/workspaceStore.tsx';
 import { Toaster } from './components/ui/sonner';
 import { AgentRuntimeNotifications } from './components/AgentRuntimeNotifications.tsx';
 import { OnboardingDialog } from './components/OnboardingDialog.tsx';
 import { hasCompletedOnboarding } from './utils/onboarding.ts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Profiler, useCallback, useEffect, useRef, useState } from 'react';
 import { AgentSessionSupervisorProvider } from './components/AgentSessionSupervisor';
+import { usePerformanceLogging } from './hooks/usePerformanceLogging.ts';
+import { recordReactCommit } from './services/performanceLogging.ts';
+import { areShallowValuesEqual } from './store/workspaceSelectors.ts';
 
 function AppContent() {
   const appShell = useAppShell();
@@ -90,7 +93,12 @@ function AppContent() {
     <>
       <div className="flex h-dvh flex-col bg-gray-50">
         <AppHeader {...appShell.headerProps} />
-        <AppMainViews {...appShell.mainViewsProps} />
+        <Profiler
+          id={`major-view:${appShell.mainViewsProps.currentView}`}
+          onRender={(_id, _phase, actualDuration) => recordReactCommit(appShell.mainViewsProps.currentView, actualDuration)}
+        >
+          <AppMainViews {...appShell.mainViewsProps} />
+        </Profiler>
         <AppStatusBar {...appShell.statusBarProps} />
         <AppPanels {...appShell.panelsProps} />
         <UpdateAvailablePopup {...appShell.updatePopupProps} />
@@ -109,7 +117,16 @@ function AppStoreShell() {
     people,
     tasks,
     milestones,
-  } = useWorkspaceStore();
+    performanceLoggingEnabled,
+  } = useWorkspaceSelector(state => ({
+    hasHydratedCanonicalWorkspace: state.hasHydratedCanonicalWorkspace,
+    timelineSwimlanes: state.timelineSwimlanes,
+    people: state.people,
+    tasks: state.tasks,
+    milestones: state.milestones,
+    performanceLoggingEnabled: state.preferences.performanceLoggingEnabled,
+  }), areShallowValuesEqual);
+  usePerformanceLogging(performanceLoggingEnabled);
 
   return (
     <UiLayoutStoreProvider

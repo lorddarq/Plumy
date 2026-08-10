@@ -18,9 +18,35 @@ import type { McpPreferencesShape } from '../utils/mcpPreferences.ts';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers.ts';
 import mcpHttpServer from '../../../electron/services/mcp-http-server.cjs';
 import testFixtures from '../../../electron/services/test-fixtures.cjs';
+import { areAppMainViewsPropsEqual } from '../components/views/appMainViewsMemo.ts';
 
 const { createRequestDispatcher } = mcpHttpServer;
 const { makeStoreFromFixture } = testFixtures;
+
+test('AppMainViews ignores shell-only updates but renders changed view inputs', () => {
+  const shared = {
+    currentView: 'timeline',
+    frame: { viewRefreshKey: 0, timelineContainerRef: {}, kanbanContainerRef: {} },
+    timeline: { onTimelineScroll: () => undefined },
+    kanban: { onKanbanTaskClick: () => undefined },
+    roadmap: { onRoadmapTaskClick: () => undefined },
+  } as any;
+
+  const rebuiltByShellPoll = {
+    ...shared,
+    frame: { ...shared.frame },
+    timeline: { ...shared.timeline },
+    kanban: { ...shared.kanban },
+    roadmap: { ...shared.roadmap },
+  };
+  assert.equal(areAppMainViewsPropsEqual(shared, rebuiltByShellPoll), true);
+
+  const changedViewInput = {
+    ...rebuiltByShellPoll,
+    currentView: 'kanban',
+  };
+  assert.equal(areAppMainViewsPropsEqual(shared, changedViewInput), false);
+});
 
 const { act, create } = TestRenderer as any;
 

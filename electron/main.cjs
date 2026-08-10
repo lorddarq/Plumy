@@ -20,6 +20,7 @@ const { registerAttachmentIpcHandlers } = require('./ipc/attachments.cjs');
 const { registerExternalLinkIpcHandlers } = require('./ipc/external-links.cjs');
 const { registerRuntimeIpcHandlers } = require('./ipc/runtime.cjs');
 const { registerAgentRuntimeIpcHandlers } = require('./ipc/agent-runtime.cjs');
+const { registerPerformanceIpcHandlers } = require('./ipc/performance.cjs');
 const { createAgentRuntimeSessionRunner } = require('./services/agent-runtime-session-runner.cjs');
 const { resolveProfile: resolveAgentRuntimeProfile } = require('./domain/agent-runtime-profile-service.cjs');
 const { registerTaskContextIpcHandlers } = require('./ipc/task-context.cjs');
@@ -61,6 +62,7 @@ const { runDueSchedules } = require('./services/goal-schedule-service.cjs');
 const { createGoalRuntimeService } = require('./services/goal-runtime-service.cjs');
 const { getBundledSkillsRoot } = require('./services/skill-service.cjs');
 const { resolveWorkspaceUserDataPath } = require('./services/workspace-paths.cjs');
+const { createPerformanceLogService } = require('./services/performance-log.cjs');
 
 const APP_NAME = 'Omvra';
 const AGENT_RUNTIME_RECONCILIATION_INTERVAL_MS = 5_000;
@@ -73,6 +75,10 @@ const userDataPath = resolveWorkspaceUserDataPath({ appDataPath, appName: APP_NA
 app.setName(APP_NAME);
 app.setPath('userData', userDataPath);
 const store = new Store({ name: storeName });
+const performanceLog = createPerformanceLogService({
+  logsDirectory: path.join(app.getPath('userData'), 'performance-logs'),
+  shell,
+});
 reconcileInterruptedAgentRuntimeSessions(store);
 const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   store,
@@ -571,6 +577,11 @@ registerStoreIpcHandlers({
       userDataPath: app.getPath('userData'),
     });
   },
+});
+
+registerPerformanceIpcHandlers({
+  ipcMain,
+  performanceLog,
 });
 
 registerTaskContextIpcHandlers({

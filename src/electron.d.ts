@@ -227,6 +227,18 @@ declare global {
           };
         }>;
       };
+      performance: {
+        record: (event: {
+          occurredAt?: string;
+          category: string;
+          operation: string;
+          correlationId?: string | null;
+          durationMs?: number | null;
+          detail?: string | null;
+        }) => Promise<{ ok: boolean; disabled?: boolean; path?: string }>;
+        openLogsFolder: () => Promise<{ ok: boolean; error?: string }>;
+        clearLogs: () => Promise<{ ok: boolean; error?: string }>;
+      };
       updates: {
         getState: () => Promise<AppUpdateState>;
         check: () => Promise<AppUpdateState>;
