@@ -83,7 +83,10 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(statusBar, /Open supervision:/);
   assert.match(statusBar, /pendingRequest\.message/);
   assert.match(statusBar, /Input request unavailable/);
-  assert.match(execution, /Answer the pending request above/);
+  const activityIndex = execution.indexOf('Agent activity');
+  const pendingDecisionIndex = execution.indexOf("respondToRequest(request, 'decline')");
+  assert.ok(pendingDecisionIndex > activityIndex, 'Pending request actions must remain beside the anchored composer area');
+  assert.match(execution, />Decline<\/button>/);
   assert.match(execution, /requestFieldIsMissing/);
   assert.match(execution, /Reconnect session/);
   assert.match(execution, /onBlockedByBinding\(result\.binding/);

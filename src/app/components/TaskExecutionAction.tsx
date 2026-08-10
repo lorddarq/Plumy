@@ -642,27 +642,6 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-500">Task status <StateBadge label={taskStatusLabel(task.status)} value="" tone={task.status === 'done' ? 'success' : task.status === 'under-review' ? 'warning' : task.status === 'in-progress' ? 'success' : 'muted'} /></div>
                 </div>
                 {executionNotice && <div className="mt-2"><ExecutionHint tone={executionNotice.tone} title={executionNotice.title} body={executionNotice.body} /></div>}
-                {!terminalBinding && pendingRequests.map(request => {
-                  const missingRequired = request.fields.some(field => requestFieldIsMissing(request, field, requestValues));
-                  return <div key={`${request.method}-${request.requestId}`} className="mt-3">
-                    <ExecutionNotice tone="warning" title={getAttentionState('needs-input').label} nextStep={getAttentionState('needs-input').nextStep} assertive>
-                      <div>{request.message}</div>
-                      {request.serverName && <div className="mt-1 text-[11px] text-amber-700">Requested by {request.serverName}</div>}
-                    {request.fields.length > 0 && <div className="mt-3 space-y-2">{request.fields.map(field => {
-                      const key = requestValueKey(request, field.name);
-                      const value = requestFieldValue(request, field, requestValues);
-                      return <label key={field.name} className="block text-xs text-slate-700"><span className="font-medium">{field.title}{field.required ? ' *' : ''}</span>{field.description && <span className="ml-1 text-slate-500">{field.description}</span>}
-                        {field.type === 'boolean'
-                          ? <input type="checkbox" checked={Boolean(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.checked }))} className="ml-2 align-middle" />
-                          : field.options?.length
-                            ? <select value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5"><option value="">Select…</option>{field.options.map(option => <option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
-                            : <input type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'} value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5" />}
-                      </label>;
-                    })}</div>}
-                      <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => void respondToRequest(request, 'decline')} disabled={requestBusy} className="rounded border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40">Decline</button><button type="button" onClick={() => void respondToRequest(request, 'accept')} disabled={requestBusy || missingRequired} className="rounded bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40">{request.responseKind === 'codex-approval' ? 'Allow' : 'Continue'}</button></div>
-                    </ExecutionNotice>
-                  </div>;
-                })}
                 {!terminalBinding && turnState === 'waiting-input' && sessionLoaded && pendingRequests.length === 0 && (
                   <ExecutionNotice tone="warning" title="Input request unavailable" nextStep="Reconnect the session to continue." assertive>
                     <div>Omvra no longer has an answerable request for this session.</div>
@@ -697,7 +676,25 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   </div>) : <div className="px-1.5 py-1">The agent has not started work yet.</div>}
                 </div>
                 <div className="mt-3">
-                  {pendingRequests.length > 0 ? <ExecutionNotice tone="warning" title="Answer the pending request above">The guidance composer is paused while the agent waits for this response. Use Continue or Decline on the request.</ExecutionNotice> : <TaskSessionComposer
+                  {pendingRequests.length > 0 ? <div className="space-y-2">{pendingRequests.map(request => {
+                    const missingRequired = request.fields.some(field => requestFieldIsMissing(request, field, requestValues));
+                    return <ExecutionNotice key={`${request.method}-${request.requestId}`} tone="warning" title={getAttentionState('needs-input').label} nextStep={getAttentionState('needs-input').nextStep} assertive>
+                      <div>{request.message}</div>
+                      {request.serverName && <div className="mt-1 text-[11px] text-amber-700">Requested by {request.serverName}</div>}
+                      {request.fields.length > 0 && <div className="mt-3 space-y-2">{request.fields.map(field => {
+                        const key = requestValueKey(request, field.name);
+                        const value = requestFieldValue(request, field, requestValues);
+                        return <label key={field.name} className="block text-xs text-slate-700"><span className="font-medium">{field.title}{field.required ? ' *' : ''}</span>{field.description && <span className="ml-1 text-slate-500">{field.description}</span>}
+                          {field.type === 'boolean'
+                            ? <input type="checkbox" checked={Boolean(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.checked }))} className="ml-2 align-middle" />
+                            : field.options?.length
+                              ? <select value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5"><option value="">Select…</option>{field.options.map(option => <option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
+                              : <input type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'} value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5" />}
+                        </label>;
+                      })}</div>}
+                      <div className="mt-3 flex flex-wrap justify-end gap-2"><button type="button" onClick={() => void respondToRequest(request, 'decline')} disabled={requestBusy} className="rounded border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40">Decline</button><button type="button" onClick={() => void respondToRequest(request, 'accept')} disabled={requestBusy || missingRequired} className="rounded bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40">{request.responseKind === 'codex-approval' ? 'Allow' : 'Continue'}</button></div>
+                    </ExecutionNotice>;
+                  })}</div> : <TaskSessionComposer
                     value={steerText}
                     running={isTurnActive}
                     busy={operationBusy}
