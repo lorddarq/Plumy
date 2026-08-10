@@ -957,45 +957,44 @@ export function TimelineView({
   }, []);
 
   const handleRowsVerticalScroll = useCallback(() => {
-    if (!leftListRef.current || !rowsContainerRef.current) return;
-    const rowsContainer = rowsContainerRef.current;
-    const scrollTop = rowsContainer.scrollTop;
-    const scrollLeft = rowsContainer.scrollLeft;
-    const scrollWidth = rowsContainer.scrollWidth;
-    const clientWidth = rowsContainer.clientWidth;
-
-    // Read layout metrics before synchronizing the fixed pane. Writing
-    // scrollTop first would force a synchronous reflow for the reads below.
-    leftListRef.current.scrollTop = scrollTop;
-
-    if (!windowExtensionPendingRef.current) {
-      const remainingRight = scrollWidth - clientWidth - scrollLeft;
-      const direction = scrollLeft <= WINDOW_EXTENSION_BUFFER_PX
-        ? 'past'
-        : remainingRight <= WINDOW_EXTENSION_BUFFER_PX
-          ? 'future'
-          : null;
-
-      if (direction) {
-        windowExtensionPendingRef.current = true;
-        if (direction === 'past') {
-          rowsContainer.scrollLeft += getTimelineWindowScrollCompensation(
-            timelineWindow,
-            direction,
-            showWeekends,
-            DEFAULT_DAY_WIDTH
-          );
-        }
-        setTimelineWindow(window => extendTimelineWindow(window, direction));
-      }
-    }
-
     if (scrollNotifyRafRef.current == null) {
       scrollNotifyRafRef.current = requestAnimationFrame(() => {
-        if (rowsContainerRef.current) {
+        const rowsContainer = rowsContainerRef.current;
+        const leftList = leftListRef.current;
+        if (rowsContainer && leftList) {
+          // Keep all layout reads and the fixed-pane write in one frame. Doing
+          // this in the scroll event itself blocks wheel dispatch on reflow.
+          const scrollTop = rowsContainer.scrollTop;
+          const scrollLeft = rowsContainer.scrollLeft;
+          const scrollWidth = rowsContainer.scrollWidth;
+          const clientWidth = rowsContainer.clientWidth;
+          leftList.scrollTop = scrollTop;
+
+          if (!windowExtensionPendingRef.current) {
+            const remainingRight = scrollWidth - clientWidth - scrollLeft;
+            const direction = scrollLeft <= WINDOW_EXTENSION_BUFFER_PX
+              ? 'past'
+              : remainingRight <= WINDOW_EXTENSION_BUFFER_PX
+                ? 'future'
+                : null;
+
+            if (direction) {
+              windowExtensionPendingRef.current = true;
+              if (direction === 'past') {
+                rowsContainer.scrollLeft += getTimelineWindowScrollCompensation(
+                  timelineWindow,
+                  direction,
+                  showWeekends,
+                  DEFAULT_DAY_WIDTH
+                );
+              }
+              setTimelineWindow(window => extendTimelineWindow(window, direction));
+            }
+          }
+
           const nextMetrics = {
-            scrollLeft: rowsContainerRef.current.scrollLeft,
-            viewportWidth: rowsContainerRef.current.clientWidth,
+            scrollLeft: rowsContainer.scrollLeft,
+            viewportWidth: rowsContainer.clientWidth,
           };
           setHorizontalMetrics(current => (
             current.scrollLeft === nextMetrics.scrollLeft && current.viewportWidth === nextMetrics.viewportWidth
@@ -1004,7 +1003,7 @@ export function TimelineView({
           ));
           onTimelineScroll?.({
             scrollLeft: nextMetrics.scrollLeft,
-            scrollTop: rowsContainerRef.current.scrollTop,
+            scrollTop: rowsContainer.scrollTop,
           });
         }
         scrollNotifyRafRef.current = null;
