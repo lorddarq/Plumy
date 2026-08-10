@@ -171,6 +171,16 @@ export function DraggableSwimlaneRow({
     [dates]
   );
 
+  const rowDayWidths = useMemo(
+    () => (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60),
+    [dateWidths, dates]
+  );
+  const rowDayPrefix = useMemo(() => {
+    const prefix: number[] = [0];
+    rowDayWidths.forEach(width => prefix.push(prefix[prefix.length - 1] + width));
+    return prefix;
+  }, [rowDayWidths]);
+
   const getTaskDurationDays = useCallback((task: Task): number => {
     const MS_PER_DAY = 1000 * 60 * 60 * 24;
     const origStart = parseISODateLocal(task.startDate);
@@ -192,11 +202,8 @@ export function DraggableSwimlaneRow({
     if (localX < 0) return null;
 
     // Compute prefix sums for day widths
-    const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
-    const prefix: number[] = [0];
-    for (let i = 0; i < dayWidthsLocal.length; i++) {
-      prefix.push(prefix[i] + (dayWidthsLocal[i] ?? 60));
-    }
+    const dayWidthsLocal = rowDayWidths;
+    const prefix = rowDayPrefix;
 
     // Find which day index the drop position corresponds to
     let dayIdx = 0;
@@ -231,11 +238,8 @@ export function DraggableSwimlaneRow({
     const left = calculateDropPosition(clientOffset, dragOffsetX);
     if (left === null) return null;
 
-    const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
-    const prefix: number[] = [0];
-    for (let i = 0; i < dayWidthsLocal.length; i++) {
-      prefix.push(prefix[i] + (dayWidthsLocal[i] ?? 60));
-    }
+    const dayWidthsLocal = rowDayWidths;
+    const prefix = rowDayPrefix;
     const matchedStartIdx = prefix.findIndex((value, index) => (
       index < prefix.length - 1 && left >= value && left < prefix[index + 1]
     ));
@@ -377,11 +381,8 @@ export function DraggableSwimlaneRow({
       const localX = clientOffset.x - containerRect.left + scrollLeft - (item.dragOffsetX ?? 0);
 
       // Compute prefix sums for day widths to find which day slot the drop is over
-      const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
-      const prefix: number[] = [0];
-      for (let i = 0; i < dayWidthsLocal.length; i++) {
-        prefix.push(prefix[i] + (dayWidthsLocal[i] ?? 60));
-      }
+      const dayWidthsLocal = rowDayWidths;
+      const prefix = rowDayPrefix;
 
       // Find which day index the drop position corresponds to
       let dayIdx = 0;
@@ -459,15 +460,6 @@ export function DraggableSwimlaneRow({
       : startIndex;
     return { task, startIndex, endIndex };
   }), [getVisibleIndexForDate, timelineTasks]);
-  const rowDayWidths = useMemo(
-    () => (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60),
-    [dateWidths, dates]
-  );
-  const rowDayPrefix = useMemo(() => {
-    const prefix: number[] = [0];
-    rowDayWidths.forEach(width => prefix.push(prefix[prefix.length - 1] + width));
-    return prefix;
-  }, [rowDayWidths]);
   const rowMonthStarts = useMemo(() => {
     const monthStarts: Record<string, number> = {};
     (monthKeys ?? []).forEach(monthKey => {
