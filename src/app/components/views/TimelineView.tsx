@@ -255,6 +255,7 @@ export function TimelineView({
   const hasInitializedScrollRef = useRef<boolean>(false);
   const scrollNotifyRafRef = useRef<number | null>(null);
   const windowExtensionPendingRef = useRef(false);
+  const lastHorizontalScrollLeftRef = useRef<number | null>(null);
   const resizeUpdateRafRef = useRef<number | null>(null);
   const pendingResizePreviewRef = useRef<{ taskId: string; left: number; width: number } | null>(null);
   const pendingRevealDateRef = useRef<string | null>(null);
@@ -955,48 +956,53 @@ export function TimelineView({
         const rowsContainer = rowsContainerRef.current;
         const leftList = leftListRef.current;
         if (rowsContainer && leftList) {
-          // Keep all layout reads and the fixed-pane write in one frame. Doing
-          // this in the scroll event itself blocks wheel dispatch on reflow.
+          // Keep the fixed-pane write in one frame. Horizontal geometry is
+          // independent from vertical scrolling, so avoid forcing layout on
+          // every vertical wheel frame just to re-check it.
           const scrollTop = rowsContainer.scrollTop;
           const scrollLeft = rowsContainer.scrollLeft;
-          const scrollWidth = rowsContainer.scrollWidth;
-          const clientWidth = rowsContainer.clientWidth;
           leftList.scrollTop = scrollTop;
 
-          if (!windowExtensionPendingRef.current) {
-            const remainingRight = scrollWidth - clientWidth - scrollLeft;
-            const direction = scrollLeft <= WINDOW_EXTENSION_BUFFER_PX
-              ? 'past'
-              : remainingRight <= WINDOW_EXTENSION_BUFFER_PX
-                ? 'future'
-                : null;
+          if (lastHorizontalScrollLeftRef.current !== scrollLeft) {
+            lastHorizontalScrollLeftRef.current = scrollLeft;
+            const scrollWidth = rowsContainer.scrollWidth;
+            const clientWidth = rowsContainer.clientWidth;
 
-            if (direction) {
-              windowExtensionPendingRef.current = true;
-              if (direction === 'past') {
-                rowsContainer.scrollLeft += getTimelineWindowScrollCompensation(
-                  timelineWindow,
-                  direction,
-                  showWeekends,
-                  DEFAULT_DAY_WIDTH
-                );
+            if (!windowExtensionPendingRef.current) {
+              const remainingRight = scrollWidth - clientWidth - scrollLeft;
+              const direction = scrollLeft <= WINDOW_EXTENSION_BUFFER_PX
+                ? 'past'
+                : remainingRight <= WINDOW_EXTENSION_BUFFER_PX
+                  ? 'future'
+                  : null;
+
+              if (direction) {
+                windowExtensionPendingRef.current = true;
+                if (direction === 'past') {
+                  rowsContainer.scrollLeft += getTimelineWindowScrollCompensation(
+                    timelineWindow,
+                    direction,
+                    showWeekends,
+                    DEFAULT_DAY_WIDTH
+                  );
+                }
+                setTimelineWindow(window => extendTimelineWindow(window, direction));
               }
-              setTimelineWindow(window => extendTimelineWindow(window, direction));
             }
-          }
 
-          const nextMetrics = {
-            scrollLeft: rowsContainer.scrollLeft,
-            viewportWidth: rowsContainer.clientWidth,
-          };
-          setHorizontalMetrics(current => (
-            current.scrollLeft === nextMetrics.scrollLeft && current.viewportWidth === nextMetrics.viewportWidth
-              ? current
-              : nextMetrics
-          ));
+            const nextMetrics = {
+              scrollLeft: rowsContainer.scrollLeft,
+              viewportWidth: clientWidth,
+            };
+            setHorizontalMetrics(current => (
+              current.scrollLeft === nextMetrics.scrollLeft && current.viewportWidth === nextMetrics.viewportWidth
+                ? current
+                : nextMetrics
+            ));
+          }
           onTimelineScroll?.({
-            scrollLeft: nextMetrics.scrollLeft,
-            scrollTop: rowsContainer.scrollTop,
+            scrollLeft,
+            scrollTop,
           });
         }
         scrollNotifyRafRef.current = null;
