@@ -523,7 +523,7 @@ app.whenReady().then(() => {
     const runtimeOnlyChange = [...changedKeys].length > 0
       && [...changedKeys].every(key => AGENT_RUNTIME_STORE_KEYS.has(key));
     if (!runtimeOnlyChange) broadcastStoreDidChange([...changedKeys]);
-    syncUpdateChannelFromStore();
+    if (changedKeys.has(PREFERENCES_KEY)) syncUpdateChannelFromStore();
   });
   ipcMain.on(RENDERER_DIAGNOSTIC_CHANNEL, (_event, details) => recordRendererFailure({ kind: 'renderer-unhandled-error', ...details }));
   updateController = createUpdateController({
