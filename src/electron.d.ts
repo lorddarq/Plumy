@@ -199,6 +199,7 @@ declare global {
   interface Window {
     electron: {
       storeGet: (key: string) => Promise<any>;
+      storeGetMany: (keys: string[]) => Promise<Record<string, any>>;
       storeSet: (key: string, value: any) => Promise<void>;
       storeSetMany: (values: Record<string, any>) => Promise<{ count: number }>;
       storeDelete: (key: string) => Promise<void>;

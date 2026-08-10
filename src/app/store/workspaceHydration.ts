@@ -33,6 +33,25 @@ import {
   TASKS_KEY,
 } from './workspacePersistence.ts';
 
+const CANONICAL_WORKSPACE_KEYS = [
+  TASKS_KEY,
+  SWIMLANES_KEY,
+  PEOPLE_KEY,
+  MILESTONES_KEY,
+  STATUS_COLUMNS_KEY,
+  PREFERENCES_KEY,
+  GOAL_POLICY_KEY,
+];
+
+async function readCanonicalWorkspaceSnapshot(): Promise<Record<string, unknown>> {
+  const scopedRead = window.electron?.storeGetMany;
+  if (typeof scopedRead === 'function') {
+    return scopedRead(CANONICAL_WORKSPACE_KEYS);
+  }
+  const exported = await window.electron?.storeExport?.();
+  return exported && typeof exported === 'object' ? exported : {};
+}
+
 export interface WorkspaceSeeds {
   tasks: Task[];
   timelineSwimlanes: TimelineSwimlane[];
@@ -251,7 +270,7 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
     const hydrateFromCanonicalStore = async () => {
       if (typeof window !== 'undefined') {
         try {
-          const exported = await window.electron?.storeExport?.();
+          const exported = await readCanonicalWorkspaceSnapshot();
           if (cancelled || !exported || typeof exported !== 'object') return;
           if (!hasCanonicalWorkspaceData(exported) && hasAnyPortableLocalStorageData()) {
             const migratedProjects = sanitizeTimelineSwimlanes(safeReadLocalStorageJSON(SWIMLANES_KEY, seeds.timelineSwimlanes), seeds.timelineSwimlanes);
@@ -285,7 +304,7 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
     const unsubscribe = window.electron?.onStoreChanged?.(() => {
-      void window.electron?.storeExport?.().then(exported => {
+      void readCanonicalWorkspaceSnapshot().then(exported => {
         if (exported && typeof exported === 'object') syncCanonicalWorkspaceFromExport(exported);
       }).catch(() => {
         // External synchronization is best effort; keep the current workspace usable.

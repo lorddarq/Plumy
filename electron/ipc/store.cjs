@@ -1,5 +1,9 @@
 function registerStoreIpcHandlers({ ipcMain, store, preferencesKey, onPreferencesSet }) {
   ipcMain.handle('store/get', (_, key) => store.get(key));
+  ipcMain.handle('store/get-many', (_, keys) => {
+    const requestedKeys = Array.isArray(keys) ? keys.filter(key => typeof key === 'string') : [];
+    return Object.fromEntries(requestedKeys.map(key => [key, store.get(key)]));
+  });
   ipcMain.handle('store/set', (_, key, value) => {
     const result = store.set(key, value);
     if (key === preferencesKey && typeof onPreferencesSet === 'function') {

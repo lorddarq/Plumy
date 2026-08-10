@@ -23,6 +23,7 @@ if (typeof window !== 'undefined') {
 contextBridge.exposeInMainWorld('electron', {
   // Store
   storeGet: (key) => ipcRenderer.invoke('store/get', key),
+  storeGetMany: (keys) => ipcRenderer.invoke('store/get-many', keys),
   storeSet: (key, value) => ipcRenderer.invoke('store/set', key, value),
   storeSetMany: (values) => ipcRenderer.invoke('store/set-many', values),
   storeDelete: (key) => ipcRenderer.invoke('store/delete', key),
