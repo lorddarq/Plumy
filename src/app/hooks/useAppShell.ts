@@ -41,14 +41,7 @@ import {
   normalizeMcpPort,
   normalizeMcpServerAddress,
 } from '../constants/mcp.ts';
-
-function areSerializedValuesEqual(left: unknown, right: unknown): boolean {
-  try {
-    return JSON.stringify(left) === JSON.stringify(right);
-  } catch {
-    return false;
-  }
-}
+import { areSerializedValuesEqual } from '../store/workspaceSelectors.ts';
 
 function normalizeLoadStatusIds(
   value: unknown,

@@ -24,6 +24,7 @@ import {
   type KanbanTaskFilters,
 } from '../../utils/taskFilters';
 import { orderKanbanTasks, type KanbanTaskOrder } from '../../utils/taskOrdering';
+import { areShallowValuesEqual } from '../../store/workspaceSelectors.ts';
 
 const COLUMN_DRAG_EDGE_SCROLL_ZONE = 96;
 const COLUMN_DRAG_EDGE_SCROLL_STEP = 28;
@@ -109,7 +110,7 @@ export function KanbanView({
   useEffect(() => {
     setFilters(previousFilters => {
       const nextFilters = sanitizeKanbanTaskFilters(previousFilters, projects, people);
-      return JSON.stringify(previousFilters) === JSON.stringify(nextFilters)
+      return areShallowValuesEqual(previousFilters, nextFilters)
         ? previousFilters
         : nextFilters;
     });
@@ -118,7 +119,7 @@ export function KanbanView({
   useEffect(() => {
     setFilters(previousFilters => {
       const nextFilters = sanitizeKanbanTaskFilters(initialFilters, projects, people);
-      return JSON.stringify(previousFilters) === JSON.stringify(nextFilters)
+      return areShallowValuesEqual(previousFilters, nextFilters)
         ? previousFilters
         : nextFilters;
     });
