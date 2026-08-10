@@ -229,14 +229,6 @@ export function TimelineView({
     }
     return swimlanes;
   }, [mode, people, swimlanes]);
-  const visibleTaskCount = useMemo(() => {
-    const visibleSwimlaneIds = new Set(displaySwimlanes.map(swimlane => swimlane.id));
-    return timelineTasks.filter(task => (
-      mode === 'people'
-        ? Boolean(task.assigneeId && visibleSwimlaneIds.has(task.assigneeId))
-        : Boolean(task.swimlaneId && visibleSwimlaneIds.has(task.swimlaneId))
-    )).length;
-  }, [displaySwimlanes, mode, timelineTasks]);
   const timelineTasksBySwimlane = useMemo(() => {
     const tasksBySwimlane = new Map<string, Task[]>();
     timelineTasks.forEach(task => {
@@ -248,6 +240,10 @@ export function TimelineView({
     });
     return tasksBySwimlane;
   }, [mode, timelineTasks]);
+  const visibleTaskCount = useMemo(
+    () => displaySwimlanes.reduce((count, swimlane) => count + (timelineTasksBySwimlane.get(swimlane.id)?.length ?? 0), 0),
+    [displaySwimlanes, timelineTasksBySwimlane]
+  );
   const lastDisplaySwimlaneId = displaySwimlanes[displaySwimlanes.length - 1]?.id;
 
   // Refs
