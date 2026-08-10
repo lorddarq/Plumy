@@ -65,7 +65,10 @@ export function useTaskContextHistory(taskId?: string, expectedRevision = 0) {
     setDetailState('idle');
     if (!taskId) return;
     void refresh();
-    const unsubscribe = window.electron?.onStoreChanged?.(() => void refresh());
+    const unsubscribe = window.electron?.onStoreChanged?.((payload) => {
+      if (Array.isArray(payload?.keys) && !payload.keys.includes('omvra.taskContextEntries.v1')) return;
+      void refresh();
+    });
     return () => { unsubscribe?.(); };
   }, [refresh, taskId]);
 

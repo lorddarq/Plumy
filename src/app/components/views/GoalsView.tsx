@@ -213,9 +213,15 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
       }).catch(() => {});
     };
     const runtimePoll = window.setInterval(refreshRuntimeProjection, 1000);
-    const unsubscribe = window.electron?.onStoreChanged?.(() => {
+    const unsubscribe = window.electron?.onStoreChanged?.((payload) => {
+      if (Array.isArray(payload?.keys)
+        && !payload.keys.includes(STORAGE_KEY)
+        && !payload.keys.includes('omvra.goalSchedules.v1')) return;
       refreshRuntimeProjection();
-      if (!draggingRef.current && rendererWritesPendingRef.current === 0) void refreshCanonicalGoals();
+      if (!draggingRef.current && rendererWritesPendingRef.current === 0
+        && (!Array.isArray(payload?.keys) || payload.keys.includes(STORAGE_KEY))) {
+        void refreshCanonicalGoals();
+      }
     });
     const unsubscribeRuntime = window.electron?.goals?.onRuntimeChanged?.((event) => {
       if (cancelled) return;
@@ -237,7 +243,10 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
     void refreshSchedules().then(() => {
       if (!cancelled) setSchedulesHydrated(true);
     });
-    const unsubscribe = window.electron?.onStoreChanged?.(() => { if (!draggingRef.current && scheduleWritesPendingRef.current === 0) void refreshSchedules(); });
+    const unsubscribe = window.electron?.onStoreChanged?.((payload) => {
+      if (Array.isArray(payload?.keys) && !payload.keys.includes(GOAL_SCHEDULES_STORAGE_KEY)) return;
+      if (!draggingRef.current && scheduleWritesPendingRef.current === 0) void refreshSchedules();
+    });
     return () => { cancelled = true; unsubscribe?.(); };
   }, []);
   useEffect(() => {

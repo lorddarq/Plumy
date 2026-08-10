@@ -116,7 +116,8 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
   useEffect(() => {
     if (!preferences.mcpAgentAccessEnabled) return;
 
-    const unsubscribe = window.electron?.onStoreChanged?.(() => {
+    const unsubscribe = window.electron?.onStoreChanged?.((payload) => {
+      if (Array.isArray(payload?.keys) && !payload.keys.includes('omvra.mcp.audit.v1')) return;
       void refreshMcpAuditLog();
     });
 
