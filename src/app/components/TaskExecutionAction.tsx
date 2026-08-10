@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Copy, Folder, Info, MessageSquarePlus, Play, Server, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
-import { agentRuntimeTurnState, describeAgentRuntimeSession, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
+import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
 import {
   agentRuntimeWorkspaceSourceLabel,
   resolveAgentRuntimeWorkspace,
@@ -280,16 +280,19 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     .filter(event => event.nativeEventType === 'item/agentMessage/delta' && event.messagePreview)
     .map(event => event.messagePreview || ''));
   const activityWithoutOutput = activity.filter(item => item.label !== 'Agent shared an update');
+  const taskStarted = hasAgentRuntimeTaskStarted(turnState, events);
   const visibleActivity = activityWithoutOutput.length > 0 ? activityWithoutOutput : binding?.state === 'interrupted'
     ? [{ id: `${binding.id}-interrupted`, label: 'Work was interrupted', detail: 'Start work again to reconnect and continue with the task instructions.', count: 1, tone: 'warning' as const }]
     : binding?.state === 'failed'
       ? [{ id: `${binding.id}-failed`, label: 'Previous runtime unavailable', detail: 'Start a new session to reconnect; the current task context is preserved.', count: 1, tone: 'danger' as const }]
-      : [];
+      : taskStarted && binding
+        ? [{ id: `${binding.id}-working`, label: 'Agent work is in progress', detail: 'The runtime accepted the task instructions. Detailed activity will appear when it is reported.', count: 1, tone: 'neutral' as const }]
+        : [];
   const isTurnActive = sessionSummary?.isTurnActive === true;
   const agentStatusTone = sessionSummary?.tone === 'positive' ? 'success'
     : sessionSummary?.tone === 'warning' ? 'warning'
       : sessionSummary?.tone === 'danger' ? 'danger' : 'muted';
-  const instructionsSent = latestTurnStartIndex >= 0 || events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent');
+  const instructionsSent = taskStarted;
   const latestTurnCompleted = latestRunEvents.some(event => event.nativeEventType === 'turn/completed');
   const lastObservedAt = binding?.lastObservedAt || binding?.updatedAt;
   const lastObservedLabel = lastObservedAt

@@ -38,6 +38,11 @@ export function isAgentRuntimeTurnInFlight(binding?: { state?: string; turn?: Ag
   return IN_FLIGHT_AGENT_RUNTIME_TURN_STATES.has(agentRuntimeTurnState(binding) || '');
 }
 
+export function hasAgentRuntimeTaskStarted(turnState: string | undefined, events: AgentRuntimeActivityEvent[]): boolean {
+  return ['active', 'waiting-input', 'cancelling'].includes(turnState || '')
+    || events.some(event => event.nativeEventType === 'turn/started' || event.nativeEventType === 'omvra/taskInstructions/sent');
+}
+
 export function joinAgentMessageDeltas(deltas: string[]): string {
   const cleaned = deltas.filter(delta => delta.length > 0);
   if (cleaned.length < 2) return cleaned.join('').trim();

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { agentRuntimeTurnState, describeAgentRuntimeSession, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
+import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
 
 test('agent message delta joining preserves normal boundaries and repairs compact legacy chunks', () => {
   assert.equal(joinAgentMessageDeltas(['Current ', 'implementation ', 'passes.']), 'Current implementation passes.');
@@ -48,6 +48,12 @@ test('a ready provider session reports work only from its canonical turn project
   assert.equal(isAgentRuntimeTurnInFlight(working), true);
   assert.equal(agentRuntimeTurnState(working), 'active');
   assert.equal(describeAgentRuntimeSession('ready', [], undefined, agentRuntimeTurnState(working)).label, 'Agent is working');
+});
+
+test('an active turn proves task instructions were accepted before events arrive', () => {
+  assert.equal(hasAgentRuntimeTaskStarted('active', []), true);
+  assert.equal(hasAgentRuntimeTaskStarted('starting', []), false);
+  assert.equal(hasAgentRuntimeTaskStarted(undefined, [{ id: 'event-1', type: 'turn-state', nativeEventType: 'turn/started' }]), true);
 });
 
 test('terminal provider sessions ignore stale in-flight turn projections', () => {
