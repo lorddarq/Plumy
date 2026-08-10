@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const { spawnSync } = require('child_process');
 const { randomUUID } = require('crypto');
+const { isDeepStrictEqual } = require('node:util');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -507,7 +508,7 @@ app.whenReady().then(() => {
       ? hintedRendererKeys
       : new Set([...Object.keys(nextStore || {}), ...Object.keys(previousStore || {})].filter(key => {
         if (Object.is(nextStore?.[key], previousStore?.[key])) return false;
-        try { return JSON.stringify(nextStore?.[key]) !== JSON.stringify(previousStore?.[key]); } catch { return true; }
+        return !isDeepStrictEqual(nextStore?.[key], previousStore?.[key]);
       }));
     if (changedKeys.has(TASKS_KEY)) {
       try {
