@@ -237,6 +237,17 @@ export function TimelineView({
         : Boolean(task.swimlaneId && visibleSwimlaneIds.has(task.swimlaneId))
     )).length;
   }, [displaySwimlanes, mode, timelineTasks]);
+  const timelineTasksBySwimlane = useMemo(() => {
+    const tasksBySwimlane = new Map<string, Task[]>();
+    timelineTasks.forEach(task => {
+      const swimlaneId = mode === 'people' ? task.assigneeId : task.swimlaneId;
+      if (!swimlaneId) return;
+      const laneTasks = tasksBySwimlane.get(swimlaneId);
+      if (laneTasks) laneTasks.push(task);
+      else tasksBySwimlane.set(swimlaneId, [task]);
+    });
+    return tasksBySwimlane;
+  }, [mode, timelineTasks]);
   const lastDisplaySwimlaneId = displaySwimlanes[displaySwimlanes.length - 1]?.id;
 
   // Refs
@@ -1158,9 +1169,7 @@ export function TimelineView({
                 const isDraggedRowCollapsed = Boolean(
                   visibleSwimlaneDropIndicator && draggingSwimlaneId === swimlane.id
                 );
-                const taskCount = mode === 'people'
-                  ? timelineTasks.filter(t => t.assigneeId === swimlane.id).length
-                  : timelineTasks.filter(t => t.swimlaneId === swimlane.id).length;
+                const taskCount = timelineTasksBySwimlane.get(swimlane.id)?.length ?? 0;
                 
                 return (
                   <React.Fragment key={swimlane.id}>
@@ -1300,9 +1309,7 @@ export function TimelineView({
             )}
             <div className="timeline-rows-container">
               {displaySwimlanes.map((swimlane, idx) => {
-                const swimlaneTasks = mode === 'people'
-                  ? timelineTasks.filter(t => t.assigneeId === swimlane.id)
-                  : timelineTasks.filter(t => t.swimlaneId === swimlane.id);
+                const swimlaneTasks = timelineTasksBySwimlane.get(swimlane.id) ?? [];
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
                 const isDraggedRowCollapsed = Boolean(
                   visibleSwimlaneDropIndicator && draggingSwimlaneId === swimlane.id
