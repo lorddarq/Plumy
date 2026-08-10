@@ -430,25 +430,11 @@ export function TimelineView({
   const dates = allDates;
   const dayWidths = allDayWidths;
 
-  // Compute track assignments for each swimlane
-  const swimlaneTrackAssignments = useMemo(() => {
-    const assignments: Record<string, Record<string, number>> = {};
-    displaySwimlanes.forEach(swimlane => {
-      const swimlaneTasks = mode === 'people'
-        ? timelineTasks.filter(t => t.assigneeId === swimlane.id)
-        : timelineTasks.filter(t => t.swimlaneId === swimlane.id);
-      assignments[swimlane.id] = allocateTasksToTracks(swimlaneTasks);
-    });
-    return assignments;
-  }, [timelineTasks, displaySwimlanes, mode]);
-
   // Compute dynamic heights for swimlanes
   const swimlaneHeights = useMemo(() => {
     const heights: Record<string, number> = {};
     displaySwimlanes.forEach(swimlane => {
-      const swimlaneTasks = mode === 'people'
-        ? timelineTasks.filter(t => t.assigneeId === swimlane.id)
-        : timelineTasks.filter(t => t.swimlaneId === swimlane.id);
+      const swimlaneTasks = timelineTasksBySwimlane.get(swimlane.id) ?? [];
       // Each track is 40px (task render height 32px + gap 8px), with at least DEFAULT_ROW_HEIGHT
       const TRACK_HEIGHT = 40;
       const trackAssignments = allocateTasksToTracks(swimlaneTasks);
@@ -456,7 +442,7 @@ export function TimelineView({
       heights[swimlane.id] = Math.max(DEFAULT_ROW_HEIGHT, trackCount * TRACK_HEIGHT);
     });
     return heights;
-  }, [timelineTasks, displaySwimlanes, mode]);
+  }, [displaySwimlanes, timelineTasksBySwimlane]);
 
   const draggedSwimlaneHeight = draggingSwimlaneId
     ? swimlaneHeights[draggingSwimlaneId] || DEFAULT_ROW_HEIGHT
