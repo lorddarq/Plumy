@@ -61,9 +61,11 @@ test('generic ACP client negotiates exact capabilities and completes a bounded s
   assert.equal(observation.capabilities.resume, true);
   assert.equal(observation.capabilities.load, false);
   assert.equal(observation.capabilities.mcpHttp, true);
-  const session = await client.startSession({ model: 'acp-model', mcpServers: [{ name: 'omvra', url: 'http://127.0.0.1:3456/mcp' }] });
+  const session = await client.startSession({ model: 'acp-model' });
   assert.equal(session.sessionId, 'session-1');
-  assert.equal(messages.find(message => message.method === 'session/new').params.model, 'acp-model');
+  const newSession = messages.find(message => message.method === 'session/new');
+  assert.equal(newSession.params.model, 'acp-model');
+  assert.equal('mcpServers' in newSession.params, false);
   assert.deepEqual(await client.prompt(session.sessionId, 'Do bounded work'), { stopReason: 'end_turn' });
   assert.deepEqual(client.cancel(session.sessionId), { acknowledged: false });
   await client.closeSession(session.sessionId);
@@ -132,8 +134,6 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
   }, { workspacePath: '/tmp/workspace', spawnProcess: (_command, args) => {
     assert.deepEqual(args, [
       '-c', 'model="gpt"',
-      '-c', 'mcp_servers.omvra.enabled=false',
-      '-c', 'mcp_servers.omvra_testing_mcp.enabled=false',
       'app-server', '--stdio',
     ]);
     return child;
@@ -154,7 +154,7 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
   assert.equal(requests.find(message => message.method === 'thread/start').params.cwd, '/tmp/workspace');
   assert.equal(requests.find(message => message.method === 'thread/start').params.approvalPolicy, 'never');
   assert.equal(requests.find(message => message.method === 'thread/start').params.model, 'gpt');
-  assert.deepEqual(requests.find(message => message.method === 'thread/start').params.config, scopedMcpConfig.config);
+  assert.equal('config' in requests.find(message => message.method === 'thread/start').params, false);
   assert.equal('mcpServers' in requests.find(message => message.method === 'thread/start').params, false);
   assert.equal(requests.find(message => message.method === 'thread/resume').params.threadId, 'thread-1');
   assert.equal(requests.find(message => message.method === 'thread/resume').params.approvalPolicy, 'never');
@@ -163,8 +163,10 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
   client.close();
 });
 
-test('Codex client fails before prompting when the scoped MCP server reports startup failure', async () => {
+test('Codex client inherits provider MCP configuration without gating thread creation', async () => {
+  const requests = [];
   const child = createChild((message, currentChild) => {
+    requests.push(message);
     if (message.method === 'initialize') respond(currentChild, message.id, { userAgent: 'codex-cli/1.0' });
     if (message.method === 'account/read') respond(currentChild, message.id, { account: { type: 'chatgpt' }, requiresOpenaiAuth: true });
     if (message.method === 'model/list') respond(currentChild, message.id, { data: [] });
@@ -178,10 +180,11 @@ test('Codex client fails before prompting when the scoped MCP server reports sta
   }, { workspacePath: '/tmp/workspace', spawnProcess: () => child, timeoutMs: 100 });
 
   await client.initialize();
-  await assert.rejects(
-    () => client.startSession({ config: { mcp_servers: { omvra: { url: 'http://127.0.0.1:3456/mcp', enabled: true } } } }),
-    error => error.code === 'ACP_MCP_GRANT_FAILED' && /connection refused/.test(error.message),
-  );
+  const session = await client.startSession({ config: { mcp_servers: { omvra: { url: 'http://127.0.0.1:3456/mcp', enabled: true } } } });
+  assert.equal(session.sessionId, 'thread-failed');
+  const start = requests.find(message => message.method === 'thread/start');
+  assert.equal('config' in start.params, false);
+  assert.equal('mcpServers' in start.params, false);
   client.close();
 });
 
@@ -204,7 +207,7 @@ test('Claude client launches the exact native stream-json contract and writes ra
   assert.equal(launches[0].options.shell, false);
   assert.deepEqual(launches[0].args, [
     '--setting-sources', 'user', '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
-    '--session-id', '00000000-0000-4000-8000-000000000001', '--mcp-config', '/tmp/omvra-mcp.json',
+    '--session-id', '00000000-0000-4000-8000-000000000001',
   ]);
   assert.deepEqual(messages[0], { type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Continue' }] } });
   await client.closeSession();

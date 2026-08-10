@@ -92,9 +92,6 @@ function createAgentExecutionPreflightService({
         blockers.push(issue('ACP_CAPABILITY_UNSUPPORTED', `Required capability "${capability}" is not supported.`, { capability }));
       }
     }
-    if (input.requireScopedMcp === true && input.scopedMcpAvailable !== true) {
-      blockers.push(issue('ACP_MCP_GRANT_FAILED', 'A scoped MCP grant is required but unavailable.'));
-    }
     if (input.budgetAllowed === false) blockers.push(issue('ACP_BUDGET_EXCEEDED', 'The applicable execution budget does not permit this start.'));
     if (input.permissionsAllowed === false) blockers.push(issue('ACP_PERMISSION_DENIED', 'The execution permission policy does not permit this start.'));
 
@@ -140,8 +137,6 @@ function createAgentExecutionPreflightService({
         capabilityIds: Object.entries(observation.agentCapabilities || {}).filter(([, supported]) => supported === true).map(([id]) => id).sort(),
       } : null,
       policyRevision: Number.isFinite(Number(input.policyRevision)) ? Math.max(0, Math.floor(Number(input.policyRevision))) : null,
-      requireScopedMcp: input.requireScopedMcp === true,
-      scopedMcpAvailable: input.scopedMcpAvailable === true,
       budgetAllowed: input.budgetAllowed !== false,
       permissionsAllowed: input.permissionsAllowed !== false,
       contextEntryIds: [context.taskContext?.latestCheckpoint, ...(context.taskContext?.entriesSinceCheckpoint || []), ...(context.taskContext?.recentHistory || [])]

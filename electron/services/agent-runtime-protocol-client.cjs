@@ -2,7 +2,6 @@ const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
-const os = require('node:os');
 const { buildRuntimeEnvironment } = require('./agent-runtime-environment.cjs');
 
 const ACP_PROTOCOL_VERSION = 1;
@@ -39,7 +38,7 @@ function validateInputText(value) {
 }
 
 function validateMcpServers(value) {
-  const servers = value === undefined ? [] : value;
+  const servers = value;
   if (!Array.isArray(servers) || servers.length > 16 || Buffer.byteLength(JSON.stringify(servers)) > 64 * 1024) {
     throw runtimeError('ACP_MCP_GRANT_FAILED', 'Scoped MCP configuration is invalid or too large.');
   }
@@ -283,22 +282,22 @@ class AcpStdioClient {
     };
   }
 
-  async startSession({ mcpServers = [], model } = {}) {
+  async startSession({ mcpServers, model } = {}) {
     const selectedModel = requestedModel(this.profile, model);
     assertAdvertisedModel(selectedModel, this.models || []);
-    const result = await this.transport.request('session/new', { cwd: this.workspacePath, mcpServers: validateMcpServers(mcpServers), ...(selectedModel ? { model: selectedModel } : {}) });
+    const result = await this.transport.request('session/new', { cwd: this.workspacePath, ...(mcpServers === undefined ? {} : { mcpServers: validateMcpServers(mcpServers) }), ...(selectedModel ? { model: selectedModel } : {}) });
     return { sessionId: validateSessionRef(result?.sessionId), configuration: result };
   }
 
-  async resumeSession(sessionId, { mcpServers = [] } = {}) {
+  async resumeSession(sessionId, { mcpServers } = {}) {
     const id = validateSessionRef(sessionId);
-    const scopedMcpServers = validateMcpServers(mcpServers);
+    const mcpConfiguration = mcpServers === undefined ? {} : { mcpServers: validateMcpServers(mcpServers) };
     if (this.capabilities?.resume) {
-      await this.transport.request('session/resume', { sessionId: id, cwd: this.workspacePath, mcpServers: scopedMcpServers });
+      await this.transport.request('session/resume', { sessionId: id, cwd: this.workspacePath, ...mcpConfiguration });
       return { sessionId: id, mode: 'resume' };
     }
     if (this.capabilities?.load) {
-      await this.transport.request('session/load', { sessionId: id, cwd: this.workspacePath, mcpServers: scopedMcpServers });
+      await this.transport.request('session/load', { sessionId: id, cwd: this.workspacePath, ...mcpConfiguration });
       return { sessionId: id, mode: 'load' };
     }
     throw runtimeError('ACP_SESSION_RESUME_UNSUPPORTED', 'The ACP runtime does not advertise session resume or load.');
@@ -332,13 +331,8 @@ class AcpStdioClient {
 class CodexAppServerClient {
   constructor(profile, options) {
     this.profile = profile;
-    this.mcpStartupStates = new Map();
-    // Do not inherit either desktop Omvra endpoint from ~/.codex/config.toml.
-    // thread/start supplies the current app's scoped endpoint instead.
     this.transport = new JsonLineTransport(profile.executablePath, [
       ...(profile.fixedArgs || []),
-      '-c', 'mcp_servers.omvra.enabled=false',
-      '-c', 'mcp_servers.omvra_testing_mcp.enabled=false',
       'app-server', '--stdio',
     ], options);
     this.workspacePath = validateWorkspacePath(options.workspacePath);
@@ -351,10 +345,6 @@ class CodexAppServerClient {
         if (threadId && turnId) this.activeTurns.set(threadId, turnId);
       }
       if (message.method === 'turn/completed' && message.params?.threadId) this.activeTurns.delete(message.params.threadId);
-      if (message.method === 'mcpServer/startupStatus/updated' && typeof message.params?.name === 'string') {
-        const key = `${message.params.threadId || '*'}:${message.params.name}`;
-        this.mcpStartupStates.set(key, message.params);
-      }
     });
   }
 
@@ -380,44 +370,19 @@ class CodexAppServerClient {
     };
   }
 
-  async startSession(configuration = {}) {
-    const selectedModel = requestedModel(this.profile, configuration.model);
+  async startSession({ model, ephemeral } = {}) {
+    const selectedModel = requestedModel(this.profile, model);
     assertAdvertisedModel(selectedModel, this.models || []);
-    const result = await this.transport.request('thread/start', { ...configuration, ...(selectedModel ? { model: selectedModel } : {}), ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), cwd: this.workspacePath });
+    const result = await this.transport.request('thread/start', { ...(selectedModel ? { model: selectedModel } : {}), ...(typeof ephemeral === 'boolean' ? { ephemeral } : {}), ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), cwd: this.workspacePath });
     const sessionId = validateSessionRef(result?.thread?.id);
-    await this.waitForConfiguredMcpServers(sessionId, configuration);
     return { sessionId, configuration: result };
   }
 
-  async resumeSession(sessionId, configuration = {}) {
+  async resumeSession(sessionId) {
     const id = validateSessionRef(sessionId);
-    const result = await this.transport.request('thread/resume', { ...configuration, ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), threadId: id });
+    const result = await this.transport.request('thread/resume', { ...(this.approvalPolicy ? { approvalPolicy: this.approvalPolicy } : {}), threadId: id });
     const resumedSessionId = validateSessionRef(result?.thread?.id || id);
-    await this.waitForConfiguredMcpServers(resumedSessionId, configuration);
     return { sessionId: resumedSessionId, configuration: result };
-  }
-
-  async waitForConfiguredMcpServers(threadId, configuration) {
-    const configured = configuration?.config?.mcp_servers;
-    const names = configured && typeof configured === 'object' && !Array.isArray(configured)
-      ? Object.entries(configured).filter(([, server]) => server?.enabled !== false).map(([name]) => name)
-      : [];
-    if (!names.length) return;
-
-    const deadline = Date.now() + this.transport.timeoutMs;
-    while (Date.now() <= deadline) {
-      let readyCount = 0;
-      for (const name of names) {
-        const startup = this.mcpStartupStates.get(`${threadId}:${name}`) || this.mcpStartupStates.get(`*:${name}`);
-        if (startup?.status === 'failed' || startup?.status === 'cancelled') {
-          throw runtimeError('ACP_MCP_GRANT_FAILED', `Scoped MCP server "${name}" failed to start${startup.error ? `: ${startup.error}` : '.'}`);
-        }
-        if (startup?.status === 'ready') readyCount += 1;
-      }
-      if (readyCount === names.length) return;
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-    throw runtimeError('ACP_MCP_GRANT_FAILED', `Timed out waiting for scoped MCP server${names.length === 1 ? '' : 's'} ${names.join(', ')}.`);
   }
 
   async prompt(sessionId, text) {
@@ -462,40 +427,27 @@ class ClaudeStreamJsonClient {
   initialize() {
     return Promise.resolve({
       implementationName: 'Claude Code', adapterVersion: null, authentication: 'unknown',
-      capabilities: { prompt: true, resume: true, steer: true, cancel: true, close: true, mcpConfigPath: true, modelSelection: true },
+      capabilities: { prompt: true, resume: true, steer: true, cancel: true, close: true, modelSelection: true },
     });
   }
 
-  createMcpConfigPath(mcpServers) {
-    if (!mcpServers || typeof mcpServers !== 'object') return null;
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-mcp-'));
-    const configPath = path.join(directory, 'config.json');
-    fs.writeFileSync(configPath, JSON.stringify({ mcpServers }), { encoding: 'utf8', mode: 0o600 });
-    this.mcpConfigDirectory = directory;
-    return configPath;
-  }
-
-  startSession({ sessionId = randomUUID(), mcpConfigPath, mcpServers, model } = {}) {
+  startSession({ sessionId = randomUUID(), model } = {}) {
     this.sessionId = validateSessionRef(sessionId);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(this.sessionId)) {
       throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session ID must be a UUID.');
     }
     const selectedModel = requestedModel(this.profile, model);
     const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId, ...(selectedModel ? ['--model', selectedModel] : [])];
-    const configPath = mcpConfigPath || this.createMcpConfigPath(mcpServers);
-    if (configPath) args.push('--mcp-config', validateWorkspacePath(configPath));
     this.transport = new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath });
     return Promise.resolve({ sessionId: this.sessionId });
   }
 
-  resumeSession(sessionId, { mcpConfigPath, mcpServers } = {}) {
+  resumeSession(sessionId) {
     this.sessionId = validateSessionRef(sessionId);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(this.sessionId)) {
       throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session ID must be a UUID.');
     }
     const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--resume', this.sessionId];
-    const configPath = mcpConfigPath || this.createMcpConfigPath(mcpServers);
-    if (configPath) args.push('--mcp-config', validateWorkspacePath(configPath));
     this.transport = new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath });
     return Promise.resolve({ sessionId: this.sessionId });
   }
@@ -521,13 +473,7 @@ class ClaudeStreamJsonClient {
   steer(sessionId, text) { return this.prompt(sessionId, text); }
   cancel() { this.close(); return Promise.resolve({ acknowledged: false }); }
   closeSession() { this.close(); return Promise.resolve({ acknowledged: true }); }
-  close() {
-    this.transport?.close();
-    if (this.mcpConfigDirectory) {
-      fs.rmSync(this.mcpConfigDirectory, { recursive: true, force: true });
-      this.mcpConfigDirectory = null;
-    }
-  }
+  close() { this.transport?.close(); }
 }
 
 function createNativeRuntimeClient(profile, options = {}) {

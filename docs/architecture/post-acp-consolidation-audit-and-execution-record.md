@@ -77,7 +77,7 @@ Forbidden dependencies remain: domain to MCP/ACP/IPC/React; MCP handlers to pers
 - Preload invoke channels and IPC parity.
 - Renderer provider exports, hydration order, localStorage fallback, import/export, restart behavior, and canonical keys.
 - Task, milestone, and Goal `__mcpRevision` behavior and exact result/error shapes.
-- ACP provider-neutral session binding, bounded context pack, session-scoped MCP grant, explicit launch, and no automatic completion or acceptance.
+- ACP provider-neutral session binding, bounded context pack, provider-owned MCP configuration, explicit launch, and no automatic completion or acceptance.
 
 ## Findings-driven work sequence
 

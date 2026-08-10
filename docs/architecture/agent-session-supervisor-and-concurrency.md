@@ -309,7 +309,7 @@ Opaque provider session references must remain outside renderer-authored durable
 
 ## Rollout sequence and QA handoff
 
-1. **Contract gate:** preserve the provider-neutral runtime/session contract, task contribution revisions/evidence, Goal lifecycle gates, scoped MCP access, and local-only boundaries. No implementation work starts if the change requires a second source of truth.
+1. **Contract gate:** preserve the provider-neutral runtime/session contract, task contribution revisions/evidence, Goal lifecycle gates, provider-owned MCP configuration, and local-only boundaries. No implementation work starts if the change requires a second source of truth.
 2. **Main-process gate:** implement and test the global one-session reservation, provider liveness/recovery, terminal slot release, and deterministic second-start rejection for task and Goal-node scopes.
 3. **Supervisor gate:** route Task Details, Kanban, Roadmap, Timeline, and Goals through the app-level supervisor; verify parent unmount, hide/reopen, pending input, cancel, end-session, and status-dock discovery.
 4. **Lifecycle gate:** verify that session events and provider completion do not mutate contribution acceptance, task completion, Goal completion, dependencies, or human review state without their existing governed commands.

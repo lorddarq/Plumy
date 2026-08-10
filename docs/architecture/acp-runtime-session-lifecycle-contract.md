@@ -12,7 +12,7 @@ ACP owns live interaction. Existing task collaboration, Goal lifecycle, context 
 
 The first release supports explicitly configured local stdio runtimes using native ACP, native Codex app-server, or native Claude stream-json, plus a user-invoked external handoff. Omvra launches the installed runtime directly; it does not require a separately installed protocol-conversion executable. Generic ACP profiles remain application-neutral: any conforming runtime can be configured with its exact executable and fixed launch arguments, including OpenCode with `acp`. Stdio is a locality and process-lifecycle choice, not a single-agent restriction: Omvra may coordinate multiple concurrent sessions in one capable runtime and/or multiple explicitly started runtime subprocesses. Distributed runtime pools and remote transports remain deferred.
 
-Agent-runtime and MCP transports are independent. ACP, Codex app-server, or Claude stream-json carries runtime/session control over local stdio; MCP carries governed Omvra reads and writes through a separately negotiated, session-scoped connection. The first release does not give a runtime the existing workspace-wide HTTP bearer token or unrestricted stdio MCP access. Authentication remains owned by the selected runtime and Omvra does not collect provider credentials. Codex exposes authentication during model-free preflight through `account/read`; Claude authentication remains `unknown` until an explicitly started session reports it because its CLI exposes no model-free authentication handshake. The release does not add automatic spawning, watcher dispatch, remote gateways, arbitrary runtime plugins, or silent failover.
+Agent-runtime and MCP transports are independent. ACP, Codex app-server, or Claude stream-json carries runtime/session control over local stdio; MCP carries governed Omvra reads and writes over Omvra's configured HTTP endpoint. The selected runtime is authoritative for its MCP server registry, configuration, and credentials. Omvra exposes the endpoint and waits for its listener to be ready, but does not disable, replace, inject, or gate provider MCP configuration during session start or resume. Authentication remains owned by the selected runtime and Omvra does not collect provider credentials. Codex exposes authentication during model-free preflight through `account/read`; Claude authentication remains `unknown` until an explicitly started session reports it because its CLI exposes no model-free authentication handshake. The release does not add automatic spawning, watcher dispatch, remote gateways, arbitrary runtime plugins, or silent failover.
 
 ## Decision drivers
 
@@ -23,7 +23,7 @@ Agent-runtime and MCP transports are independent. ACP, Codex app-server, or Clau
 - Goal execution already owns acknowledgement, dispatch, retry, evidence, acceptance, and completion independently of any provider session.
 - `agent.resolve_task_context` is the canonical assigned-task preflight; the task-context ledger is the bounded, source-linked portability seam.
 - MCP transports and runtime protocol clients must remain separate adapters over the domain layer.
-- Current MCP HTTP bearer authentication and stdio transport access are workspace-level boundaries, not ACP session authorization boundaries.
+- Codex, Claude, and conforming ACP runtimes own the MCP configuration they expose to their sessions; Omvra owns only its endpoint and governed tool behavior.
 - MCP audit records are bounded and redacted. Workspace backup/restore preserves versioned workspace records and unknown fields.
 
 ### Constraints
@@ -166,7 +166,7 @@ Provider-reported tokens, context usage, and cost are optional observations labe
 
 ### 2026-08 lifecycle audit and decision
 
-Verified ownership before this change: `agent-runtime-session-service.cjs` persisted binding state and normalized events; `agent-runtime-session-runner.cjs` owned live clients, pending requests, provider notifications, cancellation, and task-execution synchronization; task attempts persisted `runtimeExecution`; renderer supervision, milestone launch, and status surfaces each interpreted binding state independently. The uncommitted pending-request controls and scoped MCP approval handling were retained because they close real interaction gaps. Their binding-state-derived work labels were rewritten to consume the canonical turn projection. No unrelated dirty files were discarded.
+Verified ownership before this change: `agent-runtime-session-service.cjs` persisted binding state and normalized events; `agent-runtime-session-runner.cjs` owned live clients, pending requests, provider notifications, cancellation, and task-execution synchronization; task attempts persisted `runtimeExecution`; renderer supervision, milestone launch, and status surfaces each interpreted binding state independently. Pending-request controls remain because they close real interaction gaps; Omvra-specific MCP auto-approval was removed with configuration injection so provider permission handling remains authoritative. Binding-state-derived work labels consume the canonical turn projection.
 
 | Option | Benefit | Cost or disqualifier | Decision |
 | --- | --- | --- | --- |
@@ -230,7 +230,6 @@ interface AcpSessionBindingV1 {
   runtimeProfileId: string;
   scope: AcpWorkScopeV1;
   opaqueSessionRef?: string;
-  mcpGrantId?: string;
   state: AcpSessionState;
   turn?: AcpTaskTurnProjectionV1;
   capabilities: RuntimeCapabilityObservationV1[];
@@ -254,7 +253,7 @@ Binding and turn invariants:
 - A connected or resumable binding requires `opaqueSessionRef`; terminal retention may clear it without deleting the binding record.
 - Pending input is addressable only by binding ID, turn ID, and provider request ID. Routine policy-approved tool permission requests remain permission events and do not enter `waiting-input`.
 - `opaqueSessionRef` is a runtime-owned correlation token, not an agent identity, credential, transcript locator, acceptance signal, or authority grant.
-- `mcpGrantId` correlates a separately managed MCP authorization grant. It is not the bearer secret and cannot be exchanged for one through workspace reads.
+- Legacy `mcpGrantId` fields are preserved as unknown migration data but are not written, consumed, or revoked by the runtime runner.
 - The captured task/Goal revision identifies the context used to start the session. A later revision marks the session context stale; it does not roll back the work record or authorize overwriting the newer revision.
 - Every governed write still supplies the current task or Goal revision. The adapter cannot bypass optimistic concurrency.
 - Capabilities are a start-time snapshot for reproducibility. Current controls also consult the latest observation and fail if support is no longer available.
@@ -282,23 +281,17 @@ Durable task context appended during a turn is queued for the next task turn by 
 
 The existing task attempt `runtimeExecution` remains a compatibility mirror for task status/evidence surfaces. The binding `turn` projection is necessary because Goal-node turns and cross-surface concurrency cannot be represented by task attempts alone. No new store or event bus is introduced.
 
-## Session-scoped MCP access contract
+## Provider-owned MCP configuration contract
 
-Starting an ACP session and granting MCP access are separate operations. After task/Goal preflight succeeds, Omvra may issue an ephemeral MCP grant bound to:
+Starting or resuming a runtime session does not create an MCP configuration. Codex, Claude, or another ACP runtime loads the same MCP roster it would use when launched directly. Omvra must not pass `mcp_servers`, `mcpServers`, `--mcp-config`, provider CLI overrides, or provider credentials as part of task execution.
 
-- the ACP binding ID and exact task/contribution or Goal-node execution attempt;
-- the approved MCP capability profile and project/workspace scope;
-- an issued-at time, expiry, and revocation state.
+Omvra remains responsible for:
 
-The grant authorizes only the capabilities needed by that work scope. It does not bypass task/Goal revisions, dependency gates, policy, evidence, audit, or acceptance. Session close, cancellation, terminal failure, archive, or explicit revocation invalidates it; expiry never advances lifecycle state.
+- starting and exposing its configured HTTP MCP listener;
+- enforcing the normal workspace capability, revision, policy, evidence, audit, and acceptance contracts on each tool call;
+- reporting provider MCP startup and tool events as observations without treating unrelated server failures as an Omvra task-start failure.
 
-Transport is negotiated independently of ACP:
-
-- An HTTP-capable runtime receives a loopback Omvra MCP endpoint with a short-lived scoped bearer credential through a protected runtime configuration channel.
-- A stdio-only runtime receives an Omvra-managed scoped MCP proxy that enforces the same grant before dispatching to the shared domain services.
-- The existing workspace-wide HTTP bearer token and the unrestricted `mcp-stdio.cjs` entry point are not passed to ACP sessions.
-
-The secret is held in memory and omitted from prompts, task/Goal records, binding metadata, environment diagnostics, command-line arguments, general audit, and backups. Persist only the non-secret grant correlation ID and bounded issue/expiry/revocation facts. External handoff receives no MCP grant automatically.
+If the provider has no usable Omvra MCP entry, the provider owns that configuration failure. Omvra reports the observed limitation and never manufactures a second registry, substitutes a dev endpoint, or broadens credentials. External handoff likewise receives no Omvra-generated MCP configuration.
 
 ## Lifecycle contract
 
@@ -322,7 +315,7 @@ sequenceDiagram
   participant O as Omvra lifecycle
   participant A as Runtime protocol client
   participant R as Selected runtime
-  participant M as Scoped MCP gateway
+  participant M as Omvra MCP HTTP endpoint
   U->>O: Explicit execution request
   O->>O: Resolve runtime, dependencies, revision, policy, context
   O->>A: Create stable execution attempt
@@ -332,8 +325,8 @@ sequenceDiagram
   A->>R: Create or resume native session
   R-->>A: Opaque session reference and capabilities
   A->>O: Persist session binding
-  O->>M: Issue binding-scoped grant
-  M-->>R: Negotiated MCP connection
+  R->>R: Load provider-owned MCP roster
+  R->>M: Connect using provider-owned configuration
   R-->>A: Live native-protocol updates
   A-->>U: Normalized progress and requests
   R->>O: Governed MCP writes and evidence references
@@ -351,7 +344,7 @@ sequenceDiagram
 - **Cancellation:** move the turn, not the session, to `cancelling`; issue the selected protocol's cancel operation only when supported and wait for acknowledgement. A timeout makes the turn `interrupted`; the reusable provider session remains `ready` when transport liveness is intact.
 - **Missing or unavailable runtime:** fail before session creation. Do not create a fabricated session, background retry, or fallback attempt. External handoff remains a separate explicit action.
 - **Authentication required:** surface the runtime-provided method or agent-native sign-in instruction. Omvra never receives or persists the credential.
-- **MCP grant failure or expiry:** deny MCP access visibly without falling back to a broader token or transport. The ACP session may remain open for user steering, but it cannot claim governed Omvra work succeeded.
+- **Provider MCP unavailable:** keep the runtime session visible, report the provider observation, and do not inject a substitute configuration. The session cannot claim governed Omvra work succeeded without durable Omvra evidence.
 - **Stale work revision:** keep the session visible as stale, require context refresh, and let the normal revision contract reject stale writes.
 
 Active and interrupted bindings retain the opaque reference so a supported resume is possible. Explicitly closed, cancelled, or archived bindings retain normalized metadata and correlation IDs but remove the opaque reference. In the first release, normalized terminal bindings and events remain with the workspace until the workspace is deleted; reads stay bounded. There is no background retention job. A later configurable expiry policy may shorten that metadata retention without restoring or extending session resumability.
@@ -364,11 +357,11 @@ Active and interrupted bindings retain the opaque reference so a supported resum
 - Generic ACP profiles accept any conforming executable and fixed arguments. OpenCode uses its installed executable with `acp`; its advertised ACP version, capabilities, and authentication methods are handled by the same generic client.
 - Launch requires an explicit user or already-governed Goal action. Assignment, delegation eligibility, watcher changes, and board polling cannot launch it.
 - The executable path is exact, fixed arguments are an array, the workspace directory is validated, and no shell interpolation is used.
-- Only the selected runtime receives the bounded context pack and session-scoped Omvra MCP connection configuration required for the scope.
+- Only the selected runtime receives the bounded context pack. MCP configuration is inherited from that runtime unchanged.
 - The first migrated policy permits one in-flight task/Goal turn across the workspace while allowing multiple idle reusable sessions. Per-runtime multiplexing is deferred until a provider-neutral advertised-capacity contract exists. Join behavior is based on accepted durable outputs, never shared transcripts or session proximity.
-- This is local multi-agent execution, not a remote/shared agent pool. Remote ACP over HTTP/WebSocket may later expand deployment location and independent scaling without changing the collaboration, session-binding, MCP-grant, or acceptance contracts.
+- This is local multi-agent execution, not a remote/shared agent pool. Remote ACP over HTTP/WebSocket may later expand deployment location and independent scaling without changing the collaboration, session-binding, provider-owned MCP, or acceptance contracts.
 - Remote gateways, hosted agents, Omvra-owned provider credentials, provider SDKs, arbitrary runtime/plugin installation, recursive agent trees, background relaunch, and silent runtime failover are out of scope.
-- `Open externally` uses an allowlisted application link or exact executable handoff. It records `external-handoff` only, creates no ACP binding or MCP grant, does not prove authentication or execution, and does not change task/Goal status. The UI should describe this as opening/preparing work externally, not starting or sending an ACP session.
+- `Open externally` uses an allowlisted application link or exact executable handoff. It records `external-handoff` only, creates no ACP binding or MCP configuration, does not prove authentication or execution, and does not change task/Goal status. The UI should describe this as opening/preparing work externally, not starting or sending an ACP session.
 
 ## Alignment with existing Omvra contracts
 
@@ -418,9 +411,7 @@ Adapters return stable, visible failure classes such as:
 - `ACP_SESSION_NOT_FOUND`
 - `ACP_SESSION_RESUME_UNSUPPORTED`
 - `ACP_SESSION_INTERRUPTED`
-- `ACP_MCP_GRANT_FAILED`
-- `ACP_MCP_GRANT_EXPIRED`
-- `ACP_MCP_CAPABILITY_DENIED`
+- `ACP_MCP_UNAVAILABLE`
 - `REVISION_MISMATCH`
 
 No failure class authorizes fallback, lifecycle advancement, or data deletion. Retry creates no duplicate binding or event when the same idempotency key is replayed.
@@ -432,8 +423,8 @@ No failure class authorizes fallback, lifecycle advancement, or data deletion. R
 3. Add connection preflight and explicit external handoff with redacted audit.
 4. Add the separate session-binding/event store and `sessionBindingId` attempt extension.
 5. Add native local-stdio ACP, Codex app-server, and Claude stream-json clients with focused initialization/capability/auth tests.
-6. Add the session-scoped MCP grant/gateway boundary; prove that both negotiated transports deny out-of-scope and expired access without broader fallback.
-7. Bind one user-initiated task attempt; pass bounded context plus scoped MCP configuration.
+6. Keep MCP configuration provider-owned; prove task start and resume do not inject, disable, or replace provider MCP entries.
+7. Bind one user-initiated task attempt and pass only the bounded context pack.
 8. Add steering, input, permission, cancel, close, crash, and resume behavior only where negotiated capabilities support them.
 9. Add Goal-node binding after task behavior passes lifecycle, archive, backup, and privacy QA.
 10. Prove local multi-agent coordination with concurrent bounded attempts, then prove portability with a second runtime using the same accepted checkpoint, not a copied transcript.
@@ -445,7 +436,7 @@ Rollback preserves runtime profiles, bindings, attempts, events, and unknown fie
 - **Identity/runtime coupling:** profiles and defaults are separate from people; resolution never reads persona as a runtime choice.
 - **Premature completion:** session/attempt events cannot mutate submission, acceptance, task status, or Goal delivery.
 - **Credential or transcript leakage:** forbidden fields at profile, binding, context, audit, export, and backup boundaries; add privacy-negative fixtures.
-- **Over-broad MCP authority:** issue an ephemeral binding-scoped grant, enforce it at either negotiated MCP transport, revoke it on terminal session events, and never fall back to the workspace-wide token or unrestricted stdio entry point.
+- **Competing MCP authorities:** the runtime owns its MCP roster and credentials; Omvra exposes one configured endpoint and never injects a parallel registry or dev endpoint.
 - **Capability drift:** persist observations with timestamps, refresh at preflight, and fail unsupported controls visibly.
 - **Stale session context:** capture the starting revision, show staleness, and retain existing revision checks on every write.
 - **Orphaned sessions after crash:** persist binding before the first model turn, use idempotency, reconcile on startup, and require explicit resume/close.
@@ -462,7 +453,7 @@ Rollback preserves runtime profiles, bindings, attempts, events, and unknown fie
 - Privacy: no credential, prompt, response, transcript, tool payload, hidden reasoning, evidence body, or opaque session reference in task, collaboration, Goal graph, context index, general audit, cards, or exports.
 - Persistence: reload, backup/restore, archive/restore, unknown-field preservation, and ACP-disabled rollback.
 - Integration: direct task execution and Goals without session fields remain unchanged; MCP and native runtime clients remain siblings over domain services.
-- MCP authorization: grant scope, expiry, revocation, redaction, HTTP and scoped-proxy parity, and rejection of broader fallback.
+- MCP authority: Codex/Claude inheritance, no launch or thread-level injection, listener readiness, and normal endpoint policy enforcement.
 - Local multi-agent execution: concurrent session multiplexing when supported, separate subprocess isolation otherwise, and joins gated by accepted durable outputs.
 
 ## Acceptance mapping
@@ -471,7 +462,7 @@ Rollback preserves runtime profiles, bindings, attempts, events, and unknown fie
 - Session closing, process exit, crash, and cancellation cannot complete or abandon Omvra work.
 - Provider credentials and raw transcripts are forbidden from workspace records.
 - Unsupported and unknown capabilities fail visibly and are never simulated.
-- Runtime and MCP transports are independent; every governed runtime session receives only an ephemeral scope-bound MCP grant.
+- Runtime and MCP transports are independent; every runtime session inherits the provider's MCP configuration unchanged.
 - Local stdio permits bounded concurrent multi-agent work without implying a distributed runtime pool.
 - Automatic spawning, watcher dispatch, remote gateways, arbitrary plugins, and silent failover remain outside the first release.
 

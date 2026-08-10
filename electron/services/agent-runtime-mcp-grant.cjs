@@ -77,37 +77,11 @@ function isScopedToolCallAllowed(grant, toolName, args = {}) {
     || canWrite;
 }
 
-function buildProviderMcpConfiguration(grant, provider) {
-  if (!grant) return {};
-  const server = {
-    name: 'omvra',
-    url: grant.endpoint,
-    headers: { Authorization: `Bearer ${grant.token}` },
-  };
-  if (provider === 'acp' || provider === 'acp-local-stdio') return { mcpServers: [server] };
-  if (provider === 'codex-app-server' || provider === 'codex-app-server-stdio') {
-    return {
-      config: {
-        mcp_servers: {
-          omvra: {
-            url: server.url,
-            http_headers: server.headers,
-            enabled: true,
-          },
-        },
-      },
-    };
-  }
-  if (provider === 'claude-stream-json' || provider === 'claude-stream-json-stdio') return { mcpServers: { omvra: server } };
-  return {};
-}
-
 function _resetForTests() {
   grants.clear();
 }
 
 module.exports = {
-  buildProviderMcpConfiguration,
   findScopedMcpGrant,
   issueScopedMcpGrant,
   isScopedToolCallAllowed,

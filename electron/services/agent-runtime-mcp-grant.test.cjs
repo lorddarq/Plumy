@@ -1,7 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  buildProviderMcpConfiguration,
   findScopedMcpGrant,
   issueScopedMcpGrant,
   isScopedToolCallAllowed,
@@ -11,28 +10,10 @@ const {
 
 test.afterEach(() => _resetForTests());
 
-test('issues an in-memory task-scoped grant and provider configuration without persisting the token', () => {
+test('issues an in-memory task-scoped grant without persisting the token', () => {
   const grant = issueScopedMcpGrant({ endpoint: 'http://127.0.0.1:3456/mcp', scope: { kind: 'task', taskId: 'task-1' } });
   assert.equal(grant.ok, true);
   assert.equal(findScopedMcpGrant(grant.token).scope.taskId, 'task-1');
-  const arrayConfiguration = {
-    mcpServers: [{ name: 'omvra', url: 'http://127.0.0.1:3456/mcp', headers: { Authorization: `Bearer ${grant.token}` } }],
-  };
-  assert.deepEqual(buildProviderMcpConfiguration(grant, 'acp-local-stdio'), arrayConfiguration);
-  assert.deepEqual(buildProviderMcpConfiguration(grant, 'codex-app-server-stdio'), {
-    config: {
-      mcp_servers: {
-        omvra: {
-          url: 'http://127.0.0.1:3456/mcp',
-          http_headers: { Authorization: `Bearer ${grant.token}` },
-          enabled: true,
-        },
-      },
-    },
-  });
-  assert.deepEqual(buildProviderMcpConfiguration(grant, 'claude-stream-json-stdio'), {
-    mcpServers: { omvra: arrayConfiguration.mcpServers[0] },
-  });
   assert.equal(JSON.stringify(grant.scope).includes(grant.token), false);
 });
 

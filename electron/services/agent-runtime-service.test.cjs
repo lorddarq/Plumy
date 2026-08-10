@@ -104,8 +104,6 @@ test('Codex connection test uses app-server directly and reuses its authenticate
       assert.equal(command, '/usr/bin/codex');
       assert.deepEqual(args, [
         '-c', 'model="gpt-5"',
-        '-c', 'mcp_servers.omvra.enabled=false',
-        '-c', 'mcp_servers.omvra_testing_mcp.enabled=false',
         'app-server', '--stdio',
       ]);
       return child;

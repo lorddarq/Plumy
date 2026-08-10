@@ -64,12 +64,12 @@ test('preflight fails closed for unfinished dependencies, active attempts, auth,
   });
   const result = service.prepare(null, {
     taskId: 'task-1', contributionId: 'contribution-1', requiredCapabilities: ['resume'],
-    requireScopedMcp: true, scopedMcpAvailable: false, budgetAllowed: false, permissionsAllowed: false,
+    budgetAllowed: false, permissionsAllowed: false,
   });
   assert.equal(result.canStart, false);
   assert.deepEqual(new Set(result.blockers.map(item => item.code)), new Set([
     'TASK_DEPENDENCY_INELIGIBLE', 'ACP_EXECUTION_ALREADY_ACTIVE', 'ACP_AUTHENTICATION_REQUIRED', 'ACP_CAPABILITY_UNSUPPORTED',
-    'ACP_MCP_GRANT_FAILED', 'ACP_BUDGET_EXCEEDED', 'ACP_PERMISSION_DENIED',
+    'ACP_BUDGET_EXCEEDED', 'ACP_PERMISSION_DENIED',
   ]));
 });
 

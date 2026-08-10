@@ -26,7 +26,6 @@ const { registerTaskContextIpcHandlers } = require('./ipc/task-context.cjs');
 const { captureMeaningfulTaskCheckpoints } = require('./domain/task-context-checkpoint-service.cjs');
 const { startMcpHttpServer, waitForMcpHttpServerReady } = require('./services/mcp-http-server.cjs');
 const { getMcpServerConfig, getMcpCapabilityProfile } = require('./services/workspace-service.cjs');
-const { issueScopedMcpGrant, revokeScopedMcpGrant } = require('./services/agent-runtime-mcp-grant.cjs');
 const {
   createUpdateController,
   normalizeUpdateChannel,
@@ -91,12 +90,6 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   getTaskById: (runtimeStore, taskId) => require('./services/workspace-service.cjs').getTaskById(runtimeStore, taskId),
   listTaskContext: (runtimeStore, payload) => listTaskContextEntries(runtimeStore, payload),
   getTaskContextEntry: (runtimeStore, payload) => getTaskContextEntry(runtimeStore, payload),
-  issueMcpGrant: (runtimeStore, payload) => {
-    const config = getMcpServerConfig(runtimeStore);
-    if (!isMcpAgentAccessEnabled(runtimeStore)) return { ok: false, error: 'ACP_MCP_GRANT_FAILED', message: 'MCP agent access is disabled.' };
-    return issueScopedMcpGrant({ endpoint: config.publicUrl, scope: payload.scope, capabilityProfile: getMcpCapabilityProfile(runtimeStore) });
-  },
-  revokeMcpGrant: (_runtimeStore, grantId) => revokeScopedMcpGrant(grantId),
   ensureMcpReady: () => ensureMcpServerReady(),
   logger: console,
 });

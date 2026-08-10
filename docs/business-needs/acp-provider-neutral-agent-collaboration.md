@@ -87,7 +87,7 @@ Local launch behavior must:
 
 Every configured runtime may expose **Open externally** when it has a safe native handoff but ACP is unavailable or unnecessary. The handoff opens the selected application with the workspace and a bounded task prompt or task-context reference. Where the external application supports it, the prompt remains unsent for human review.
 
-An external handoff records only that Omvra prepared and opened the work. It does not create an ACP session or MCP grant, prove authentication or that a model turn started, or advance task lifecycle state. No provider usage should be attributed until the external runtime reports it through a later governed integration.
+An external handoff records only that Omvra prepared and opened the work. It does not create an ACP session or MCP configuration, prove authentication or that a model turn started, or advance task lifecycle state. No provider usage should be attributed until the external runtime reports it through a later governed integration.
 
 ## Required product capabilities
 
@@ -95,7 +95,7 @@ An external handoff records only that Omvra prepared and opened the work. It doe
 
 - Start or connect an ACP session from a task or contributor assignment.
 - Bind the session to a provider, implementation, agent profile, task revision, contribution, and execution attempt.
-- Pass a session-scoped Omvra MCP connection and a bounded task context projection into the session.
+- Pass a bounded task context projection into the session while inheriting the selected runtime's MCP configuration unchanged.
 - Show normalized live messages, plan updates, tool activity, diffs, permission requests, input requests, usage, and reported cost when supported.
 - Let the user or orchestrator steer, cancel, resume, or close the session.
 - Convert useful outcomes into source-linked evidence, decisions, blockers, handoffs, and context checkpoints rather than persisting an unlimited transcript.
@@ -121,7 +121,7 @@ An external handoff records only that Omvra prepared and opened the work. It doe
 1. A user, workflow, or orchestrator selects an eligible agent for a task contribution or Goal node.
 2. Omvra checks work eligibility, dependencies, permissions, provider availability, and execution budget.
 3. Omvra creates an execution attempt and binds an ACP session to it.
-4. The agent receives the current work projection, latest accepted checkpoint, a bounded history index, and an ephemeral scope-bound Omvra MCP grant.
+4. The agent receives the current work projection, latest accepted checkpoint, and a bounded history index; its runtime supplies the configured MCP roster.
 5. ACP carries live interaction while MCP carries governed reads and writes.
 6. Omvra records normalized session metadata and redacted audit events without raw prompts, responses, tool payloads, or hidden reasoning.
 7. The agent submits structured evidence and a handoff checkpoint.
@@ -160,7 +160,7 @@ flowchart TD
 | Task collaboration persistence and MCP | Gives every session a durable orchestrator, contributor, scope, status, and evidence owner | Open inside **Omvra Multi-Agent Task Orchestration** |
 | Orchestration lifecycle and contributor handoffs | Separates live session activity from submission, revision, acceptance, and aggregate completion | Open inside **Omvra Multi-Agent Task Orchestration** |
 | Provider-neutral session binding | Correlates provider session IDs with Omvra task, contribution, Goal node, execution attempt, revisions, and capabilities | New ACP-specific contract; not currently represented by a live task or milestone |
-| ACP client runtime and capability adapter | Starts or connects agents, negotiates optional features, passes MCP configuration, and normalizes updates | New ACP-specific capability; not currently represented by a live task or milestone |
+| ACP client runtime and capability adapter | Starts or connects agents, negotiates optional features, inherits provider MCP configuration, and normalizes updates | New ACP-specific capability; not currently represented by a live task or milestone |
 
 The context ledger should precede production cross-provider handoffs. A user-invoked ACP prototype can be built without it, but the prototype would still depend on provider transcripts and would not prove the intended context or portability benefit.
 
@@ -219,7 +219,7 @@ This table reflects the live Omvra roadmap read on 2026-07-28.
 1. Configure one exact local agent runtime from Omvra settings without provider credentials.
 2. Provide connection testing and a user-initiated **Open externally** fallback.
 3. Implement a minimal local-stdio ACP client for that runtime and bind one ACP session to one task execution attempt.
-4. Pass a session-scoped Omvra MCP connection and the bounded context pack into the session. ACP and MCP negotiate transport separately: an HTTP-capable runtime uses loopback HTTP with an ephemeral scoped credential; a stdio-only runtime uses an Omvra-managed scoped proxy. Never pass the existing broad HTTP token or unrestricted stdio MCP access.
+4. Pass the bounded context pack into the session. The selected runtime remains authoritative for MCP configuration and connects to Omvra's configured HTTP endpoint without Omvra injecting or replacing server entries.
 5. Show live progress, permissions, cancellation, capability gaps, context usage, and optional reported cost.
 6. Persist a structured checkpoint and evidence, then verify that task completion still requires the existing acceptance path.
 
@@ -250,7 +250,7 @@ This table reflects the live Omvra roadmap read on 2026-07-28.
 - Omvra records provider, agent implementation, model or mode when reported, capabilities, scope identity, revisions, timestamps, and outcomes for every execution attempt.
 - Omvra resolves the exact runtime before execution and never silently substitutes another installed runtime.
 - Provider authentication and credentials are not copied into workspace records.
-- ACP and MCP transports are negotiated independently. Each ACP session receives an ephemeral scope-bound MCP grant; the workspace-wide HTTP token and unrestricted stdio MCP entry point are never inherited or used as fallback.
+- ACP and MCP transports remain independent. Each session inherits the selected runtime's MCP roster and credentials unchanged; Omvra does not maintain or inject a competing provider configuration.
 - Connection testing does not create a session or model turn. External handoff does not count as execution until independently acknowledged.
 - ACP capabilities are negotiated; unsupported controls are hidden or shown as unavailable rather than simulated.
 - Provider-reported token, context, and cost data is labelled as reported and optional. Unknown values remain unknown.
@@ -271,7 +271,7 @@ This table reflects the live Omvra roadmap read on 2026-07-28.
 - Workflow dependencies do not advance from an ACP plan or stopped session alone.
 - Context and cost are visible when reported, with unsupported data clearly identified.
 - Provider switching does not weaken task revision protection, Goal policy, evidence, human gates, or audit privacy.
-- Concurrent local sessions remain isolated by work scope and MCP grant, and joins wait for accepted durable outputs.
+- Concurrent local sessions remain isolated by work scope and provider session, and joins wait for accepted durable outputs.
 - Controlled benchmarks measure each provider against its own baseline and do not create a misleading cross-provider leaderboard.
 
 ## Non-goals
