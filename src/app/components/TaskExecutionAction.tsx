@@ -247,13 +247,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
           setPendingRequests([]);
           setRequestValues({});
         }
+        if (agentRuntimeTurnState(nextBinding) === 'waiting-input') void refreshSession();
       }
       if (nextEvent?.bindingId && (nextBinding?.scope?.taskId === task.id || binding?.id === nextEvent.bindingId)) {
         setEvents(current => current.some(event => event.id === nextEvent.id) ? current : [...current, nextEvent].slice(-100));
       }
     });
-    const timer = window.setInterval(() => void refreshSession(), 10000);
-    return () => { window.clearInterval(timer); unsubscribe?.(); };
+    return () => unsubscribe?.();
   }, [open, task.id, binding?.id]);
 
   const observation = resolution?.profile ? runtimeState?.observations?.[resolution.profile.id] : undefined;

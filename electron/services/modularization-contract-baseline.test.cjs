@@ -226,6 +226,7 @@ const IPC_INVOKE_CHANNELS = [
   'performance/clear-logs',
   'performance/open-logs-folder',
   'performance/record',
+  'performance/record-batch',
   'skills/pick-directory',
   'store/delete',
   'store/export',

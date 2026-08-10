@@ -4,7 +4,7 @@ import { Play, Trash2 } from 'lucide-react';
 import { Task } from '../types';
 import { PenWritingIcon } from './icons/PenWritingIcon';
 import { FilesCopyIcon } from './icons/FilesCopyIcon';
-import { useAgentSessionSupervisor } from './AgentSessionSupervisor';
+import { useAgentSessionLauncher } from './AgentSessionSupervisor';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -48,7 +48,7 @@ export function DraggableTimelineTask({
   const ref = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
-  const { requestTask } = useAgentSessionSupervisor();
+  const { requestTask } = useAgentSessionLauncher();
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const dragOffsetXRef = useRef(0);
 

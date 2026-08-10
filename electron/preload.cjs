@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld('electron', {
 
   performance: {
     record: (event) => ipcRenderer.invoke('performance/record', event),
+    recordBatch: (events) => ipcRenderer.invoke('performance/record-batch', events),
     openLogsFolder: () => ipcRenderer.invoke('performance/open-logs-folder'),
     clearLogs: () => ipcRenderer.invoke('performance/clear-logs'),
   },

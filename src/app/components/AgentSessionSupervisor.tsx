@@ -1,8 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type Context, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type Context, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import type { Task, TimelineSwimlane } from '../types';
 import { TaskExecutionAction } from './TaskExecutionAction';
 import { agentRuntimeTurnState, isAgentRuntimeTurnInFlight, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
 import { measurePerformanceOperation } from '../services/performanceLogging.ts';
+import { findNewCompletedTaskRuns, type RuntimeEvent } from '../utils/agentRuntimeNotifications.ts';
+import { areSerializedValuesEqual } from '../store/workspaceSelectors.ts';
 
 export const CONNECTED_SESSION_STATES = new Set(['starting', 'ready']);
 const HISTORY_SESSION_STATES = new Set(['interrupted', 'failed', 'closed', 'complete', 'completed']);
@@ -36,6 +39,10 @@ interface AgentSessionSupervisorContextValue {
   openSession: (binding: SessionBinding) => void;
 }
 
+interface AgentSessionLauncherContextValue {
+  requestTask: AgentSessionSupervisorContextValue['requestTask'];
+}
+
 export interface SessionDockProjection {
   state: 'none' | 'starting' | 'working' | 'hidden-active' | 'ready' | 'needs-input' | 'interrupted' | 'failed' | 'history' | 'blocked';
   binding?: SessionBinding;
@@ -47,6 +54,7 @@ export interface SessionDockProjection {
 
 type AgentSessionSupervisorGlobal = typeof globalThis & {
   __omvraAgentSessionSupervisorContext?: Context<AgentSessionSupervisorContextValue | null>;
+  __omvraAgentSessionLauncherContext?: Context<AgentSessionLauncherContextValue | null>;
 };
 
 // Vite can refresh this module while preserving mounted children. Keep the
@@ -54,9 +62,17 @@ type AgentSessionSupervisorGlobal = typeof globalThis & {
 const agentSessionSupervisorGlobal = globalThis as AgentSessionSupervisorGlobal;
 const AgentSessionSupervisorContext = agentSessionSupervisorGlobal.__omvraAgentSessionSupervisorContext
   || (agentSessionSupervisorGlobal.__omvraAgentSessionSupervisorContext = createContext<AgentSessionSupervisorContextValue | null>(null));
+const AgentSessionLauncherContext = agentSessionSupervisorGlobal.__omvraAgentSessionLauncherContext
+  || (agentSessionSupervisorGlobal.__omvraAgentSessionLauncherContext = createContext<AgentSessionLauncherContextValue | null>(null));
 
 export function useAgentSessionSupervisor() {
   const context = useContext(AgentSessionSupervisorContext);
+  if (!context) throw new Error('AgentSessionSupervisor must be rendered above its launch surfaces.');
+  return context;
+}
+
+export function useAgentSessionLauncher() {
+  const context = useContext(AgentSessionLauncherContext);
   if (!context) throw new Error('AgentSessionSupervisor must be rendered above its launch surfaces.');
   return context;
 }
@@ -66,10 +82,29 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
   const [bindings, setBindings] = useState<SessionBinding[]>([]);
   const [pendingRequestsByBinding, setPendingRequestsByBinding] = useState<Record<string, SessionDockItem['pendingRequest']>>({});
   const [supervisionVisible, setSupervisionVisible] = useState(false);
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
 
   useEffect(() => {
     let disposed = false;
     let refreshRunning = false;
+    let notificationsInitialized = false;
+    const seenEventIds = new Set<string>();
+    const notifyCompletedRuns = (events: RuntimeEvent[], nextBindings: SessionBinding[], initialize = false) => {
+      if (!notificationsInitialized) {
+        events.forEach(event => {
+          const eventId = event && typeof event === 'object' && 'id' in event ? String(event.id || '') : '';
+          if (eventId) seenEventIds.add(eventId);
+        });
+        if (initialize) notificationsInitialized = true;
+        return;
+      }
+      const completedRuns = findNewCompletedTaskRuns(events, nextBindings, seenEventIds);
+      for (const run of completedRuns) {
+        const task = tasksRef.current.find(candidate => candidate.id === run.taskId);
+        toast.success('Agent run finished', { id: run.eventId, description: task?.title || run.taskId });
+      }
+    };
     const refresh = async () => {
       if (refreshRunning || disposed) return;
       refreshRunning = true;
@@ -79,6 +114,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
         ));
         if (!result?.ok || !Array.isArray(result.bindings)) return;
         const nextBindings = result.bindings as SessionBinding[];
+        notifyCompletedRuns(Array.isArray(result.events) ? result.events as RuntimeEvent[] : [], nextBindings, true);
         const requestEntries = await Promise.all(nextBindings
           .filter(binding => agentRuntimeTurnState(binding) === 'waiting-input')
           .map(async binding => {
@@ -89,8 +125,9 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
             return [binding.id, request && typeof request.message === 'string' ? { requestId: request.requestId, message: request.message } : undefined] as const;
           }));
         if (!disposed) {
-          setBindings(nextBindings);
-          setPendingRequestsByBinding(Object.fromEntries(requestEntries));
+          setBindings(current => areSerializedValuesEqual(current, nextBindings) ? current : nextBindings);
+          const nextRequests = Object.fromEntries(requestEntries);
+          setPendingRequestsByBinding(current => areSerializedValuesEqual(current, nextRequests) ? current : nextRequests);
         }
       } finally {
         refreshRunning = false;
@@ -99,7 +136,9 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
     void refresh();
     const timer = window.setInterval(() => void refresh(), 10000);
     const unsubscribe = window.electron?.agentRuntime?.sessions?.onEvent?.((payload) => {
-      if (payload?.binding) void refresh();
+      if (!payload?.binding) return;
+      if (payload.kind === 'event' && payload.event) notifyCompletedRuns([payload.event as RuntimeEvent], [payload.binding as SessionBinding]);
+      void refresh();
     });
     return () => {
       disposed = true;
@@ -154,21 +193,24 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
     pendingRequest: dockBinding ? pendingRequestsByBinding[dockBinding.id] : undefined,
   }), [activeBinding, bindings, blockedByActiveSession, dockBinding, dockItems, dockTask, historyBinding, pendingRequestsByBinding, readyBinding, supervisionVisible]);
   const value = useMemo(() => ({ requestTask, sessionDock, openSession: openBinding }), [openBinding, requestTask, sessionDock]);
+  const launcherValue = useMemo(() => ({ requestTask }), [requestTask]);
   return (
-    <AgentSessionSupervisorContext.Provider value={value}>
-      {children}
-      {request && (
-        <TaskExecutionAction
-          key={request.requestId}
-          task={request.task}
-          repositoryFolder={request.repositoryFolder}
-          openRequest={request.requestId}
-          startOnOpenRequest={request.startOnRequest}
-          onVisibilityChange={setSupervisionVisible}
-          onBlockedByBinding={openBinding}
-          trigger={null}
-        />
-      )}
-    </AgentSessionSupervisorContext.Provider>
+    <AgentSessionLauncherContext.Provider value={launcherValue}>
+      <AgentSessionSupervisorContext.Provider value={value}>
+        {children}
+        {request && (
+          <TaskExecutionAction
+            key={request.requestId}
+            task={request.task}
+            repositoryFolder={request.repositoryFolder}
+            openRequest={request.requestId}
+            startOnOpenRequest={request.startOnRequest}
+            onVisibilityChange={setSupervisionVisible}
+            onBlockedByBinding={openBinding}
+            trigger={null}
+          />
+        )}
+      </AgentSessionSupervisorContext.Provider>
+    </AgentSessionLauncherContext.Provider>
   );
 }

@@ -5,7 +5,7 @@ import { getTasksForMilestone } from '../utils/roadmap';
 import { agentRuntimeWorkspaceSourceLabel, resolveAgentRuntimeWorkspace } from '../utils/agentRuntimeWorkspace';
 import { ContextMenuItem } from './ui/context-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
-import { useAgentSessionSupervisor } from './AgentSessionSupervisor';
+import { useAgentSessionLauncher } from './AgentSessionSupervisor';
 import { OverflowActionMenu } from './OverflowActionMenu';
 import { ExecutionNotice } from './ExecutionNotice';
 import { getAttentionState, getSessionAttentionState, type AttentionState } from '../utils/attention';
@@ -41,7 +41,7 @@ function runtimeLabel(mode?: string) {
 }
 
 export function MilestoneExecutionAction({ milestone, tasks, projects, trigger, openRequest }: MilestoneExecutionActionProps) {
-  const { requestTask } = useAgentSessionSupervisor();
+  const { requestTask } = useAgentSessionLauncher();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<PreflightRow[]>([]);

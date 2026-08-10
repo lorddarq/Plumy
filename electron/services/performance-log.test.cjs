@@ -31,4 +31,10 @@ test('performance log stores timing metadata without arbitrary content', async t
     durationMs: 12.35,
     detail: null,
   });
+
+  await service.recordMany([
+    { category: 'render', operation: 'commit', durationMs: 2 },
+    { category: 'browser', operation: 'long-task', durationMs: 51 },
+  ]);
+  assert.equal(fs.readFileSync(service.runPath, 'utf8').trim().split('\n').length, 3);
 });

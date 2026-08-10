@@ -8,7 +8,6 @@ import { useAppShell } from './hooks/useAppShell.ts';
 import { UiLayoutStoreProvider } from './store/uiLayoutStore.tsx';
 import { WorkspaceStoreProvider, useWorkspaceSelector } from './store/workspaceStore.tsx';
 import { Toaster } from './components/ui/sonner';
-import { AgentRuntimeNotifications } from './components/AgentRuntimeNotifications.tsx';
 import { OnboardingDialog } from './components/OnboardingDialog.tsx';
 import { hasCompletedOnboarding } from './utils/onboarding.ts';
 import { Profiler, useCallback, useEffect, useRef, useState } from 'react';
@@ -17,7 +16,7 @@ import { usePerformanceLogging } from './hooks/usePerformanceLogging.ts';
 import { recordReactCommit } from './services/performanceLogging.ts';
 import { areShallowValuesEqual } from './store/workspaceSelectors.ts';
 
-function AppContent() {
+function AppContent({ performanceLoggingEnabled }: { performanceLoggingEnabled: boolean }) {
   const appShell = useAppShell();
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const onboardingHandledRef = useRef(false);
@@ -93,12 +92,14 @@ function AppContent() {
     <>
       <div className="flex h-dvh flex-col bg-gray-50">
         <AppHeader {...appShell.headerProps} />
-        <Profiler
-          id={`major-view:${appShell.mainViewsProps.currentView}`}
-          onRender={(_id, _phase, actualDuration) => recordReactCommit(appShell.mainViewsProps.currentView, actualDuration)}
-        >
-          <AppMainViews {...appShell.mainViewsProps} />
-        </Profiler>
+        {performanceLoggingEnabled ? (
+          <Profiler
+            id={`major-view:${appShell.mainViewsProps.currentView}`}
+            onRender={(_id, _phase, actualDuration) => recordReactCommit(appShell.mainViewsProps.currentView, actualDuration)}
+          >
+            <AppMainViews {...appShell.mainViewsProps} />
+          </Profiler>
+        ) : <AppMainViews {...appShell.mainViewsProps} />}
         <AppStatusBar {...appShell.statusBarProps} />
         <AppPanels {...appShell.panelsProps} />
         <UpdateAvailablePopup {...appShell.updatePopupProps} />
@@ -136,9 +137,8 @@ function AppStoreShell() {
       tasks={tasks}
       milestones={milestones}
     >
-      <AgentRuntimeNotifications tasks={tasks} />
       <AgentSessionSupervisorProvider tasks={tasks} projects={timelineSwimlanes}>
-        <AppContent />
+        <AppContent performanceLoggingEnabled={performanceLoggingEnabled} />
       </AgentSessionSupervisorProvider>
     </UiLayoutStoreProvider>
   );

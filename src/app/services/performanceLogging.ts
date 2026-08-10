@@ -10,6 +10,11 @@ let enabled = false;
 let latestWorkspaceCorrelationId: string | null = null;
 let latestActivity: { correlationId: string; recordedAt: number } | null = null;
 const CORRELATION_WINDOW_MS = 250;
+const FLUSH_INTERVAL_MS = 2000;
+const MAX_BATCH_SIZE = 100;
+type RecordedPerformanceEvent = PerformanceEvent & { occurredAt: string };
+let bufferedEvents: RecordedPerformanceEvent[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function createCorrelationId(prefix: string): string {
   const suffix = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -17,7 +22,12 @@ function createCorrelationId(prefix: string): string {
 }
 
 export function configurePerformanceLogging(nextEnabled: boolean): void {
+  if (!nextEnabled && enabled) void flushPerformanceEvents();
   enabled = nextEnabled;
+  if (!enabled && flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
 }
 
 export function getLatestWorkspaceCorrelationId(): string | null {
@@ -26,9 +36,32 @@ export function getLatestWorkspaceCorrelationId(): string | null {
 
 export function recordPerformanceEvent(event: PerformanceEvent): void {
   if (!enabled || typeof window === 'undefined') return;
-  const record = window.electron?.performance?.record;
-  if (typeof record !== 'function') return;
-  void record({ ...event, occurredAt: new Date().toISOString() }).catch(() => undefined);
+  bufferedEvents.push({ ...event, occurredAt: new Date().toISOString() });
+  if (bufferedEvents.length >= MAX_BATCH_SIZE) {
+    void flushPerformanceEvents();
+  } else if (!flushTimer) {
+    flushTimer = setTimeout(() => { void flushPerformanceEvents(); }, FLUSH_INTERVAL_MS);
+  }
+}
+
+export async function flushPerformanceEvents(): Promise<void> {
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  if (bufferedEvents.length === 0 || typeof window === 'undefined') return;
+  const events = bufferedEvents;
+  bufferedEvents = [];
+  const performanceApi = window.electron?.performance;
+  try {
+    if (typeof performanceApi?.recordBatch === 'function') {
+      await performanceApi.recordBatch(events);
+    } else if (typeof performanceApi?.record === 'function') {
+      await Promise.all(events.map(event => performanceApi.record(event)));
+    }
+  } catch {
+    // Diagnostics must never interfere with application work.
+  }
 }
 
 export function recordWorkspacePublication(changedFields: string[]): string {

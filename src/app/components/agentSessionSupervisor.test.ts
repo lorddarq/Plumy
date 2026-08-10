@@ -30,6 +30,8 @@ test('Roadmap task rows request the app-level supervisor before closing their sh
 test('Timeline uses the same request-only launch boundary', () => {
   const source = readComponent('DraggableTimelineTask.tsx');
 
+  assert.match(source, /useAgentSessionLauncher/);
+  assert.doesNotMatch(source, /useAgentSessionSupervisor/);
   assert.match(source, /requestTask\(task/);
   assert.doesNotMatch(source, /TaskExecutionAction/);
 });
@@ -39,8 +41,10 @@ test('the app-level supervisor is the only renderer owner of TaskExecutionAction
   const app = readFileSync(resolve(componentsDirectory, '../App.tsx'), 'utf8');
 
   assert.match(supervisor, /<TaskExecutionAction/);
+  assert.match(supervisor, /AgentSessionLauncherContext\.Provider/);
   assert.match(app, /<AgentSessionSupervisorProvider\b/);
   assert.match(app, /projects=\{timelineSwimlanes\}/);
+  assert.doesNotMatch(app, /AgentRuntimeNotifications/);
 });
 
 test('the supervisor owns a live session registry and a reopenable active-session dock', () => {
@@ -52,6 +56,7 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(source, /pendingRequest/);
   assert.match(source, /openSession/);
   const execution = readComponent('TaskExecutionAction.tsx');
+  assert.doesNotMatch(execution, /setInterval\(\(\) => void refreshSession/);
   assert.match(execution, /showClose=\{false\}/);
   assert.match(execution, /Minimize supervision/);
   assert.match(execution, /Preparing your work session/);
@@ -91,6 +96,11 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(execution, /Reconnect session/);
   assert.match(execution, /onBlockedByBinding\(result\.binding/);
   assert.match(source, /onBlockedByBinding=\{openBinding\}/);
+});
+
+test('Timeline scroll does not publish unchanged horizontal metrics', () => {
+  const source = readComponent('views/TimelineView.tsx');
+  assert.match(source, /current\.scrollLeft === nextMetrics\.scrollLeft && current\.viewportWidth === nextMetrics\.viewportWidth/);
 });
 
 test('task supervision prefers an in-flight turn or reusable ready session over closed history', () => {

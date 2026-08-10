@@ -50,15 +50,33 @@ test('performance registrar delegates timing records and local log controls', as
     ipcMain,
     performanceLog: {
       record: details => { calls.push(['record', details]); return { ok: true }; },
+      recordMany: events => { calls.push(['record-batch', events]); return { ok: true }; },
       openFolder: () => { calls.push(['open']); return { ok: true }; },
       clear: () => { calls.push(['clear']); return { ok: true }; },
     },
   });
 
   assert.deepEqual(await handlers.get('performance/record')(null, { operation: 'render' }), { ok: true });
+  assert.deepEqual(await handlers.get('performance/record-batch')(null, [{ operation: 'render' }]), { ok: true });
   assert.deepEqual(await handlers.get('performance/open-logs-folder')(), { ok: true });
   assert.deepEqual(await handlers.get('performance/clear-logs')(), { ok: true });
-  assert.deepEqual(calls, [['record', { operation: 'render' }], ['open'], ['clear']]);
+  assert.deepEqual(calls, [['record', { operation: 'render' }], ['record-batch', [{ operation: 'render' }]], ['open'], ['clear']]);
+});
+
+test('agent runtime session listing is read-only and never reconciles bindings', () => {
+  const { handlers, ipcMain } = createIpcHarness();
+  let reconcileCalls = 0;
+  registerAgentRuntimeIpcHandlers({
+    ipcMain,
+    listAgentRuntimeSessions: payload => ({ ok: true, payload }),
+    reconcileAgentRuntimeSessions: () => { reconcileCalls += 1; },
+  });
+
+  assert.deepEqual(handlers.get('agent-runtime/sessions/list')(null, { limit: 25 }), {
+    ok: true,
+    payload: { limit: 25 },
+  });
+  assert.equal(reconcileCalls, 0);
 });
 
 test('Goal registrar rejects missing reset ids before creating a lifecycle service', () => {

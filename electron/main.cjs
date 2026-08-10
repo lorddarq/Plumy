@@ -646,7 +646,6 @@ registerAgentRuntimeIpcHandlers({
   createAgentRuntimeSessionBinding: (payload) => createAgentRuntimeSessionBinding(store, payload),
   evaluateAgentRuntimeGovernance: (payload) => evaluateAgentRuntimeGovernance(store, payload),
   listAgentRuntimeSessions: (payload) => listAgentRuntimeSessions(store, payload),
-  reconcileAgentRuntimeSessions: () => agentRuntimeSessionRunner.reconcile(),
   prepareAgentExecution: (payload) => prepareAgentExecution(store, payload),
   recoverOrphanedTaskExecution: (payload) => recoverOrphanedTaskExecution(store, payload),
   prepareAgentRuntimeSessionArchive: (bindingId) => prepareAgentRuntimeSessionArchive(store, bindingId),

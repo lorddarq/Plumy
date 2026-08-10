@@ -983,7 +983,11 @@ export function TimelineView({
             scrollLeft: rowsContainerRef.current.scrollLeft,
             viewportWidth: rowsContainerRef.current.clientWidth,
           };
-          setHorizontalMetrics(nextMetrics);
+          setHorizontalMetrics(current => (
+            current.scrollLeft === nextMetrics.scrollLeft && current.viewportWidth === nextMetrics.viewportWidth
+              ? current
+              : nextMetrics
+          ));
           onTimelineScroll?.({
             scrollLeft: nextMetrics.scrollLeft,
             scrollTop: rowsContainerRef.current.scrollTop,

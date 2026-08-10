@@ -38,9 +38,16 @@ function createPerformanceLogService({ logsDirectory, shell, now = () => new Dat
   }
 
   function record(event) {
+    return recordMany([event]);
+  }
+
+  function recordMany(events) {
     initializeRun();
-    const line = `${JSON.stringify(sanitizePerformanceEvent({ occurredAt: now().toISOString(), ...event }))}\n`;
-    writeQueue = writeQueue.then(() => fs.promises.appendFile(runPath, line, 'utf8'));
+    const lines = (Array.isArray(events) ? events : [])
+      .map(event => JSON.stringify(sanitizePerformanceEvent({ occurredAt: now().toISOString(), ...event })))
+      .join('\n');
+    if (!lines) return Promise.resolve({ ok: true, path: runPath });
+    writeQueue = writeQueue.then(() => fs.promises.appendFile(runPath, `${lines}\n`, 'utf8'));
     return writeQueue.then(() => ({ ok: true, path: runPath }));
   }
 
@@ -60,7 +67,7 @@ function createPerformanceLogService({ logsDirectory, shell, now = () => new Dat
     return { ok: true };
   }
 
-  return { clear, openFolder, record, runPath };
+  return { clear, openFolder, record, recordMany, runPath };
 }
 
 module.exports = { createPerformanceLogService, sanitizePerformanceEvent };

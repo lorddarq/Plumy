@@ -3,7 +3,7 @@ interface RuntimeBinding {
   scope?: { kind?: string; taskId?: string };
 }
 
-interface RuntimeEvent {
+export interface RuntimeEvent {
   id: string;
   bindingId: string;
   nativeEventType?: string;
