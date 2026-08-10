@@ -381,8 +381,9 @@ function appendMcpAuditLog(store, entry) {
 }
 
 function archiveMcpAuditEntries(store, entries) {
-  const directory = typeof store.get(PREFERENCES_KEY)?.goalAuditArchiveDirectory === 'string'
-    ? store.get(PREFERENCES_KEY).goalAuditArchiveDirectory.trim()
+  const preferences = store.get(PREFERENCES_KEY);
+  const directory = typeof preferences?.goalAuditArchiveDirectory === 'string'
+    ? preferences.goalAuditArchiveDirectory.trim()
     : '';
   if (!directory) return { status: 'unconfigured', archived: 0 };
   const filePath = path.join(directory, 'mcp-audit.jsonl');

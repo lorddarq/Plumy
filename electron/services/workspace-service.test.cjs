@@ -215,6 +215,25 @@ test('audit writes backfill and append to the configured external directory', ()
   fs.rmSync(archiveDirectory, { recursive: true, force: true });
 });
 
+test('audit archive reads preferences once per append', () => {
+  const archiveDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-mcp-audit-read-'));
+  const source = makeStoreFromFixture('workspace-basic');
+  source.set('omvra.preferences.v1', { goalAuditArchiveDirectory: archiveDirectory });
+  let preferenceReads = 0;
+  const store = {
+    get: key => {
+      if (key === 'omvra.preferences.v1') preferenceReads += 1;
+      return source.get(key);
+    },
+    set: (key, value) => source.set(key, value),
+  };
+
+  appendMcpAuditLog(store, { type: 'mcp_tool_call', toolName: 'workspace.snapshot' });
+
+  assert.equal(preferenceReads, 1);
+  fs.rmSync(archiveDirectory, { recursive: true, force: true });
+});
+
 test('audit summary normalizes legacy outcomes and groups bounded metadata', () => {
   const store = makeStoreFromFixture('workspace-basic');
   store.set('omvra.mcp.audit.v1', [

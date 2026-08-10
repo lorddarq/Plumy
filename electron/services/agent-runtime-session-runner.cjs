@@ -514,7 +514,8 @@ function createAgentRuntimeSessionRunner({
         executionContract: confirmed.contractSnapshot,
         executionContractDigest: confirmed.contractDigest,
       };
-      const attempts = Array.isArray(store.get('omvra.taskContributionAttempts.v1')) ? store.get('omvra.taskContributionAttempts.v1') : [];
+      const storedAttempts = store.get('omvra.taskContributionAttempts.v1');
+      const attempts = Array.isArray(storedAttempts) ? storedAttempts : [];
       store.set('omvra.taskContributionAttempts.v1', attempts.concat(attempt));
     }
 
