@@ -952,11 +952,18 @@ export function TimelineView({
   const handleRowsVerticalScroll = useCallback(() => {
     if (!leftListRef.current || !rowsContainerRef.current) return;
     const rowsContainer = rowsContainerRef.current;
-    leftListRef.current.scrollTop = rowsContainer.scrollTop;
+    const scrollTop = rowsContainer.scrollTop;
+    const scrollLeft = rowsContainer.scrollLeft;
+    const scrollWidth = rowsContainer.scrollWidth;
+    const clientWidth = rowsContainer.clientWidth;
+
+    // Read layout metrics before synchronizing the fixed pane. Writing
+    // scrollTop first would force a synchronous reflow for the reads below.
+    leftListRef.current.scrollTop = scrollTop;
 
     if (!windowExtensionPendingRef.current) {
-      const remainingRight = rowsContainer.scrollWidth - rowsContainer.clientWidth - rowsContainer.scrollLeft;
-      const direction = rowsContainer.scrollLeft <= WINDOW_EXTENSION_BUFFER_PX
+      const remainingRight = scrollWidth - clientWidth - scrollLeft;
+      const direction = scrollLeft <= WINDOW_EXTENSION_BUFFER_PX
         ? 'past'
         : remainingRight <= WINDOW_EXTENSION_BUFFER_PX
           ? 'future'

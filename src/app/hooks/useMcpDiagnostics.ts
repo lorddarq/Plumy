@@ -39,6 +39,7 @@ export function useMcpDiagnostics({ enabled, endpoint }: UseMcpDiagnosticsOption
       }
 
       const reason = result.error || 'unknown';
+      if (reason.toLowerCase().includes('aborted')) return;
       if (attempt < 2 && (reason.includes('Failed to fetch') || reason.includes('ERR_CONNECTION_REFUSED'))) {
         retryTimer = window.setTimeout(() => {
           void run(attempt + 1);
