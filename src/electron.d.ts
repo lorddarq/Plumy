@@ -212,7 +212,7 @@ declare global {
         updateArtifacts: (payload: { goalId: string; elementId: string; artifactReferences: any[]; expectedRevision: number; idempotencyKey: string }) => Promise<{ ok: boolean; goal?: any; revision?: number; error?: string; currentRevision?: number; message?: string; idempotent?: boolean }>;
         onRuntimeChanged: (listener: (payload: { eventId: string; scope: 'graph' | 'execution' | 'policy' | 'conflict' | 'reconciliation' | 'schedule'; goalId: string; revision: number; actor: string; changeType: string; occurredAt: string; errorCode?: string; details?: Record<string, unknown> }) => void) => () => void;
       };
-      onStoreChanged: (listener: (payload: { updatedAt: string }) => void) => () => void;
+      onStoreChanged: (listener: (payload: { updatedAt: string; keys?: string[] }) => void) => () => void;
       app: {
         getRuntimeInfo: () => Promise<{
           name: string;

@@ -43,10 +43,10 @@ const CANONICAL_WORKSPACE_KEYS = [
   GOAL_POLICY_KEY,
 ];
 
-async function readCanonicalWorkspaceSnapshot(): Promise<Record<string, unknown>> {
+async function readCanonicalWorkspaceSnapshot(keys: string[] = CANONICAL_WORKSPACE_KEYS): Promise<Record<string, unknown>> {
   const scopedRead = window.electron?.storeGetMany;
   if (typeof scopedRead === 'function') {
-    return scopedRead(CANONICAL_WORKSPACE_KEYS);
+    return scopedRead(keys);
   }
   const exported = await window.electron?.storeExport?.();
   return exported && typeof exported === 'object' ? exported : {};
@@ -303,8 +303,12 @@ export function useCanonicalWorkspaceHydration(options: WorkspaceHydrationOption
 
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
-    const unsubscribe = window.electron?.onStoreChanged?.(() => {
-      void readCanonicalWorkspaceSnapshot().then(exported => {
+    const unsubscribe = window.electron?.onStoreChanged?.((payload) => {
+      const changedKeys = Array.isArray(payload?.keys)
+        ? payload.keys.filter(key => CANONICAL_WORKSPACE_KEYS.includes(key))
+        : CANONICAL_WORKSPACE_KEYS;
+      if (changedKeys.length === 0) return;
+      void readCanonicalWorkspaceSnapshot(changedKeys).then(exported => {
         if (exported && typeof exported === 'object') syncCanonicalWorkspaceFromExport(exported);
       }).catch(() => {
         // External synchronization is best effort; keep the current workspace usable.

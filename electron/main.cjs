@@ -225,9 +225,10 @@ function startAgentRuntimeReconciliation() {
   agentRuntimeReconciliationTimer = setInterval(tick, AGENT_RUNTIME_RECONCILIATION_INTERVAL_MS);
 }
 
-function broadcastStoreDidChange() {
+function broadcastStoreDidChange(keys = []) {
   const payload = {
     updatedAt: new Date().toISOString(),
+    keys,
   };
 
   for (const window of BrowserWindow.getAllWindows()) {
@@ -508,10 +509,13 @@ app.whenReady().then(() => {
     } catch (error) {
       console.error('[task-context] checkpoint capture failed:', error?.message || error);
     }
-    const changedKeys = new Set([...Object.keys(nextStore || {}), ...Object.keys(previousStore || {})]);
-    const runtimeOnlyChange = [...AGENT_RUNTIME_STORE_KEYS].some(key => JSON.stringify(nextStore?.[key]) !== JSON.stringify(previousStore?.[key]))
-      && [...changedKeys].every(key => AGENT_RUNTIME_STORE_KEYS.has(key) || JSON.stringify(nextStore?.[key]) === JSON.stringify(previousStore?.[key]));
-    if (!runtimeOnlyChange) broadcastStoreDidChange();
+    const changedKeys = new Set([...Object.keys(nextStore || {}), ...Object.keys(previousStore || {})].filter(key => {
+      if (Object.is(nextStore?.[key], previousStore?.[key])) return false;
+      try { return JSON.stringify(nextStore?.[key]) !== JSON.stringify(previousStore?.[key]); } catch { return true; }
+    }));
+    const runtimeOnlyChange = [...changedKeys].length > 0
+      && [...changedKeys].every(key => AGENT_RUNTIME_STORE_KEYS.has(key));
+    if (!runtimeOnlyChange) broadcastStoreDidChange([...changedKeys]);
     syncUpdateChannelFromStore();
   });
   ipcMain.on(RENDERER_DIAGNOSTIC_CHANNEL, (_event, details) => recordRendererFailure({ kind: 'renderer-unhandled-error', ...details }));
