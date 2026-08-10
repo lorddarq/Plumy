@@ -281,7 +281,9 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
           const previous = canonicalGoalsRef.current;
           const changed = goals.filter(goal => {
             const prior = previous.find(item => item.id === goal.id);
-            return prior && JSON.stringify(prior) !== JSON.stringify(goal);
+            // Goal mutations advance the canonical revision; use that contract
+            // instead of serializing entire graph records on every write pass.
+            return prior && goalRevision(prior) !== goalRevision(goal);
           });
           if (changed.length === 1 && previous.some(goal => goal.id === changed[0].id) && typeof window.electron?.goals?.update === 'function') {
             const goal = changed[0];
