@@ -535,6 +535,13 @@
   border-bottom: 1px solid var(--timeline-border);
 }
 
+/* Rows have explicit heights, so the browser can skip offscreen descendants
+ * while preserving the scroll geometry during vertical scrolling. */
+.timeline-rows-container > .swimlane-row,
+.timeline-left-list > .timeline-swimlane-label-container {
+  content-visibility: auto;
+}
+
 .swimlane-row-timeline {
   position: relative;
   flex: 1;
