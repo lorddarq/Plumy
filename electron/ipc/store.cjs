@@ -1,10 +1,11 @@
-function registerStoreIpcHandlers({ ipcMain, store, preferencesKey, onPreferencesSet }) {
+function registerStoreIpcHandlers({ ipcMain, store, preferencesKey, onPreferencesSet, onStoreMutation }) {
   ipcMain.handle('store/get', (_, key) => store.get(key));
   ipcMain.handle('store/get-many', (_, keys) => {
     const requestedKeys = Array.isArray(keys) ? keys.filter(key => typeof key === 'string') : [];
     return Object.fromEntries(requestedKeys.map(key => [key, store.get(key)]));
   });
   ipcMain.handle('store/set', (_, key, value) => {
+    if (typeof onStoreMutation === 'function' && typeof key === 'string') onStoreMutation([key]);
     const result = store.set(key, value);
     if (key === preferencesKey && typeof onPreferencesSet === 'function') {
       onPreferencesSet(value);
@@ -16,6 +17,7 @@ function registerStoreIpcHandlers({ ipcMain, store, preferencesKey, onPreference
       ? Object.entries(values)
       : [];
     if (entries.length === 0) return { count: 0 };
+    if (typeof onStoreMutation === 'function') onStoreMutation(entries.map(([key]) => key));
 
     const current = store.store && typeof store.store === 'object' ? store.store : {};
     const next = { ...current };
@@ -39,7 +41,10 @@ function registerStoreIpcHandlers({ ipcMain, store, preferencesKey, onPreference
     }
     return { count: entries.length };
   });
-  ipcMain.handle('store/delete', (_, key) => store.delete(key));
+  ipcMain.handle('store/delete', (_, key) => {
+    if (typeof onStoreMutation === 'function' && typeof key === 'string') onStoreMutation([key]);
+    return store.delete(key);
+  });
   ipcMain.handle('store/export', () => store.store);
 }
 
