@@ -11,12 +11,26 @@ interface HorizontalScrollbarProps {
 export function HorizontalScrollbar({ scrollContainerRef, ariaLabel, enabled = true, hideWhenNoOverflow = false }: HorizontalScrollbarProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startClientX: number; startScrollLeft: number } | null>(null);
+  const scrollSyncRafRef = useRef<number | null>(null);
   const [metrics, setMetrics] = useState({ clientWidth: 0, scrollWidth: 0, scrollLeft: 0 });
 
   const syncMetrics = useCallback(() => {
     const node = scrollContainerRef.current;
     if (!node) return;
     setMetrics({ clientWidth: node.clientWidth, scrollWidth: node.scrollWidth, scrollLeft: node.scrollLeft });
+  }, [scrollContainerRef]);
+
+  const syncScrollPosition = useCallback(() => {
+    if (scrollSyncRafRef.current !== null) return;
+    scrollSyncRafRef.current = window.requestAnimationFrame(() => {
+      scrollSyncRafRef.current = null;
+      const node = scrollContainerRef.current;
+      if (!node) return;
+      const nextScrollLeft = node.scrollLeft;
+      setMetrics(current => current.scrollLeft === nextScrollLeft
+        ? current
+        : { ...current, scrollLeft: nextScrollLeft });
+    });
   }, [scrollContainerRef]);
 
   useEffect(() => {
@@ -26,14 +40,18 @@ export function HorizontalScrollbar({ scrollContainerRef, ariaLabel, enabled = t
     const observer = new ResizeObserver(syncMetrics);
     observer.observe(node);
     if (node.firstElementChild instanceof HTMLElement) observer.observe(node.firstElementChild);
-    node.addEventListener('scroll', syncMetrics, { passive: true });
+    node.addEventListener('scroll', syncScrollPosition, { passive: true });
     window.addEventListener('resize', syncMetrics);
     return () => {
       observer.disconnect();
-      node.removeEventListener('scroll', syncMetrics);
+      node.removeEventListener('scroll', syncScrollPosition);
       window.removeEventListener('resize', syncMetrics);
+      if (scrollSyncRafRef.current !== null) {
+        window.cancelAnimationFrame(scrollSyncRafRef.current);
+        scrollSyncRafRef.current = null;
+      }
     };
-  }, [scrollContainerRef, syncMetrics]);
+  }, [scrollContainerRef, syncMetrics, syncScrollPosition]);
 
   const maxScrollLeft = Math.max(metrics.scrollWidth - metrics.clientWidth, 0);
   const thumbWidthRatio = maxScrollLeft > 0 ? Math.max(metrics.clientWidth / metrics.scrollWidth, 0.12) : 1;
