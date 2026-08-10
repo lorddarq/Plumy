@@ -82,11 +82,13 @@ test('store registrar reports renderer mutation keys without reading the whole s
 
 test('store registrar reads only requested keys', () => {
   const { handlers, ipcMain } = createIpcHarness();
+  let snapshotReads = 0;
+  const values = { tasks: [1], people: [2], runtime: [3] };
   const store = {
-    get: key => ({ tasks: [1], people: [2], runtime: [3] }[key]),
+    get: key => values[key],
     set: () => {},
     delete: () => {},
-    get store() { return {}; },
+    get store() { snapshotReads += 1; return values; },
   };
   registerStoreIpcHandlers({ ipcMain, store, preferencesKey: 'preferences' });
 
@@ -94,6 +96,7 @@ test('store registrar reads only requested keys', () => {
     tasks: [1],
     people: [2],
   });
+  assert.equal(snapshotReads, 1);
 });
 
 test('performance registrar delegates timing records and local log controls', async () => {

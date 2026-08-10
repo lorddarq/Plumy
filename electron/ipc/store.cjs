@@ -2,7 +2,9 @@ function registerStoreIpcHandlers({ ipcMain, store, preferencesKey, onPreference
   ipcMain.handle('store/get', (_, key) => store.get(key));
   ipcMain.handle('store/get-many', (_, keys) => {
     const requestedKeys = Array.isArray(keys) ? keys.filter(key => typeof key === 'string') : [];
-    return Object.fromEntries(requestedKeys.map(key => [key, store.get(key)]));
+    const storedSnapshot = store.store;
+    const snapshot = storedSnapshot && typeof storedSnapshot === 'object' ? storedSnapshot : {};
+    return Object.fromEntries(requestedKeys.map(key => [key, snapshot[key]]));
   });
   ipcMain.handle('store/set', (_, key, value) => {
     if (typeof onStoreMutation === 'function' && typeof key === 'string') onStoreMutation([key]);
@@ -19,7 +21,8 @@ function registerStoreIpcHandlers({ ipcMain, store, preferencesKey, onPreference
     if (entries.length === 0) return { count: 0 };
     if (typeof onStoreMutation === 'function') onStoreMutation(entries.map(([key]) => key));
 
-    const current = store.store && typeof store.store === 'object' ? store.store : {};
+    const storedSnapshot = store.store;
+    const current = storedSnapshot && typeof storedSnapshot === 'object' ? storedSnapshot : {};
     const next = { ...current };
     entries.forEach(([key, value]) => { next[key] = value; });
 
