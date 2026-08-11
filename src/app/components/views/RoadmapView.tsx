@@ -369,7 +369,6 @@ export function RoadmapView({
                 leftWidth={LEFT_WIDTH}
                 headerHeight={HEADER_HEIGHT}
                 chartHeight={chartHeight}
-                chartScrollTop={0}
                 scrollContentRef={roadmapSidebarSurfaceRef}
                 statusColumns={statusColumns}
                 onAddMilestone={onAddMilestone}
@@ -395,7 +394,6 @@ export function RoadmapView({
                     left: LEFT_WIDTH,
                     width: timelineWidth,
                     height: HEADER_HEIGHT,
-                    transform: `translate3d(${-navigation.scrollLeft}px, 0, 0)`,
                   }}
                 >
                   {monthGroups.map(month => (

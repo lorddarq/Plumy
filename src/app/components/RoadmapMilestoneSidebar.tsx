@@ -27,7 +27,6 @@ interface RoadmapMilestoneSidebarProps {
   leftWidth: number;
   headerHeight: number;
   chartHeight: number;
-  chartScrollTop: number;
   scrollContentRef?: RefObject<HTMLDivElement | null>;
   statusColumns: StatusColumn[];
   onAddMilestone: () => void;
@@ -40,7 +39,6 @@ export function RoadmapMilestoneSidebar({
   leftWidth,
   headerHeight,
   chartHeight,
-  chartScrollTop,
   scrollContentRef,
   statusColumns,
   onAddMilestone,
@@ -82,7 +80,6 @@ export function RoadmapMilestoneSidebar({
           className="relative"
           style={{
             height: Math.max(0, chartHeight - headerHeight),
-            transform: `translate3d(0, ${-chartScrollTop}px, 0)`,
           }}
         >
           {rows.map(row => {
