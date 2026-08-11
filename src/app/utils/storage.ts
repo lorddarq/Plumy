@@ -426,17 +426,21 @@ export async function restorePortableStorageSnapshot(
   }
 
   if (electronStoreSnapshot && typeof electronStoreSnapshot === 'object') {
-    const storeSet = window.electron?.storeSet;
-    if (typeof storeSet === 'function') {
-      await Promise.all(
-        Object.entries(electronStoreSnapshot)
-          .map(([key, value]) => {
-            const portableKey = normalizePortableStorageKey(key);
-            return portableKey ? [portableKey, value] as const : null;
-          })
-          .filter((entry): entry is readonly [string, unknown] => Boolean(entry))
-          .map(([key, value]) => storeSet(key, value).catch(() => undefined))
-      );
+    const entries = Object.entries(electronStoreSnapshot)
+      .map(([key, value]) => {
+        const portableKey = normalizePortableStorageKey(key);
+        return portableKey ? [portableKey, value] as const : null;
+      })
+      .filter((entry): entry is readonly [string, unknown] => Boolean(entry));
+
+    const storeSetMany = window.electron?.storeSetMany;
+    if (typeof storeSetMany === 'function') {
+      await storeSetMany(Object.fromEntries(entries)).catch(() => undefined);
+    } else {
+      const storeSet = window.electron?.storeSet;
+      if (typeof storeSet === 'function') {
+        await Promise.all(entries.map(([key, value]) => storeSet(key, value).catch(() => undefined)));
+      }
     }
   }
 }
