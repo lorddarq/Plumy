@@ -79,6 +79,23 @@ export async function setCanonicalJSON<T = any>(key: string, value: T): Promise<
   }
 }
 
+const pendingMirrorWrites = new Map<string, {
+  value: unknown;
+  resolve: () => void;
+}>();
+let mirrorFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function flushPendingMirrorWrites(): void {
+  mirrorFlushTimer = null;
+  if (pendingMirrorWrites.size === 0) return;
+
+  const pending = Array.from(pendingMirrorWrites.entries());
+  pendingMirrorWrites.clear();
+  void persistJSONBatchWithElectronMirror(Object.fromEntries(
+    pending.map(([key, entry]) => [key, entry.value])
+  )).finally(() => pending.forEach(([, entry]) => entry.resolve()));
+}
+
 export async function deleteStoredValue(key: string): Promise<void> {
   try {
     // @ts-ignore
@@ -106,24 +123,10 @@ export async function deleteStoredValue(key: string): Promise<void> {
  */
 export function persistJSONWithElectronMirror<T = any>(key: string, value: T): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve();
-
-  return measurePerformanceOperation('storage', `persist.${key}`, async () => {
-    try {
-      const storeSet = window.electron?.storeSet;
-      if (typeof storeSet === 'function') {
-        await storeSet(key, value).catch(() => {
-          // Ignore mirror failures to keep renderer persistence non-breaking.
-        });
-        return;
-      }
-    } catch (err) {
-      // ignore
-    }
-
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch (err) {
-      // ignore
+  return new Promise(resolve => {
+    pendingMirrorWrites.set(key, { value, resolve });
+    if (mirrorFlushTimer === null) {
+      mirrorFlushTimer = globalThis.setTimeout(flushPendingMirrorWrites, 50);
     }
   });
 }
