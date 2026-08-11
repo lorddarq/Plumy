@@ -3,11 +3,25 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 export function VerticalScrollbar({ scrollContainerRef, ariaLabel }: { scrollContainerRef: RefObject<HTMLDivElement | null>; ariaLabel: string }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startClientY: number; startScrollTop: number } | null>(null);
+  const scrollSyncRafRef = useRef<number | null>(null);
   const [metrics, setMetrics] = useState({ clientHeight: 0, scrollHeight: 0, scrollTop: 0 });
 
   const syncMetrics = useCallback(() => {
     const node = scrollContainerRef.current;
     if (node) setMetrics({ clientHeight: node.clientHeight, scrollHeight: node.scrollHeight, scrollTop: node.scrollTop });
+  }, [scrollContainerRef]);
+
+  const syncScrollPosition = useCallback(() => {
+    if (scrollSyncRafRef.current !== null) return;
+    scrollSyncRafRef.current = window.requestAnimationFrame(() => {
+      scrollSyncRafRef.current = null;
+      const node = scrollContainerRef.current;
+      if (!node) return;
+      const nextScrollTop = node.scrollTop;
+      setMetrics(current => current.scrollTop === nextScrollTop
+        ? current
+        : { ...current, scrollTop: nextScrollTop });
+    });
   }, [scrollContainerRef]);
 
   useEffect(() => {
@@ -17,14 +31,18 @@ export function VerticalScrollbar({ scrollContainerRef, ariaLabel }: { scrollCon
     const observer = new ResizeObserver(syncMetrics);
     observer.observe(node);
     if (node.firstElementChild instanceof HTMLElement) observer.observe(node.firstElementChild);
-    node.addEventListener('scroll', syncMetrics, { passive: true });
+    node.addEventListener('scroll', syncScrollPosition, { passive: true });
     window.addEventListener('resize', syncMetrics);
     return () => {
       observer.disconnect();
-      node.removeEventListener('scroll', syncMetrics);
+      node.removeEventListener('scroll', syncScrollPosition);
       window.removeEventListener('resize', syncMetrics);
+      if (scrollSyncRafRef.current !== null) {
+        window.cancelAnimationFrame(scrollSyncRafRef.current);
+        scrollSyncRafRef.current = null;
+      }
     };
-  }, [scrollContainerRef, syncMetrics]);
+  }, [scrollContainerRef, syncMetrics, syncScrollPosition]);
 
   const maxScrollTop = Math.max(metrics.scrollHeight - metrics.clientHeight, 0);
   const thumbHeightRatio = maxScrollTop > 0 ? Math.max(metrics.clientHeight / metrics.scrollHeight, 0.16) : 1;
