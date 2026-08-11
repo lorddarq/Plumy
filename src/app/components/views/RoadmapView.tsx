@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Filter, Flag, TriangleAlert } from 'lucide-react';
 import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../../types';
 import { getProjectVisual } from '../../utils/projectVisual';
@@ -175,6 +175,8 @@ export function RoadmapView({
 }: RoadmapViewProps) {
   const chartScrollRef = useRef<HTMLDivElement>(null);
   const chartViewportRef = useRef<HTMLDivElement>(null);
+  const roadmapHeaderSurfaceRef = useRef<HTMLDivElement>(null);
+  const roadmapSidebarSurfaceRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [projectFilter, setProjectFilter] = useState('all');
   const [healthFilter, setHealthFilter] = useState<MilestoneHealth | 'all'>('all');
@@ -278,12 +280,19 @@ export function RoadmapView({
         chartViewportHeight,
         chartContentHeight + (chartContentHeight > chartViewportHeight ? CHART_PADDING_BOTTOM : 0)
       );
+  const handleRoadmapScrollFrame = useCallback(({ scrollLeft, scrollTop }: { scrollLeft: number; scrollTop: number }) => {
+    const headerSurface = roadmapHeaderSurfaceRef.current;
+    const sidebarSurface = roadmapSidebarSurfaceRef.current;
+    if (headerSurface) headerSurface.style.transform = `translate3d(${-scrollLeft}px, 0, 0)`;
+    if (sidebarSurface) sidebarSurface.style.transform = `translate3d(0, ${-scrollTop}px, 0)`;
+  }, []);
   const navigation = useFixedTimeSurfaceNavigation({
     scrollRef: chartScrollRef,
     rangeStart: range.start,
     dayCount: allDates.length,
     dayWidth: DAY_WIDTH,
     autoScrollKey: `${toLocalISODate(range.start)}:${toLocalISODate(range.end)}:${timelineWidth}`,
+    onScrollFrame: handleRoadmapScrollFrame,
   });
   const todayIndex = navigation.todayMarker?.index ?? -1;
   const todayLeft = navigation.todayMarker?.center ?? null;
@@ -360,7 +369,8 @@ export function RoadmapView({
                 leftWidth={LEFT_WIDTH}
                 headerHeight={HEADER_HEIGHT}
                 chartHeight={chartHeight}
-                chartScrollTop={navigation.scrollTop}
+                chartScrollTop={0}
+                scrollContentRef={roadmapSidebarSurfaceRef}
                 statusColumns={statusColumns}
                 onAddMilestone={onAddMilestone}
                 onMilestoneClick={onMilestoneClick}
@@ -379,6 +389,7 @@ export function RoadmapView({
                 onMouseDown={navigation.handleHeaderScrubStart}
               >
                 <div
+                  ref={roadmapHeaderSurfaceRef}
                   className="absolute top-0"
                   style={{
                     left: LEFT_WIDTH,

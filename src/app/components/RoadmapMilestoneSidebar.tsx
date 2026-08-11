@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type { ProjectMilestone, StatusColumn, TaskStatus, TimelineSwimlane } from '../types';
 import { getProjectVisual } from '../utils/projectVisual';
 import { getMilestoneHealthVisual, getStatusVisual, type MilestoneHealth } from '../utils/roadmap';
@@ -28,6 +28,7 @@ interface RoadmapMilestoneSidebarProps {
   headerHeight: number;
   chartHeight: number;
   chartScrollTop: number;
+  scrollContentRef?: RefObject<HTMLDivElement | null>;
   statusColumns: StatusColumn[];
   onAddMilestone: () => void;
   onMilestoneClick: (milestone: ProjectMilestone) => void;
@@ -40,6 +41,7 @@ export function RoadmapMilestoneSidebar({
   headerHeight,
   chartHeight,
   chartScrollTop,
+  scrollContentRef,
   statusColumns,
   onAddMilestone,
   onMilestoneClick,
@@ -76,6 +78,7 @@ export function RoadmapMilestoneSidebar({
         style={{ width: leftWidth }}
       >
         <div
+          ref={scrollContentRef}
           className="relative"
           style={{
             height: Math.max(0, chartHeight - headerHeight),

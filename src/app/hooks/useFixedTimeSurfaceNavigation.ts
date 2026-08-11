@@ -14,6 +14,7 @@ interface UseFixedTimeSurfaceNavigationOptions {
   today?: Date;
   autoScrollKey?: string;
   scrollStepPx?: number;
+  onScrollFrame?: (state: { scrollLeft: number; scrollTop: number }) => void;
 }
 
 interface UseFixedTimeSurfaceNavigationResult {
@@ -37,6 +38,7 @@ export function useFixedTimeSurfaceNavigation({
   today = new Date(),
   autoScrollKey,
   scrollStepPx = 200,
+  onScrollFrame,
 }: UseFixedTimeSurfaceNavigationOptions): UseFixedTimeSurfaceNavigationResult {
   // Roadmap uses a fixed-width day surface, so it can share this navigation hook directly.
   // Timeline keeps its own navigation because visible days can be filtered and widths vary per cell.
@@ -98,10 +100,14 @@ export function useFixedTimeSurfaceNavigation({
       scrollUpdateRafRef.current = null;
       const nextScrollLeft = scrollRef.current?.scrollLeft || 0;
       const nextScrollTop = scrollRef.current?.scrollTop || 0;
-      setScrollLeft(current => (current === nextScrollLeft ? current : nextScrollLeft));
-      setScrollTop(current => (current === nextScrollTop ? current : nextScrollTop));
+      if (onScrollFrame) {
+        onScrollFrame({ scrollLeft: nextScrollLeft, scrollTop: nextScrollTop });
+      } else {
+        setScrollLeft(current => (current === nextScrollLeft ? current : nextScrollLeft));
+        setScrollTop(current => (current === nextScrollTop ? current : nextScrollTop));
+      }
     });
-  }, [scrollRef]);
+  }, [onScrollFrame, scrollRef]);
 
   useEffect(() => () => {
     if (scrollUpdateRafRef.current !== null) {
@@ -126,11 +132,15 @@ export function useFixedTimeSurfaceNavigation({
       behavior,
     });
     if (behavior !== 'smooth') {
-      setScrollLeft(targetLeft);
-      setScrollTop(scrollRef.current.scrollTop);
+      const nextState = { scrollLeft: targetLeft, scrollTop: scrollRef.current.scrollTop };
+      if (onScrollFrame) onScrollFrame(nextState);
+      else {
+        setScrollLeft(targetLeft);
+        setScrollTop(nextState.scrollTop);
+      }
     }
     return targetLeft;
-  }, [dayCount, dayWidth, rangeStart, scrollRef]);
+  }, [dayCount, dayWidth, onScrollFrame, rangeStart, scrollRef]);
 
   const scrollToToday = useCallback(() => (
     scrollToDate(today, 'auto')
