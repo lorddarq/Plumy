@@ -47,6 +47,7 @@ export function AnchoredPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const programmaticAnchorRef = useRef<string | null>(null);
   const programmaticScrollTimeoutRef = useRef<number | null>(null);
+  const activeSectionRafRef = useRef<number | null>(null);
   const enabledItems = useMemo(
     () => navGroups.flatMap(group => group.items).filter(item => !item.disabled),
     [navGroups]
@@ -95,7 +96,7 @@ export function AnchoredPanel({
     return () => window.cancelAnimationFrame(frame);
   }, [firstAnchor, initialAnchor]);
 
-  const syncActiveSection = () => {
+  const syncActiveSectionNow = () => {
     const scrollNode = scrollRef.current;
     if (!scrollNode) return;
 
@@ -126,10 +127,21 @@ export function AnchoredPanel({
     }
   };
 
+  const syncActiveSection = () => {
+    if (activeSectionRafRef.current !== null) return;
+    activeSectionRafRef.current = window.requestAnimationFrame(() => {
+      activeSectionRafRef.current = null;
+      syncActiveSectionNow();
+    });
+  };
+
   useEffect(() => {
     return () => {
       if (programmaticScrollTimeoutRef.current !== null) {
         window.clearTimeout(programmaticScrollTimeoutRef.current);
+      }
+      if (activeSectionRafRef.current !== null) {
+        window.cancelAnimationFrame(activeSectionRafRef.current);
       }
     };
   }, []);
