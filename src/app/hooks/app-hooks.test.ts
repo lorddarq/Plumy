@@ -8,6 +8,7 @@ import { usePeopleActions } from './usePeopleActions.ts';
 import { useStatusColumnActions } from './useStatusColumnActions.ts';
 import { createDuplicatedTask, useTaskActions } from './useTaskActions.ts';
 import { useMcpPanelState } from './useMcpPanelState.ts';
+import { useMcpDiagnostics } from './useMcpDiagnostics.ts';
 import { useViewState, type AllViewStates } from './useViewState.ts';
 import { useTaskContextHistory } from './useTaskContextHistory.ts';
 import type { McpPreferencesShape } from '../utils/mcpPreferences.ts';
@@ -101,6 +102,91 @@ function setWindowMock(mock: Record<string, unknown>) {
     }
   };
 }
+
+test('useMcpDiagnostics waits for the development MCP listener to be running', async () => {
+  const previousFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    throw new Error('Unexpected diagnostics request');
+  }) as typeof fetch;
+  const restoreWindow = setWindowMock({
+    location: { hostname: 'localhost' },
+    setTimeout: global.setTimeout.bind(global),
+    clearTimeout: global.clearTimeout.bind(global),
+  });
+
+  try {
+    const harness = await renderHook(
+      () => useMcpDiagnostics({
+        enabled: true,
+        listenerStatus: {
+          status: 'starting',
+          listening: false,
+          boundUrl: null,
+        },
+      }),
+      undefined as never
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    assert.equal(fetchCalls, 0);
+    await harness.unmount();
+  } finally {
+    globalThis.fetch = previousFetch;
+    restoreWindow();
+  }
+});
+
+test('useMcpDiagnostics probes the listener bound URL', async () => {
+  const previousFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+  globalThis.fetch = (async (input, init) => {
+    requestedUrls.push(String(input));
+    const request = JSON.parse(String(init?.body)) as { method: string };
+    return new Response(JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'test',
+      result: request.method === 'tools/list' ? { tools: [] } : {},
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
+  const restoreWindow = setWindowMock({
+    location: { hostname: 'localhost' },
+    setTimeout: global.setTimeout.bind(global),
+    clearTimeout: global.clearTimeout.bind(global),
+  });
+
+  try {
+    const harness = await renderHook(
+      () => useMcpDiagnostics({
+        enabled: true,
+        listenerStatus: {
+          status: 'running',
+          listening: true,
+          boundUrl: 'http://127.0.0.1:3900/mcp',
+        },
+      }),
+      undefined as never
+    );
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    assert.deepEqual(requestedUrls, [
+      'http://127.0.0.1:3900/mcp',
+      'http://127.0.0.1:3900/mcp',
+    ]);
+    await harness.unmount();
+  } finally {
+    globalThis.fetch = previousFetch;
+    restoreWindow();
+  }
+});
 
 test('useTaskActions saves, comments, and promotes agentic tasks to review', async () => {
   let tasks: Task[] = [];

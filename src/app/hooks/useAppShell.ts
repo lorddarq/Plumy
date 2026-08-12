@@ -519,7 +519,7 @@ export function useAppShell(): AppShellState {
 
   useMcpDiagnostics({
     enabled: preferences.mcpAgentAccessEnabled,
-    endpoint: preferences.mcpServerAddress,
+    listenerStatus: mcpListenerStatus,
   });
 
   return {

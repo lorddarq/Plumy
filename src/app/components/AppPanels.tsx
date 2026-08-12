@@ -11,14 +11,15 @@ import {
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import type { MarkdownAppearance } from '../utils/markdownAppearance';
 import type { GoalPolicyV1 } from '../utils/goalPolicy';
-import { MilestoneDialog } from './dialogs/MilestoneDialog';
-import { MilestoneDetailsDialog } from './dialogs/MilestoneDetailsDialog';
-import { SwimlaneDialog } from './dialogs/SwimlaneDialog';
-import { PreferencesPanel } from './PreferencesPanel';
+import { DeferredSurface } from './DeferredSurface';
 import { McpHealthCheckResult } from '../services/mcp/types';
 
 const TaskDialog = lazy(() => import('./dialogs/TaskDialog').then(module => ({ default: module.TaskDialog })));
 const TaskDetailsDialog = lazy(() => import('./dialogs/TaskDetailsDialog').then(module => ({ default: module.TaskDetailsDialog })));
+const loadMilestoneDialog = () => import('./dialogs/MilestoneDialog').then(module => ({ default: module.MilestoneDialog }));
+const loadMilestoneDetailsDialog = () => import('./dialogs/MilestoneDetailsDialog').then(module => ({ default: module.MilestoneDetailsDialog }));
+const loadSwimlaneDialog = () => import('./dialogs/SwimlaneDialog').then(module => ({ default: module.SwimlaneDialog }));
+const loadPreferencesPanel = () => import('./PreferencesPanel').then(module => ({ default: module.PreferencesPanel }));
 
 export interface AppPanelDialogState {
   isTaskDialogOpen: boolean;
@@ -163,6 +164,10 @@ export function AppPanels({
 }: AppPanelsProps) {
   const [shouldRenderTaskDialog, setShouldRenderTaskDialog] = useState(false);
   const [shouldRenderTaskDetailsDialog, setShouldRenderTaskDetailsDialog] = useState(false);
+  const [shouldRenderMilestoneDialog, setShouldRenderMilestoneDialog] = useState(false);
+  const [shouldRenderMilestoneDetailsDialog, setShouldRenderMilestoneDetailsDialog] = useState(false);
+  const [shouldRenderSwimlaneDialog, setShouldRenderSwimlaneDialog] = useState(false);
+  const [shouldRenderPreferences, setShouldRenderPreferences] = useState(false);
 
   useEffect(() => {
     if (dialogs.isTaskDialogOpen) {
@@ -175,6 +180,13 @@ export function AppPanels({
       setShouldRenderTaskDetailsDialog(true);
     }
   }, [dialogs.isTaskDetailsOpen]);
+
+  useEffect(() => {
+    if (dialogs.isMilestoneDialogOpen) setShouldRenderMilestoneDialog(true);
+    if (dialogs.detailsMilestone) setShouldRenderMilestoneDetailsDialog(true);
+    if (dialogs.isSwimlaneDialogOpen) setShouldRenderSwimlaneDialog(true);
+    if (dialogs.isPreferencesOpen) setShouldRenderPreferences(true);
+  }, [dialogs.detailsMilestone, dialogs.isMilestoneDialogOpen, dialogs.isPreferencesOpen, dialogs.isSwimlaneDialogOpen]);
 
   return (
     <>
@@ -221,106 +233,83 @@ export function AppPanels({
         )}
       </Suspense>
 
-      <MilestoneDetailsDialog
-        isOpen={Boolean(dialogs.detailsMilestone)}
-        onClose={milestoneActions.onCloseMilestoneDetails}
-        onEdit={milestoneActions.onEditMilestoneFromDetails}
-        onDelete={milestoneActions.onDeleteMilestone}
-        onTaskClick={milestoneActions.onMilestoneTaskClick}
-        milestone={dialogs.detailsMilestone}
-        projects={workspace.timelineSwimlanes}
-        tasks={workspace.tasks}
-        statusColumns={workspace.statusColumns}
-        readModel={workspace.readModel}
-      />
+      {shouldRenderMilestoneDetailsDialog && <DeferredSurface load={loadMilestoneDetailsDialog} errorLabel="Milestone details" fallback={<div role="status" className="p-6 text-sm text-gray-500">Loading milestone details...</div>} componentProps={{
+        isOpen: Boolean(dialogs.detailsMilestone), onClose: milestoneActions.onCloseMilestoneDetails, onEdit: milestoneActions.onEditMilestoneFromDetails, onDelete: milestoneActions.onDeleteMilestone, onTaskClick: milestoneActions.onMilestoneTaskClick, milestone: dialogs.detailsMilestone, projects: workspace.timelineSwimlanes, tasks: workspace.tasks, statusColumns: workspace.statusColumns, readModel: workspace.readModel,
+      }} />}
 
-      <MilestoneDialog
-        isOpen={dialogs.isMilestoneDialogOpen}
-        onClose={milestoneActions.onCloseMilestoneDialog}
-        onSave={milestoneActions.onSaveMilestone}
-        onDelete={milestoneActions.onDeleteMilestone}
-        onUpdateTaskDependencies={milestoneActions.onUpdateRoadmapTaskDependencies}
-        milestone={dialogs.selectedMilestone}
-        projects={workspace.timelineSwimlanes}
-        statusColumns={workspace.statusColumns}
-        tasks={workspace.tasks}
-        readModel={workspace.readModel}
-      />
+      {shouldRenderMilestoneDialog && <DeferredSurface load={loadMilestoneDialog} errorLabel="Milestone dialog" fallback={<div role="status" className="p-6 text-sm text-gray-500">Loading milestone dialog...</div>} componentProps={{
+        isOpen: dialogs.isMilestoneDialogOpen, onClose: milestoneActions.onCloseMilestoneDialog, onSave: milestoneActions.onSaveMilestone, onDelete: milestoneActions.onDeleteMilestone, onUpdateTaskDependencies: milestoneActions.onUpdateRoadmapTaskDependencies, milestone: dialogs.selectedMilestone, projects: workspace.timelineSwimlanes, statusColumns: workspace.statusColumns, tasks: workspace.tasks, readModel: workspace.readModel,
+      }} />}
 
-      <SwimlaneDialog
-        isOpen={dialogs.isSwimlaneDialogOpen}
-        onClose={adminActions.onCloseSwimlaneDialog}
-        onSave={adminActions.onSaveSwimlane}
-        onDelete={adminActions.onDeleteSwimlane}
-        swimlane={dialogs.selectedSwimlane}
-      />
+      {shouldRenderSwimlaneDialog && <DeferredSurface load={loadSwimlaneDialog} errorLabel="Swimlane dialog" fallback={<div role="status" className="p-6 text-sm text-gray-500">Loading swimlane dialog...</div>} componentProps={{
+        isOpen: dialogs.isSwimlaneDialogOpen, onClose: adminActions.onCloseSwimlaneDialog, onSave: adminActions.onSaveSwimlane, onDelete: adminActions.onDeleteSwimlane, swimlane: dialogs.selectedSwimlane,
+      }} />}
 
-      <PreferencesPanel
-        isOpen={dialogs.isPreferencesOpen}
-        onClose={adminActions.onClosePreferences}
-        initialAnchor={dialogs.preferencesInitialAnchor}
-        statusColumns={workspace.statusColumns}
-        cleanupGoalArtifacts={preferences.cleanupGoalArtifacts}
-        goalAuditArchiveDirectory={preferences.goalAuditArchiveDirectory}
-        externalSkillsDirectory={preferences.externalSkillsDirectory}
-        customScrollbarsEnabled={preferences.customScrollbarsEnabled}
-        condensedUI={preferences.condensedUI}
-        goalPolicy={preferences.goalPolicy}
-        executionLoadStatusIds={preferences.executionLoadStatusIds}
-        pipelineLoadStatusIds={preferences.pipelineLoadStatusIds}
-        updateChannel={preferences.updateChannel}
-        markdownAppearance={preferences.markdownAppearance}
-        showCompletedTimelineTasks={preferences.showCompletedTimelineTasks}
-        people={workspace.people}
-        tasks={workspace.tasks}
-        timelineSwimlanes={workspace.timelineSwimlanes}
-        storageMeter={preferences.storageMeter}
-        importFeedback={preferences.importFeedback}
-        onNukeLocalData={adminActions.onNukeLocalData}
-        onExportWorkspaceBackup={adminActions.onExportWorkspaceBackup}
-        onExportGoalPolicyBackup={adminActions.onExportGoalPolicyBackup}
-        onImportTasksAndProjects={adminActions.onImportTasksAndProjects}
-        onImportGoalPolicyBackup={adminActions.onImportGoalPolicyBackup}
-        onUpdateChannelChange={adminActions.onUpdateChannelChange}
-        onMarkdownAppearanceChange={adminActions.onMarkdownAppearanceChange}
-        onShowCompletedTimelineTasksChange={adminActions.onShowCompletedTimelineTasksChange}
-        onCleanupGoalArtifactsChange={adminActions.onCleanupGoalArtifactsChange}
-        onGoalAuditArchiveDirectoryChange={adminActions.onGoalAuditArchiveDirectoryChange}
-        onExternalSkillsDirectoryChange={adminActions.onExternalSkillsDirectoryChange}
-        onCustomScrollbarsEnabledChange={adminActions.onCustomScrollbarsEnabledChange}
-        onCondensedUIChange={adminActions.onCondensedUIChange}
-        onGoalPolicyChange={adminActions.onGoalPolicyChange}
-        onResetGoalPolicy={adminActions.onResetGoalPolicy}
-        onUpdateStatusColumn={adminActions.onUpdateStatusColumn}
-        onAddPerson={adminActions.onAddPerson}
-        onUpdatePerson={adminActions.onUpdatePerson}
-        onDeletePerson={adminActions.onDeletePerson}
-        mcpAgentAccessEnabled={preferences.mcpAgentAccessEnabled}
-        mcpAddress={preferences.mcpAddress}
-        mcpBindHost={preferences.mcpBindHost}
-        mcpPort={preferences.mcpPort}
-        mcpAccessToken={preferences.mcpAccessToken}
-        mcpAccessTokenIssuedAt={preferences.mcpAccessTokenIssuedAt}
-        mcpAccessTokenTtlMinutes={preferences.mcpAccessTokenTtlMinutes}
-        mcpCapabilityProfile={preferences.mcpCapabilityProfile}
-        mcpListenerStatus={preferences.mcpListenerStatus}
-        mcpAuditLog={preferences.mcpAuditLog}
-        mcpAuditSummary={preferences.mcpAuditSummary}
-        onMcpAgentAccessToggle={adminActions.onMcpAgentAccessToggle}
-        onMcpAddressChange={adminActions.onMcpAddressChange}
-        onMcpBindHostChange={adminActions.onMcpBindHostChange}
-        onMcpPortChange={adminActions.onMcpPortChange}
-        onMcpAccessTokenChange={adminActions.onMcpAccessTokenChange}
-        onMcpAccessTokenRotate={adminActions.onMcpAccessTokenRotate}
-        onMcpAccessTokenTtlMinutesChange={adminActions.onMcpAccessTokenTtlMinutesChange}
-        onMcpCapabilityProfileChange={adminActions.onMcpCapabilityProfileChange}
-        onRestartMcpServer={adminActions.onRestartMcpServer}
-        mcpHealthResult={preferences.mcpHealthResult}
-        mcpHealthCheckRunning={preferences.mcpHealthCheckRunning}
-        onRunMcpHealthCheck={adminActions.onRunMcpHealthCheck}
-        mcpRestartPending={preferences.mcpRestartPending}
-        onRefreshMcpAuditLog={adminActions.onRefreshMcpAuditLog}
-      />
+      {shouldRenderPreferences && <DeferredSurface load={loadPreferencesPanel} errorLabel="Preferences" fallback={<div role="status" className="p-6 text-sm text-gray-500">Loading preferences...</div>} componentProps={{
+        isOpen: dialogs.isPreferencesOpen, onClose: adminActions.onClosePreferences,
+        initialAnchor: dialogs.preferencesInitialAnchor,
+        statusColumns: workspace.statusColumns,
+        cleanupGoalArtifacts: preferences.cleanupGoalArtifacts,
+        goalAuditArchiveDirectory: preferences.goalAuditArchiveDirectory,
+        externalSkillsDirectory: preferences.externalSkillsDirectory,
+        customScrollbarsEnabled: preferences.customScrollbarsEnabled,
+        condensedUI: preferences.condensedUI,
+        goalPolicy: preferences.goalPolicy,
+        executionLoadStatusIds: preferences.executionLoadStatusIds,
+        pipelineLoadStatusIds: preferences.pipelineLoadStatusIds,
+        updateChannel: preferences.updateChannel,
+        markdownAppearance: preferences.markdownAppearance,
+        showCompletedTimelineTasks: preferences.showCompletedTimelineTasks,
+        people: workspace.people,
+        tasks: workspace.tasks,
+        timelineSwimlanes: workspace.timelineSwimlanes,
+        storageMeter: preferences.storageMeter,
+        importFeedback: preferences.importFeedback,
+        onNukeLocalData: adminActions.onNukeLocalData,
+        onExportWorkspaceBackup: adminActions.onExportWorkspaceBackup,
+        onExportGoalPolicyBackup: adminActions.onExportGoalPolicyBackup,
+        onImportTasksAndProjects: adminActions.onImportTasksAndProjects,
+        onImportGoalPolicyBackup: adminActions.onImportGoalPolicyBackup,
+        onUpdateChannelChange: adminActions.onUpdateChannelChange,
+        onMarkdownAppearanceChange: adminActions.onMarkdownAppearanceChange,
+        onShowCompletedTimelineTasksChange: adminActions.onShowCompletedTimelineTasksChange,
+        onCleanupGoalArtifactsChange: adminActions.onCleanupGoalArtifactsChange,
+        onGoalAuditArchiveDirectoryChange: adminActions.onGoalAuditArchiveDirectoryChange,
+        onExternalSkillsDirectoryChange: adminActions.onExternalSkillsDirectoryChange,
+        onCustomScrollbarsEnabledChange: adminActions.onCustomScrollbarsEnabledChange,
+        onCondensedUIChange: adminActions.onCondensedUIChange,
+        onGoalPolicyChange: adminActions.onGoalPolicyChange,
+        onResetGoalPolicy: adminActions.onResetGoalPolicy,
+        onUpdateStatusColumn: adminActions.onUpdateStatusColumn,
+        onAddPerson: adminActions.onAddPerson,
+        onUpdatePerson: adminActions.onUpdatePerson,
+        onDeletePerson: adminActions.onDeletePerson,
+        mcpAgentAccessEnabled: preferences.mcpAgentAccessEnabled,
+        mcpAddress: preferences.mcpAddress,
+        mcpBindHost: preferences.mcpBindHost,
+        mcpPort: preferences.mcpPort,
+        mcpAccessToken: preferences.mcpAccessToken,
+        mcpAccessTokenIssuedAt: preferences.mcpAccessTokenIssuedAt,
+        mcpAccessTokenTtlMinutes: preferences.mcpAccessTokenTtlMinutes,
+        mcpCapabilityProfile: preferences.mcpCapabilityProfile,
+        mcpListenerStatus: preferences.mcpListenerStatus,
+        mcpAuditLog: preferences.mcpAuditLog,
+        mcpAuditSummary: preferences.mcpAuditSummary,
+        onMcpAgentAccessToggle: adminActions.onMcpAgentAccessToggle,
+        onMcpAddressChange: adminActions.onMcpAddressChange,
+        onMcpBindHostChange: adminActions.onMcpBindHostChange,
+        onMcpPortChange: adminActions.onMcpPortChange,
+        onMcpAccessTokenChange: adminActions.onMcpAccessTokenChange,
+        onMcpAccessTokenRotate: adminActions.onMcpAccessTokenRotate,
+        onMcpAccessTokenTtlMinutesChange: adminActions.onMcpAccessTokenTtlMinutesChange,
+        onMcpCapabilityProfileChange: adminActions.onMcpCapabilityProfileChange,
+        onRestartMcpServer: adminActions.onRestartMcpServer,
+        mcpHealthResult: preferences.mcpHealthResult,
+        mcpHealthCheckRunning: preferences.mcpHealthCheckRunning,
+        onRunMcpHealthCheck: adminActions.onRunMcpHealthCheck,
+        mcpRestartPending: preferences.mcpRestartPending,
+        onRefreshMcpAuditLog: adminActions.onRefreshMcpAuditLog,
+      }} />}
     </>
   );
 }

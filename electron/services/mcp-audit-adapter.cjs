@@ -1,5 +1,6 @@
 const { appendMcpAuditLog } = require('./workspace-service.cjs');
 const { normalizeObject } = require('./mcp-response.cjs');
+const { normalizeFailureClass } = require('../domain/protocol-error.cjs');
 
 function getRequestMeta(req) {
   const headers = req?.headers || {};
@@ -99,18 +100,6 @@ function normalizeAuditOutcome(value, reason) {
   return 'failure';
 }
 
-function normalizeFailureClass(reason, outcome) {
-  if (outcome === 'success') return null;
-  const normalized = normalizeAuditString(reason)?.toLowerCase() || '';
-  if (normalized.includes('unauthor')) return 'unauthorized';
-  if (normalized.includes('access_disabled') || normalized.includes('write_tools_unavailable')) return 'forbidden';
-  if (normalized.includes('invalid') || normalized.includes('params')) return 'invalid_params';
-  if (normalized.includes('not_found') || normalized.includes('not found')) return 'not_found';
-  if (normalized.includes('conflict') || normalized.includes('revision')) return 'conflict';
-  if (normalized.includes('internal') || normalized.includes('error')) return 'internal';
-  return 'unknown';
-}
-
 function getAuditTarget(details = {}) {
   const target = details.target && typeof details.target === 'object' ? details.target : {};
   return {
@@ -151,7 +140,7 @@ function appendNormalizedMcpAudit(store, req, details = {}) {
     ...getRequestMeta(req),
     ...safeDetails,
     outcome,
-    failureClass: normalizeFailureClass(safeDetails.reason, outcome),
+    failureClass: normalizeFailureClass(safeDetails.reason, safeDetails.reason, outcome),
     startedAt,
     finishedAt,
     durationMs,

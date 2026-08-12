@@ -1,18 +1,24 @@
 import { useEffect } from 'react';
-import { createMcpReadService } from '../services/mcp/service';
+import { createMcpReadService } from '../services/mcp/service.ts';
 import { measurePerformanceOperation } from '../services/performanceLogging.ts';
 
 interface UseMcpDiagnosticsOptions {
   enabled: boolean;
-  endpoint: string;
+  listenerStatus: Pick<McpListenerStatus, 'status' | 'listening' | 'boundUrl'> | null;
 }
 
-export function useMcpDiagnostics({ enabled, endpoint }: UseMcpDiagnosticsOptions) {
+export function useMcpDiagnostics({ enabled, listenerStatus }: UseMcpDiagnosticsOptions) {
+  const endpoint = listenerStatus?.boundUrl?.trim() || '';
+  const listenerReady =
+    listenerStatus?.status === 'running' &&
+    listenerStatus.listening &&
+    Boolean(endpoint);
+
   useEffect(() => {
     const isLocalDevHost =
       typeof window !== 'undefined' &&
       (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    if (!isLocalDevHost) return;
+    if (!isLocalDevHost || !enabled || !listenerReady) return;
 
     let cancelled = false;
     let retryTimer: number | null = null;
@@ -60,5 +66,5 @@ export function useMcpDiagnostics({ enabled, endpoint }: UseMcpDiagnosticsOption
         window.clearTimeout(retryTimer);
       }
     };
-  }, [enabled, endpoint]);
+  }, [enabled, endpoint, listenerReady]);
 }

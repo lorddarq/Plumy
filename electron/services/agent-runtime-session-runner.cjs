@@ -402,6 +402,7 @@ function createAgentRuntimeSessionRunner({
       nativeEventType: method,
       state: params.state || params.status || params.turn?.status || params.thread?.status,
       outcome: params.outcome || params.failureReason || (errorMessage ? errorMessage.slice(0, 500) : undefined),
+      providerDetail: errorMessage,
       requestId: message?.id ?? params.requestId,
       toolName: subject,
       capabilityId: params.capabilityId,

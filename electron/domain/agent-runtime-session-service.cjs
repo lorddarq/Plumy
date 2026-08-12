@@ -1,5 +1,6 @@
 const { randomUUID } = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
+const { normalizeFailureClass, normalizeProviderDetail } = require('./protocol-error.cjs');
 
 const SESSION_BINDINGS_KEY = 'omvra.acpSessionBindings.v1';
 const SESSION_EVENTS_KEY = 'omvra.acpSessionEvents.v1';
@@ -298,6 +299,9 @@ function createAgentRuntimeSessionService({
       ...(startedAt && finishedAt ? { durationMs: Date.parse(finishedAt) - Date.parse(startedAt) } : {}),
       ...(safeIdentifier(input.state, 80) ? { state: safeIdentifier(input.state, 80) } : {}),
       ...(safeIdentifier(input.outcome, 80) ? { outcome: safeIdentifier(input.outcome, 80) } : {}),
+      ...(normalizeProviderDetail(input.providerDetail || input.errorDetail) ? {
+        providerDetail: normalizeProviderDetail(input.providerDetail || input.errorDetail),
+      } : {}),
       ...(typeof input.messagePreview === 'string' && input.messagePreview.trim() ? { messagePreview: input.messagePreview.slice(0, 500) } : {}),
       ...(safeIdentifier(input.requestId === undefined || input.requestId === null ? '' : String(input.requestId)) ? { requestId: safeIdentifier(String(input.requestId)) } : {}),
       ...(safeIdentifier(input.turnId, 160) ? { turnId: safeIdentifier(input.turnId, 160) } : {}),
@@ -323,6 +327,9 @@ function createAgentRuntimeSessionService({
         if (value !== null) event.usage[field] = value;
       }
       if (safeIdentifier(input.currency, 16)) event.usage.currency = safeIdentifier(input.currency, 16);
+    }
+    if (event.providerDetail || event.state === 'failed' || /(?:error|fail|unavailable|timeout|denied)/i.test(event.outcome || '')) {
+      event.failureClass = normalizeFailureClass(event.outcome, event.providerDetail, event.state === 'completed' ? 'success' : 'failure');
     }
     return { ok: true, event };
   }

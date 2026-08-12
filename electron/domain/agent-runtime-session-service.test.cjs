@@ -96,6 +96,26 @@ test('normalized events retain correlation and reported usage without private ru
   }).event.type, 'unsupported-event');
 });
 
+test('normalized runtime failures keep a stable class and bounded provider detail', () => {
+  const { service } = harness();
+  const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
+  const result = service.appendEvent(null, {
+    bindingId: binding.id,
+    runtimeProfileId: 'runtime-1',
+    kind: 'turn',
+    state: 'failed',
+    outcome: 'ACP_RUNTIME_UNAVAILABLE',
+    providerDetail: 'provider timed out with Authorization: Bearer secret-token at /private/workspace/file',
+    idempotencyKey: 'failure-1',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.event.failureClass, 'internal');
+  assert.match(result.event.providerDetail, /provider timed out/);
+  assert.equal(result.event.providerDetail.includes('secret-token'), false);
+  assert.equal(result.event.providerDetail.includes('/private/workspace/file'), false);
+  assert.ok(result.event.providerDetail.length <= 240);
+});
+
 test('normalized message deltas preserve whitespace between streamed chunks', () => {
   const { service } = harness();
   const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
