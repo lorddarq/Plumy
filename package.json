@@ -6,8 +6,8 @@
   "overrides": {
     "shell-quote": "1.9.0",
     "form-data": "4.0.6",
-    "undici": "6.27.0",
-    "js-yaml": "4.3.0",
+    "undici": "6.28.0",
+    "js-yaml": "4.3.1",
     "sharp": "0.35.3"
   },
   "main": "electron/main.cjs",
@@ -65,11 +65,12 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.0",
-    "@types/react": "^19.2.10",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "6.0.2",
     "concurrently": "^9.2.1",
     "electron": "43.3.0",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "26.15.7",
     "icon-gen": "^5.0.0",
     "react-test-renderer": "^18.3.1",
     "sharp": "0.35.3",
@@ -128,5 +129,9 @@
         "AppImage"
       ]
     }
+  },
+  "allowScripts": {
+    "electron-winstaller@5.4.0": true,
+    "fsevents@2.3.3": true
   }
 }

@@ -56,8 +56,6 @@ declare module 'input-otp' { export const OTPInput: any; export const OTPInputCo
 
 declare module 'next-themes' { export function useTheme(): any; }
 
-declare module 'sonner' { export type ToasterProps = any; export const Toaster: any; export default any; }
-
 declare module 'react-resizable-panels' { export const PanelGroup: any; export const Panel: any; export const PanelResizeHandle: any; export default any; }
 
 declare module 'react-responsive-masonry' { const _default: any; export default _default; }
