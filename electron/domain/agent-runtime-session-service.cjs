@@ -492,11 +492,15 @@ function createAgentRuntimeSessionService({
   function list(store, input = {}) {
     const bindingId = normalizeString(input.bindingId);
     const limit = Number.isFinite(Number(input.limit)) ? Math.max(1, Math.min(MAX_READ_LIMIT, Math.floor(Number(input.limit)))) : 50;
-    const bindings = (Array.isArray(readBindings(store)) ? readBindings(store) : [])
+    const storedBindings = readBindings(store);
+    const bindings = (Array.isArray(storedBindings) ? storedBindings : [])
       .filter(item => !bindingId || item.id === bindingId)
       .filter(item => input.activeOnly !== true || item.state === 'starting' || ACTIVE_STATES.has(item.turn?.state));
-    const bindingIds = new Set(bindings.map(item => item.id));
-    const events = (Array.isArray(readEvents(store)) ? readEvents(store) : []).filter(item => bindingIds.has(item.bindingId));
+    const events = input.includeEvents === false ? [] : (() => {
+      const bindingIds = new Set(bindings.map(item => item.id));
+      const storedEvents = readEvents(store);
+      return (Array.isArray(storedEvents) ? storedEvents : []).filter(item => bindingIds.has(item.bindingId));
+    })();
     return { ok: true, bindings: clone(bindings.slice(-limit)), events: clone(events.slice(-limit)), hasMore: bindings.length > limit || events.length > limit };
   }
 

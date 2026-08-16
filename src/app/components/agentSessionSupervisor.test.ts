@@ -50,6 +50,9 @@ test('the app-level supervisor is the only renderer owner of TaskExecutionAction
 test('the supervisor owns a live session registry and a reopenable active-session dock', () => {
   const source = readComponent('AgentSessionSupervisor.tsx');
   assert.match(source, /sessions\?\.list/);
+  assert.match(source, /agentRuntime\?\.getState/);
+  assert.match(source, /acpRuntimeAccessEnabled === false/);
+  assert.match(source, /includeEvents: !notificationsInitialized/);
   assert.match(source, /setInterval\(\(\) => void refresh\(\), 10000\)/);
   assert.match(source, /sessions\?\.onEvent/);
   assert.match(source, /sessions\?\.requests/);

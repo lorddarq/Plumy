@@ -394,6 +394,7 @@ test('Electron main composes IPC registrars while retaining application lifecycl
   assert.doesNotMatch(mainSource, /ipcMain\.handle\(/);
   assert.match(mainSource, /new BrowserWindow\(/);
   assert.match(mainSource, /app\.whenReady\(\)/);
+  assert.match(mainSource, /!readAgentRuntimeDefaults\(store\)\.acpRuntimeAccessEnabled && !agentRuntimeSessionRunner\.hasLiveSessions\(\)/);
   assert.doesNotMatch(registrarSource, /require\(['"]\.\.\/services\/(?:workspace|goal-[^'"]+)-service\.cjs['"]\)/);
 });
 

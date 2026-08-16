@@ -46,6 +46,9 @@ const {
   assignTaskToPerson,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
   TASK_CONTRIBUTION_ATTEMPTS_KEY,
+  SESSION_BINDINGS_KEY,
+  SESSION_EVENTS_KEY,
+  listAgentRuntimeSessions,
   updateAgentRuntimeTaskExecution,
 } = require('./workspace-service.cjs');
 
@@ -61,6 +64,33 @@ test('task runtime execution state persists on the canonical attempt and survive
     updatedAt: store.get(TASK_CONTRIBUTION_ATTEMPTS_KEY)[0].runtimeExecution.updatedAt,
     reason: 'provider-turn-started',
   });
+});
+
+test('session projections read task attempts once for all bindings', () => {
+  const source = makeStoreFromFixture('workspace-basic');
+  source.set(SESSION_BINDINGS_KEY, [
+    { id: 'binding-1', state: 'closed', scope: { kind: 'task', taskId: 'task-1', executionAttemptId: 'attempt-1' } },
+    { id: 'binding-2', state: 'closed', scope: { kind: 'task', taskId: 'task-2', executionAttemptId: 'attempt-2' } },
+  ]);
+  source.set(SESSION_EVENTS_KEY, []);
+  source.set(TASK_CONTRIBUTION_ATTEMPTS_KEY, [
+    { id: 'attempt-1', runtimeExecution: { state: 'complete' } },
+    { id: 'attempt-2', runtimeExecution: { state: 'interrupted' } },
+  ]);
+  let attemptReads = 0;
+  const store = {
+    get: key => {
+      if (key === TASK_CONTRIBUTION_ATTEMPTS_KEY) attemptReads += 1;
+      return source.get(key);
+    },
+    set: (key, value) => source.set(key, value),
+  };
+
+  const result = listAgentRuntimeSessions(store, { limit: 100, includeEvents: false });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.bindings.map(binding => binding.taskExecution?.state), ['complete', 'interrupted']);
+  assert.equal(attemptReads, 1);
 });
 
 test('workspace snapshot contract has expected keys and stable counts', () => {

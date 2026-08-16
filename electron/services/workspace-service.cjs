@@ -1853,15 +1853,20 @@ function updateAgentRuntimeTaskExecution(store, { taskId, attemptId, state, reas
   return { ok: true, attempt: nextAttempt, runtimeExecution };
 }
 
-function attachTaskExecutionProjection(store, binding) {
+function attachTaskExecutionProjection(attemptsById, binding) {
   if (binding?.scope?.kind !== 'task' || !binding.scope.executionAttemptId) return binding;
-  const attempt = readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY).find(item => item.id === binding.scope.executionAttemptId);
+  const attempt = attemptsById.get(binding.scope.executionAttemptId);
   return attempt?.runtimeExecution ? { ...binding, taskExecution: attempt.runtimeExecution } : binding;
 }
 
 function listAgentRuntimeSessionsWithTaskExecution(store, input) {
   const result = listAgentRuntimeSessions(store, input);
-  return result?.ok ? { ...result, bindings: result.bindings.map(binding => attachTaskExecutionProjection(store, binding)) } : result;
+  if (!result?.ok) return result;
+  const hasTaskBindings = result.bindings.some(binding => binding?.scope?.kind === 'task' && binding.scope.executionAttemptId);
+  const attemptsById = hasTaskBindings
+    ? new Map(readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY).map(attempt => [attempt.id, attempt]))
+    : new Map();
+  return { ...result, bindings: result.bindings.map(binding => attachTaskExecutionProjection(attemptsById, binding)) };
 }
 
 const {

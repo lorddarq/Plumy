@@ -6,9 +6,15 @@ function harness(seed = {}) {
   const state = { bindings: [], events: [], ...seed };
   let ordinal = 0;
   const service = createAgentRuntimeSessionService({
-    readBindings: () => state.bindings,
+    readBindings: () => {
+      state.bindingReads = (state.bindingReads || 0) + 1;
+      return state.bindings;
+    },
     writeBindings: (_store, value) => { state.bindings = value; },
-    readEvents: () => state.events,
+    readEvents: () => {
+      state.eventReads = (state.eventReads || 0) + 1;
+      return state.events;
+    },
     writeEvents: (_store, value) => { state.events = value; },
     attachBindingToAttempt: (_store, binding) => {
       state.attachedBindingId = binding.id;
@@ -42,6 +48,33 @@ test('session bindings are provider-neutral, revisioned, idempotent, and keep on
   assert.equal(ready.binding.opaqueSessionRef, 'provider-session-1');
   assert.equal(service.updateBinding(null, { bindingId: first.binding.id, expectedRevision: 0, state: 'active' }).error, 'REVISION_MISMATCH');
   assert.equal(state.bindings.length, 1);
+});
+
+test('session lists can omit retained events without reading their store collection', () => {
+  const { service, state } = harness({
+    bindings: [{ id: 'binding-1', state: 'closed' }],
+    events: [{ id: 'event-1', bindingId: 'binding-1' }],
+  });
+
+  const result = service.list(null, { limit: 100, includeEvents: false });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.bindings.length, 1);
+  assert.deepEqual(result.events, []);
+  assert.equal(state.eventReads, undefined);
+});
+
+test('session lists read each retained collection once', () => {
+  const { service, state } = harness({
+    bindings: [{ id: 'binding-1', state: 'closed' }],
+    events: [{ id: 'event-1', bindingId: 'binding-1' }],
+  });
+
+  const result = service.list(null, { limit: 100 });
+
+  assert.equal(result.ok, true);
+  assert.equal(state.bindingReads, 1);
+  assert.equal(state.eventReads, 1);
 });
 
 test('a reusable ready session is idle capacity while an in-flight turn blocks task and Goal-node starts', () => {

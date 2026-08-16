@@ -23,7 +23,7 @@ const { registerRuntimeIpcHandlers } = require('./ipc/runtime.cjs');
 const { registerAgentRuntimeIpcHandlers } = require('./ipc/agent-runtime.cjs');
 const { registerPerformanceIpcHandlers } = require('./ipc/performance.cjs');
 const { createAgentRuntimeSessionRunner } = require('./services/agent-runtime-session-runner.cjs');
-const { resolveProfile: resolveAgentRuntimeProfile } = require('./domain/agent-runtime-profile-service.cjs');
+const { readDefaults: readAgentRuntimeDefaults, resolveProfile: resolveAgentRuntimeProfile } = require('./domain/agent-runtime-profile-service.cjs');
 const { registerTaskContextIpcHandlers } = require('./ipc/task-context.cjs');
 const { captureMeaningfulTaskCheckpoints } = require('./domain/task-context-checkpoint-service.cjs');
 const { startMcpHttpServer, waitForMcpHttpServerReady } = require('./services/mcp-http-server.cjs');
@@ -218,6 +218,7 @@ function startAgentRuntimeReconciliation() {
   if (agentRuntimeReconciliationTimer) clearInterval(agentRuntimeReconciliationTimer);
   const tick = () => {
     try {
+      if (!readAgentRuntimeDefaults(store).acpRuntimeAccessEnabled && !agentRuntimeSessionRunner.hasLiveSessions()) return;
       agentRuntimeSessionRunner.reconcile();
     } catch (error) {
       console.error('[agent-runtime] reconciliation failed:', error?.message || error);

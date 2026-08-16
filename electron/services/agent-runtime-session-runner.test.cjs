@@ -148,6 +148,29 @@ test('reconciliation interrupts persisted input state when its answerable reques
   assert.equal(events.at(-1).nativeEventType, 'omvra/runtime/connection-lost');
 });
 
+test('idle reconciliation reads one lightweight session projection', () => {
+  const listInputs = [];
+  const runner = createAgentRuntimeSessionRunner({
+    store: {},
+    resolveProfile: () => ({ ok: false }),
+    confirmStart: () => ({ canStart: false }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: () => ({ ok: false }),
+    updateBinding: () => ({ ok: true }),
+    appendEvent: () => ({ ok: true }),
+    listSessions: (_store, input) => {
+      listInputs.push(input);
+      return { ok: true, bindings: [], events: [] };
+    },
+  });
+
+  const result = runner.reconcile();
+
+  assert.deepEqual(listInputs, [{ limit: 100, includeEvents: false }]);
+  assert.equal(result.ok, true);
+  assert.equal(runner.hasLiveSessions(), false);
+});
+
 test('injects the bounded Omvra context pack while leaving MCP configuration to the provider', async () => {
   const prompts = [];
   const bindingInputs = [];

@@ -109,8 +109,10 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       if (refreshRunning || disposed) return;
       refreshRunning = true;
       try {
+        const runtimeState = await window.electron?.agentRuntime?.getState?.();
+        if (runtimeState?.ok && runtimeState.value?.defaults?.acpRuntimeAccessEnabled === false) return;
         const result = await measurePerformanceOperation('acp', 'supervisor.sessions.list', async () => (
-          window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 })
+          window.electron?.agentRuntime?.sessions?.list?.({ limit: 100, includeEvents: !notificationsInitialized })
         ));
         if (!result?.ok || !Array.isArray(result.bindings)) return;
         const nextBindings = result.bindings as SessionBinding[];

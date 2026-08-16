@@ -785,19 +785,23 @@ function createAgentRuntimeSessionRunner({
   }
 
   function reconcile() {
-    const persistedSessions = listSessions(store, { limit: 100 })?.bindings || [];
+    const projection = listSessions(store, { limit: 100, includeEvents: false });
+    const persistedSessions = projection?.bindings || [];
+    let changed = false;
     for (const binding of persistedSessions) {
       if (['ready', 'active', 'needs-input', 'cancelling'].includes(binding.state) && !clients.has(binding.id)) {
-        reconcileBindingLoss(binding.id, { code: 'ACP_RUNTIME_MISSING', kind: 'error' });
+        changed = Boolean(reconcileBindingLoss(binding.id, { code: 'ACP_RUNTIME_MISSING', kind: 'error' })?.ok) || changed;
       }
     }
     for (const [bindingId, session] of clients.entries()) {
-      if (typeof session.client.isAlive === 'function' && !session.client.isAlive()) reconcileBindingLoss(bindingId, { code: 'ACP_SESSION_INTERRUPTED', kind: 'error' });
+      if (typeof session.client.isAlive === 'function' && !session.client.isAlive()) {
+        changed = Boolean(reconcileBindingLoss(bindingId, { code: 'ACP_SESSION_INTERRUPTED', kind: 'error' })?.ok) || changed;
+      }
     }
-    return listSessions(store, { limit: 100 });
+    return changed ? listSessions(store, { limit: 100, includeEvents: false }) : projection;
   }
 
-  return { close, continueTask, invoke, listRequests, reconcile, respond, resume, start, startGoalNode };
+  return { close, continueTask, hasLiveSessions: () => clients.size > 0, invoke, listRequests, reconcile, respond, resume, start, startGoalNode };
 }
 
 module.exports = { createAgentRuntimeSessionRunner };
