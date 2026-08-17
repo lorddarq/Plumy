@@ -379,6 +379,12 @@
   display: flex;
   flex-direction: column;
   overscroll-behavior: contain;
+}
+
+.timeline-left-list-content {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
   will-change: transform;
 }
 
@@ -536,10 +542,12 @@
   border-bottom: 1px solid var(--timeline-border);
 }
 
-/* Rows have explicit heights, so the browser can skip offscreen descendants
- * while preserving the scroll geometry during vertical scrolling. */
-.timeline-rows-container > .swimlane-row,
-.timeline-left-list > .timeline-swimlane-label-container {
+/* Timeline rows have explicit heights, so the browser can skip offscreen
+ * descendants while preserving scroll geometry during vertical scrolling.
+ * Keep the fixed label list fully rendered: it is translated to mirror the
+ * independently scrolling timeline, so content-visibility incorrectly treats
+ * visible labels as offscreen and blanks them after deep scrolling. */
+.timeline-rows-container > .swimlane-row {
   content-visibility: auto;
 }
 

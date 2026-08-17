@@ -163,7 +163,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   ));
   const executionContributionId = preflight?.contractSnapshot?.contributionId || startableContribution?.id;
   const resolvedRepositoryFolder = workspace?.workspacePath || '';
-  const repositorySource = agentRuntimeWorkspaceSourceLabel(workspace?.source);
+  const repositorySource = workspace ? agentRuntimeWorkspaceSourceLabel(workspace.source) : loading ? 'Resolving' : 'Not configured';
   const reportRuntimeError = (operation: string, caught: unknown, fallback: string) => {
     const message = caught instanceof Error ? caught.message : fallback;
     console.error(`[agent-runtime:ui] ${operation}.failed`, { taskId: task.id, bindingId: binding?.id || null, message, error: caught });
@@ -345,8 +345,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
 
   const refreshSession = async () => {
     const sequence = ++refreshSequence.current;
+    const listSessions = window.electron?.agentRuntime?.sessions?.list;
+    if (!listSessions) {
+      setSessionLoaded(true);
+      return null;
+    }
     const index = await measurePerformanceOperation('acp', 'task-execution.sessions.index', async () => (
-      window.electron?.agentRuntime?.sessions?.list?.({ limit: 100 })
+      listSessions({ limit: 100 })
     ));
     if (sequence !== refreshSequence.current) return null;
     if (!index?.ok) {
@@ -630,7 +635,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
               </div>
               <div className="rounded-md border border-slate-200 p-3">
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Folder className="size-3.5" />Working directory</div>
-                <div className={`mt-1 truncate font-medium ${resolvedRepositoryFolder ? 'text-slate-900' : 'text-amber-700'}`} title={resolvedRepositoryFolder || undefined}>{resolvedRepositoryFolder || 'Resolving…'}</div>
+                <div className={`mt-1 truncate font-medium ${resolvedRepositoryFolder ? 'text-slate-900' : 'text-amber-700'}`} title={resolvedRepositoryFolder || undefined}>{resolvedRepositoryFolder || (loading ? 'Resolving…' : 'Not configured')}</div>
                 <div className="text-xs text-slate-500">{repositorySource}</div>
               </div>
             </div>}

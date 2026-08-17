@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import {
   hasCanonicalWorkspaceData,
@@ -94,4 +95,10 @@ test('initial hydration parses each repeated workspace key once', () => {
     if (originalWindow === undefined) Reflect.deleteProperty(globalThis, 'window');
     else Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow });
   }
+});
+
+test('workspace persistence starts canonical writes without a shutdown-sensitive timer', () => {
+  const source = readFileSync(new URL('./workspacePersistence.ts', import.meta.url), 'utf8');
+  assert.match(source, /Promise\.resolve\(\)\.then\(async \(\) =>/);
+  assert.doesNotMatch(source, /window\.setTimeout/);
 });

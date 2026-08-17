@@ -8,7 +8,7 @@
  * different tracks (0, 1, 2, ...) to avoid visual overlap.
  */
 
-import { Task } from '../types';
+import type { Task } from '../types.ts';
 
 /**
  * Represents a task assignment to a track.
@@ -18,31 +18,45 @@ export interface TaskTrackAssignment {
   trackIndex: number;
 }
 
-/**
- * Check if two tasks overlap in their date ranges.
- *
- * @param task1 - First task
- * @param task2 - Second task
- * @returns true if tasks overlap, false otherwise
- */
-function tasksOverlap(task1: Task, task2: Task): boolean {
-  if (!task1.startDate || !task2.startDate) return false;
-  
-  // Normalize dates to midnight local time for accurate comparison
-  const s1 = new Date(task1.startDate);
-  const start1 = new Date(s1.getFullYear(), s1.getMonth(), s1.getDate()).getTime();
-  
-  const e1 = task1.endDate ? new Date(task1.endDate) : s1;
-  const end1 = new Date(e1.getFullYear(), e1.getMonth(), e1.getDate()).getTime();
-  
-  const s2 = new Date(task2.startDate);
-  const start2 = new Date(s2.getFullYear(), s2.getMonth(), s2.getDate()).getTime();
-  
-  const e2 = task2.endDate ? new Date(task2.endDate) : s2;
-  const end2 = new Date(e2.getFullYear(), e2.getMonth(), e2.getDate()).getTime();
+type HeapItem = { end: number; trackIndex: number };
 
-  // Tasks overlap if: task1.start <= task2.end AND task1.end >= task2.start
-  return start1 <= end2 && end1 >= start2;
+function pushMinHeap<T>(heap: T[], item: T, compare: (left: T, right: T) => number): void {
+  heap.push(item);
+  let index = heap.length - 1;
+  while (index > 0) {
+    const parent = Math.floor((index - 1) / 2);
+    if (compare(heap[parent], heap[index]) <= 0) break;
+    [heap[parent], heap[index]] = [heap[index], heap[parent]];
+    index = parent;
+  }
+}
+
+function popMinHeap<T>(heap: T[], compare: (left: T, right: T) => number): T | undefined {
+  if (heap.length === 0) return undefined;
+  const first = heap[0];
+  const last = heap.pop();
+  if (last && heap.length > 0) {
+    heap[0] = last;
+    let index = 0;
+    while (true) {
+      const left = index * 2 + 1;
+      const right = left + 1;
+      let smallest = index;
+      if (left < heap.length && compare(heap[left], heap[smallest]) < 0) smallest = left;
+      if (right < heap.length && compare(heap[right], heap[smallest]) < 0) smallest = right;
+      if (smallest === index) break;
+      [heap[index], heap[smallest]] = [heap[smallest], heap[index]];
+      index = smallest;
+    }
+  }
+  return first;
+}
+
+function taskDate(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()).getTime();
 }
 
 /**
@@ -66,46 +80,56 @@ export function allocateTasksToTracks(
     return assignments;
   }
 
-  // Sort tasks by start date
+  // Sort tasks by start date. The stable sort preserves the existing first-fit
+  // ordering for tasks with the same date.
   const sortedTasks = [...tasks].sort((a, b) => {
-    if (!a.startDate) return 1;
-    if (!b.startDate) return -1;
-    
-    const da = new Date(a.startDate);
-    const dateA = new Date(da.getFullYear(), da.getMonth(), da.getDate()).getTime();
-    
-    const db = new Date(b.startDate);
-    const dateB = new Date(db.getFullYear(), db.getMonth(), db.getDate()).getTime();
-    
+    const dateA = taskDate(a.startDate);
+    const dateB = taskDate(b.startDate);
+    if (dateA === null) return dateB === null ? 0 : 1;
+    if (dateB === null) return -1;
     return dateA - dateB;
   });
 
-  // Track arrays: each track contains the tasks assigned to it
-  const tracks: Task[][] = [];
+  // Active tracks are released by end date, while available track indices are
+  // reused in ascending order to preserve first-fit assignments. This avoids
+  // comparing every task against every task already assigned to a track.
+  const trackEnds: Array<number | null> = [];
+  const activeTracks: HeapItem[] = [];
+  const availableTracks: number[] = [];
+  const byEnd = (left: HeapItem, right: HeapItem) => left.end - right.end || left.trackIndex - right.trackIndex;
+  const byIndex = (left: number, right: number) => left - right;
 
-  // Assign each task to the first suitable track
   for (const task of sortedTasks) {
-    let assigned = false;
+    const start = taskDate(task.startDate);
+    if (start === null) {
+      // Missing/invalid dates never overlap in the legacy allocator and are
+      // therefore assigned to the first track as before.
+      assignments[task.id] = 0;
+      if (trackEnds.length === 0) {
+        trackEnds.push(null);
+        pushMinHeap(availableTracks, 0, byIndex);
+      }
+      continue;
+    }
 
-    // Try to fit into an existing track
-    for (let trackIdx = 0; trackIdx < tracks.length; trackIdx++) {
-      const trackTasks = tracks[trackIdx];
-      const hasOverlap = trackTasks.some(t => tasksOverlap(task, t));
-
-      if (!hasOverlap) {
-        // Task fits in this track
-        trackTasks.push(task);
-        assignments[task.id] = trackIdx;
-        assigned = true;
+    while (activeTracks.length > 0) {
+      const active = activeTracks[0];
+      if (trackEnds[active.trackIndex] !== active.end) {
+        popMinHeap(activeTracks, byEnd);
+      } else if (active.end < start) {
+        popMinHeap(activeTracks, byEnd);
+        pushMinHeap(availableTracks, active.trackIndex, byIndex);
+      } else {
         break;
       }
     }
 
-    // If no suitable track found, create a new one
-    if (!assigned) {
-      tracks.push([task]);
-      assignments[task.id] = tracks.length - 1;
-    }
+    const available = popMinHeap(availableTracks, byIndex);
+    const trackIndex = available ?? trackEnds.length;
+    const end = taskDate(task.endDate) ?? start;
+    trackEnds[trackIndex] = end;
+    pushMinHeap(activeTracks, { end, trackIndex }, byEnd);
+    assignments[task.id] = trackIndex;
   }
 
   return assignments;

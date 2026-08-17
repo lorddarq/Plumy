@@ -257,6 +257,7 @@ export function TimelineView({
   const headerRef = useRef<HTMLDivElement>(null);
   const rowsContainerRef = useRef<HTMLDivElement>(null);
   const leftListRef = useRef<HTMLDivElement>(null);
+  const leftListContentRef = useRef<HTMLDivElement>(null);
   const fixedBtnRef = useRef<HTMLDivElement>(null);
   const hasInitializedScrollRef = useRef<boolean>(false);
   const scrollNotifyRafRef = useRef<number | null>(null);
@@ -960,8 +961,8 @@ export function TimelineView({
     if (scrollNotifyRafRef.current == null) {
       scrollNotifyRafRef.current = requestAnimationFrame(() => {
         const rowsContainer = rowsContainerRef.current;
-        const leftList = leftListRef.current;
-        if (rowsContainer && leftList) {
+        const leftListContent = leftListContentRef.current;
+        if (rowsContainer && leftListContent) {
           // Keep the fixed-pane write in one frame. Horizontal geometry is
           // independent from vertical scrolling, so avoid forcing layout on
           // every vertical wheel frame just to re-check it.
@@ -970,7 +971,7 @@ export function TimelineView({
           // The left pane is intentionally not a second scroll container. Move
           // its labels on the compositor instead of writing scrollTop, which
           // can trigger a second layout/scroll update during wheel dispatch.
-          leftList.style.transform = `translate3d(0, -${scrollTop}px, 0)`;
+          leftListContent.style.transform = `translate3d(0, -${scrollTop}px, 0)`;
 
           if (lastHorizontalScrollLeftRef.current !== scrollLeft) {
             lastHorizontalScrollLeftRef.current = scrollLeft;
@@ -1163,6 +1164,7 @@ export function TimelineView({
             </div>
 
             <div className="timeline-left-list" ref={leftListRef}>
+              <div ref={leftListContentRef} className="timeline-left-list-content">
               {displaySwimlanes.map((swimlane, index) => {
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
                 const isDraggedRowCollapsed = Boolean(
@@ -1224,6 +1226,7 @@ export function TimelineView({
                 onSwimlaneDropIndicatorChange={setSwimlaneDropIndicator}
                 onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
               />
+              </div>
             </div>
           </div>
 

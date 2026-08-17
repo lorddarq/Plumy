@@ -101,13 +101,9 @@ function readArray(store, key) {
 }
 
 function setStoreEntries(store, entries) {
-  const storedSnapshot = store?.store;
-  const storeDescriptor = Object.getOwnPropertyDescriptor(store, 'store')
-    || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(store) || {}, 'store');
-  if (storedSnapshot && typeof storedSnapshot === 'object' && storeDescriptor?.set) {
-    store.store = { ...storedSnapshot, ...Object.fromEntries(entries) };
-    return;
-  }
+  // Electron Store keys use dot notation (for example `omvra.tasks.v1`).
+  // Writing a spread object would create literal top-level dotted keys and
+  // leave the canonical nested values unchanged.
   entries.forEach(([key, value]) => store.set(key, value));
 }
 

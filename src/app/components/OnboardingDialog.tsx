@@ -47,7 +47,14 @@ export function OnboardingDialog({ open, onClose }: { open: boolean; onClose: ()
       }
     };
     document.addEventListener('keydown', onKeyDown);
-    return () => { document.removeEventListener('keydown', onKeyDown); previousFocusRef.current?.focus(); };
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      const previousFocus = previousFocusRef.current;
+      const focusTarget = previousFocus?.isConnected && previousFocus !== document.body
+        ? previousFocus
+        : document.querySelector<HTMLElement>('[aria-label="Open preferences"]');
+      window.requestAnimationFrame(() => { if (focusTarget?.isConnected) focusTarget.focus(); });
+    };
   }, [open, onClose]);
   if (!open) return null;
   const slide = slides[index];

@@ -4,7 +4,7 @@ import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';
 import { GOAL_TEMPLATES, instantiateGoalTemplate, type GoalTemplate } from '../../data/goalTemplates.ts';
 import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/storage.ts';
 import { goalRevision, readGoals } from '../../utils/goalPersistence.ts';
-import { goalCanvasElementHeight, goalConnectorPath, isGoalElementConnected, isValidRetryTarget, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
+import { goalCanvasElementHeight, goalCanvasPanToCenterElement, goalConnectorPath, isGoalElementConnected, isValidRetryTarget, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
 import { createAgentElement, createGoalElement, createStableId } from '../../utils/goalElements.ts';
 import { formatGoalDetailsForClipboard } from '../../utils/goalClipboard';
 import { createCustomArtifactReference, createSupportingSourceReference } from '../../utils/goalArtifacts.ts';
@@ -531,7 +531,8 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
     if (!activeGoal) return;
     const element = createGoalElement(type, activeGoal.elements.length);
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
-    setSelectedElementId(id);
+    setSelectedElementId(element.id);
+    setPan(goalCanvasPanToCenterElement(element));
   };
   const deleteElement = () => {
     if (!selectedElement) return;
@@ -576,8 +577,9 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
   };
   const createGoal = () => {
     const title = newGoalTitle.trim() || 'Untitled goal';
-    const goal: GoalRecord = { id: createStableId('goal'), title, color: '#2563eb', updatedAt: new Date().toISOString(), elements: [{ id: createStableId('element'), type: 'goal', title, body: newGoalBody.trim() || 'Define the outcome', x: 420, y: 180, width: 250, height: 104, status: 'draft' }] };
-    setGoals(current => [...current, goal]); setSelectedGoalId(goal.id); setSelectedElementId(goal.elements[0].id); setNewGoalDialogOpen(false);
+    const element: GoalElement = { id: createStableId('element'), type: 'goal', title, body: newGoalBody.trim() || 'Define the outcome', x: 420, y: 180, width: 250, height: 104, status: 'draft' };
+    const goal: GoalRecord = { id: createStableId('goal'), title, color: '#2563eb', updatedAt: new Date().toISOString(), elements: [element] };
+    setGoals(current => [...current, goal]); setSelectedGoalId(goal.id); setSelectedElementId(element.id); setPan(goalCanvasPanToCenterElement(element)); setNewGoalDialogOpen(false);
   };
 
   const addTemplate = (template: GoalTemplate) => {
@@ -602,7 +604,8 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
     if (!activeGoal) return;
     const element = createAgentElement(person, activeGoal.elements.length);
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
-    setSelectedElementId(id);
+    setSelectedElementId(element.id);
+    setPan(goalCanvasPanToCenterElement(element));
     setAgentMenuOpen(false);
     setArtifactMenuOpen(false);
   };

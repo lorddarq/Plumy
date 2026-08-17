@@ -61,6 +61,23 @@ test('store registrar batches workspace writes into one store assignment', () =>
   assert.equal(writes, 1);
 });
 
+test('store registrar reads and writes dotted electron-store keys', () => {
+  const { handlers, ipcMain } = createIpcHarness();
+  let persistedStore = { omvra: { tasks: { v1: ['old'] } } };
+  const store = {
+    get: key => key === 'omvra.tasks.v1' ? persistedStore.omvra.tasks.v1 : undefined,
+    set: () => { throw new Error('set fallback should not be used'); },
+    delete: () => true,
+    get store() { return persistedStore; },
+    set store(value) { persistedStore = value; },
+  };
+  registerStoreIpcHandlers({ ipcMain, store, preferencesKey: 'preferences' });
+
+  assert.deepEqual(handlers.get('store/get-many')(null, ['omvra.tasks.v1']), { 'omvra.tasks.v1': ['old'] });
+  assert.deepEqual(handlers.get('store/set-many')(null, { 'omvra.tasks.v1': ['new'] }), { count: 1 });
+  assert.deepEqual(persistedStore, { omvra: { tasks: { v1: ['new'] } } });
+});
+
 test('store registrar reports renderer mutation keys without reading the whole store', () => {
   const { handlers, ipcMain } = createIpcHarness();
   const mutations = [];
@@ -82,13 +99,12 @@ test('store registrar reports renderer mutation keys without reading the whole s
 
 test('store registrar reads only requested keys', () => {
   const { handlers, ipcMain } = createIpcHarness();
-  let snapshotReads = 0;
   const values = { tasks: [1], people: [2], runtime: [3] };
   const store = {
     get: key => values[key],
     set: () => {},
     delete: () => {},
-    get store() { snapshotReads += 1; return values; },
+    get store() { throw new Error('get-many should use targeted reads'); },
   };
   registerStoreIpcHandlers({ ipcMain, store, preferencesKey: 'preferences' });
 
@@ -96,7 +112,6 @@ test('store registrar reads only requested keys', () => {
     tasks: [1],
     people: [2],
   });
-  assert.equal(snapshotReads, 1);
 });
 
 test('performance registrar delegates timing records and local log controls', async () => {

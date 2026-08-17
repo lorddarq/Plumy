@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { GoalElement } from '../types.ts';
-import { isGoalElementConnected, isValidRetryTarget, wouldCreateGoalCycle } from './goalCanvas.ts';
+import { goalCanvasPanToCenterElement, isGoalElementConnected, isValidRetryTarget, wouldCreateGoalCycle } from './goalCanvas.ts';
 
 const connector = (id: string, sourceId: string, targetId: string): GoalElement => ({
   id,
@@ -47,4 +47,9 @@ test('retry return edges are allowed only to an earlier node', () => {
   assert.equal(isValidRetryTarget(retryGraph, 'retry', 'a'), true);
   assert.equal(isValidRetryTarget(retryGraph, 'retry', 'c'), true);
   assert.equal(isValidRetryTarget(retryGraph, 'retry', 'missing'), false);
+});
+
+test('goal canvas centers newly created elements using their rendered size', () => {
+  assert.deepEqual(goalCanvasPanToCenterElement({ id: 'goal', type: 'goal', title: 'Goal', x: 420, y: 180, width: 250, height: 104 }), { x: -545, y: -232 });
+  assert.deepEqual(goalCanvasPanToCenterElement({ id: 'subgoal', type: 'subgoal', title: 'Subgoal', x: 260, y: 560 }), { x: -370, y: -605 });
 });

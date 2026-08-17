@@ -1,10 +1,24 @@
+function setNestedValue(target, key, value) {
+  const segments = key.split('.').filter(Boolean);
+  if (segments.length === 0) return;
+  let cursor = target;
+  segments.forEach((segment, index) => {
+    if (index === segments.length - 1) {
+      cursor[segment] = value;
+      return;
+    }
+    if (!cursor[segment] || typeof cursor[segment] !== 'object' || Array.isArray(cursor[segment])) {
+      cursor[segment] = {};
+    }
+    cursor = cursor[segment];
+  });
+}
+
 function registerStoreIpcHandlers({ ipcMain, store, preferencesKey, onPreferencesSet, onStoreMutation }) {
   ipcMain.handle('store/get', (_, key) => store.get(key));
   ipcMain.handle('store/get-many', (_, keys) => {
     const requestedKeys = Array.isArray(keys) ? keys.filter(key => typeof key === 'string') : [];
-    const storedSnapshot = store.store;
-    const snapshot = storedSnapshot && typeof storedSnapshot === 'object' ? storedSnapshot : {};
-    return Object.fromEntries(requestedKeys.map(key => [key, snapshot[key]]));
+    return Object.fromEntries(requestedKeys.map(key => [key, store.get(key)]));
   });
   ipcMain.handle('store/set', (_, key, value) => {
     if (typeof onStoreMutation === 'function' && typeof key === 'string') onStoreMutation([key]);
@@ -24,10 +38,14 @@ function registerStoreIpcHandlers({ ipcMain, store, preferencesKey, onPreference
     const storedSnapshot = store.store;
     const current = storedSnapshot && typeof storedSnapshot === 'object' ? storedSnapshot : {};
     const next = { ...current };
-    entries.forEach(([key, value]) => { next[key] = value; });
+    entries.forEach(([key, value]) => setNestedValue(next, key, value));
 
-    const storeDescriptor = Object.getOwnPropertyDescriptor(store, 'store')
-      || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(store) || {}, 'store');
+    let storeDescriptor;
+    let storePrototype = store;
+    while (storePrototype && !storeDescriptor) {
+      storeDescriptor = Object.getOwnPropertyDescriptor(storePrototype, 'store');
+      storePrototype = Object.getPrototypeOf(storePrototype);
+    }
     if (storeDescriptor?.set) {
       try {
         store.store = next;
