@@ -438,7 +438,15 @@ class ClaudeStreamJsonClient {
 
   #mapStreamMessage(message) {
     if (!message || typeof message.type !== 'string') return null;
-    if (message.type === 'system') return { method: 'turn/started', params: { state: 'active', subtype: message.subtype || null } };
+    if (message.type === 'system') return {
+      method: 'turn/started',
+      params: {
+        state: 'active',
+        subtype: message.subtype || null,
+        ...(Array.isArray(message.mcp_servers) ? { mcpServers: message.mcp_servers } : {}),
+        ...(message.error ? { error: message.error } : {}),
+      },
+    };
     if (message.type === 'assistant') {
       const blocks = Array.isArray(message.message?.content) ? message.message.content : [];
       const text = blocks.filter(block => block?.type === 'text').map(block => block.text).filter(Boolean).join('');
@@ -465,7 +473,7 @@ class ClaudeStreamJsonClient {
     }
     const selectedModel = requestedModel(this.profile, model);
     const mcpConfig = this.options.mcpEndpoint
-      ? JSON.stringify({ mcpServers: { omvra: { type: 'http', url: this.options.mcpEndpoint } } })
+      ? JSON.stringify({ mcpServers: { omvra: { type: 'http', url: this.options.mcpEndpoint, ...(this.options.mcpHeaders ? { headers: this.options.mcpHeaders } : {}) } } })
       : null;
     const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId, ...(selectedModel ? ['--model', selectedModel] : []), ...(mcpConfig ? ['--mcp-config', mcpConfig] : [])];
     this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath, messageMapper: message => this.#mapStreamMessage(message) }));

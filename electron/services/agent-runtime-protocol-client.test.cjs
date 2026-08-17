@@ -274,6 +274,21 @@ test('Claude receives the Omvra MCP endpoint through native mcp-config', async (
   client.close();
 });
 
+test('Claude receives scoped MCP authorization headers when provided', async () => {
+  const launches = [];
+  const client = createNativeRuntimeClient({ integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude' }, {
+    workspacePath: '/tmp/workspace', mcpEndpoint: 'http://127.0.0.1:3456/mcp',
+    mcpHeaders: { Authorization: 'Bearer scoped-token' },
+    spawnProcess: (command, args, options) => { launches.push({ command, args, options }); return createChild(() => {}); },
+  });
+  await client.startSession({ sessionId: '00000000-0000-4000-8000-000000000001' });
+  const configIndex = launches[0].args.indexOf('--mcp-config');
+  assert.deepEqual(JSON.parse(launches[0].args[configIndex + 1]), {
+    mcpServers: { omvra: { type: 'http', url: 'http://127.0.0.1:3456/mcp', headers: { Authorization: 'Bearer scoped-token' } } },
+  });
+  client.close();
+});
+
 test('Claude recovery replaces the persisted provider session instead of resuming stale history', async () => {
   const launches = [];
   const client = createNativeRuntimeClient({ integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude' }, {

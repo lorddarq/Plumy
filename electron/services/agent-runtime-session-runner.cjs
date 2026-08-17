@@ -1,6 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const { createNativeRuntimeClient } = require('./agent-runtime-protocol-client.cjs');
 const { createAgentRuntimeContextPack } = require('../domain/agent-runtime-context-pack.cjs');
+const { issueScopedMcpGrant } = require('./agent-runtime-mcp-grant.cjs');
 
 const ACTIVE_TURN_STATES = new Set(['queued', 'starting', 'active', 'waiting-input', 'cancelling']);
 const TERMINAL_TURN_STATES = new Set(['completed', 'failed', 'interrupted']);
@@ -24,6 +25,7 @@ function createAgentRuntimeSessionRunner({
   updateTaskExecutionState = null,
   emitRuntimeEvent = null,
   createClient = createNativeRuntimeClient,
+  issueMcpGrant = issueScopedMcpGrant,
   now = () => new Date().toISOString(),
   logger = null,
   maxAutomaticBatches = 0,
@@ -87,11 +89,19 @@ function createAgentRuntimeSessionRunner({
     return { ok: true };
   }
 
-  function clientOptions(profile, workspacePath, mcpReadiness) {
+  function clientOptions(profile, workspacePath, mcpReadiness, scope) {
     const options = { workspacePath, logger };
     const endpoint = mcpReadiness?.listenerStatus?.boundUrl;
     if (profile?.integrationMode === 'claude-stream-json-stdio' && typeof endpoint === 'string' && endpoint.trim()) {
       options.mcpEndpoint = endpoint.trim();
+      const grant = issueMcpGrant({
+        endpoint: options.mcpEndpoint,
+        scope,
+        capabilityProfile: mcpReadiness.listenerStatus.capabilityProfile || 'read_only',
+      });
+      if (!grant?.ok) throw Object.assign(new Error(grant?.message || 'The scoped MCP grant could not be created.'), { code: grant?.error || 'ACP_MCP_GRANT_FAILED' });
+      options.mcpHeaders = { Authorization: `Bearer ${grant.token}` };
+      options.mcpGrantId = grant.grantId;
     }
     return options;
   }
@@ -428,7 +438,18 @@ function createAgentRuntimeSessionRunner({
         : undefined,
       idempotencyKey: `runtime:${binding.id}:${randomUUID()}`,
     });
-    if (method === 'turn/started') syncTurnState(binding.id, 'active');
+    if (method === 'turn/started') {
+      if (Array.isArray(params.mcpServers)) {
+        const mcpServers = params.mcpServers.slice(0, 32).map(server => ({
+          name: typeof server?.name === 'string' ? server.name.slice(0, 160) : null,
+          status: typeof server?.status === 'string' ? server.status.slice(0, 80) : null,
+          error: typeof server?.error === 'string' ? server.error.slice(0, 500) : null,
+        }));
+        const failedServers = mcpServers.filter(server => server.status === 'failed' || server.error);
+        log(failedServers.length ? 'warn' : 'info', 'provider.mcp-status', { bindingId: binding.id, servers: mcpServers });
+      }
+      syncTurnState(binding.id, 'active');
+    }
     else if (method === 'turn/completed') {
       const waitingForInput = [...pendingRequests.values()].some(request => request.bindingId === binding.id);
       const cancellationRequested = bindingFor(binding.id)?.turn?.state === 'cancelling';
@@ -550,7 +571,7 @@ function createAgentRuntimeSessionRunner({
     log('info', 'binding.created', { taskId: payload.taskId, bindingId: binding.id, runtimeProfileId: profile.id });
     let client;
     try {
-      client = createClient(profile, clientOptions(profile, payload.workspacePath, mcpReadiness));
+      client = createClient(profile, clientOptions(profile, payload.workspacePath, mcpReadiness, binding.scope));
       log('info', 'runtime.initializing', { bindingId: binding.id, runtimeProfileId: profile.id });
       const negotiated = await client.initialize();
       log('info', 'runtime.initialized', { bindingId: binding.id, authentication: negotiated.authentication || 'unknown', capabilities: Object.keys(negotiated.capabilities || {}).filter(key => negotiated.capabilities[key] === true) });
@@ -616,7 +637,7 @@ function createAgentRuntimeSessionRunner({
     const binding = bindingResult.binding;
     let client;
     try {
-      client = createClient(profileResolution.profile, clientOptions(profileResolution.profile, payload.workspacePath, mcpReadiness));
+      client = createClient(profileResolution.profile, clientOptions(profileResolution.profile, payload.workspacePath, mcpReadiness, binding.scope));
       const negotiated = await client.initialize();
       attachClient(binding, client);
       const session = await client.startSession();
@@ -732,7 +753,7 @@ function createAgentRuntimeSessionRunner({
     if (!starting.ok) return starting;
     let client;
     try {
-      client = createClient(profileResolution.profile, clientOptions(profileResolution.profile, workspacePath, mcpReadiness));
+      client = createClient(profileResolution.profile, clientOptions(profileResolution.profile, workspacePath, mcpReadiness, current.scope));
       const negotiated = await client.initialize();
       attachClient(starting.binding, client);
       const session = await client.resumeSession(current.opaqueSessionRef);
