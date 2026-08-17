@@ -4,6 +4,7 @@ const navLinks = [
   { href: '#why-omvra', label: 'Why Omvra' },
   { href: '#features', label: 'Features' },
   { href: '#how-it-works', label: 'How it works' },
+  { href: '#acp', label: 'ACP' },
   { href: '#privacy', label: 'Privacy' },
 ]
 

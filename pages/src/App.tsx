@@ -6,6 +6,7 @@ import HowItWorks from './components/HowItWorks'
 import BestFor from './components/BestFor'
 import PrivacyProof from './components/PrivacyProof'
 import AgentPrompts from './components/AgentPrompts'
+import ACPSection from './components/ACPSection'
 import Download from './components/Download'
 import Faq from './components/Faq'
 import Footer from './components/Footer'
@@ -21,6 +22,7 @@ function App() {
       <BestFor />
       <PrivacyProof />
       <AgentPrompts />
+      <ACPSection />
       <Download />
       <Faq />
       <Footer />

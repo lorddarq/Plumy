@@ -24,6 +24,7 @@ const Footer = () => {
                 <li><a href="#why-omvra" className={linkClassName}>Why Omvra</a></li>
                 <li><a href="#features" className={linkClassName}>Features</a></li>
                 <li><a href="#how-it-works" className={linkClassName}>How it works</a></li>
+                <li><a href="#acp" className={linkClassName}>ACP runtime</a></li>
                 <li><a href="#privacy" className={linkClassName}>Privacy</a></li>
                 <li><a href="#download" className={linkClassName}>Download</a></li>
                 <li><a href="#faq" className={linkClassName}>FAQ</a></li>

@@ -205,6 +205,53 @@ Backups now include:
 
 This is intended to make workspace moves and recovery seamless rather than exporting only partial task data.
 
+## ACP and managed agent sessions
+
+Omvra’s managed agent runtime connects task execution to a local provider process through the Electron main process. The runtime keeps the provider process, task context, turn state, activity events, and session binding separate from the renderer so supervision can recover cleanly after a UI refresh or app restart.
+
+Supported local integrations are:
+
+- **Native ACP over stdio** (`acp-local-stdio`) for ACP-compatible agents. Add provider-specific launch arguments in the profile; for example, OpenCode commonly uses `acp`.
+- **Codex app-server over stdio** (`codex-app-server-stdio`) for the native Codex app-server protocol.
+- **Claude stream-json over stdio** (`claude-stream-json-stdio`) for the Claude Code CLI. Omvra launches Claude with `--print`, `--input-format stream-json`, and `--output-format stream-json` and maps Claude’s stream events into supervised turns.
+- **External handoff** for providers that should open outside Omvra rather than run as a supervised local session.
+
+### Claude Code configuration
+
+The Claude integration requires the Claude Code CLI executable, not the Claude desktop application. A typical profile uses:
+
+```text
+Executable: /Users/<user>/.local/bin/claude
+Mode: Claude stream-json over stdio
+Preferred model: sonnet
+```
+
+The model value is passed as Claude’s native `--model` argument. The connection test checks the installed CLI and its advertised stream-json flags; it does not prove that the account has an active Claude Code subscription. Claude Code authentication is separate from the desktop Claude app. Verify it with:
+
+```bash
+/Users/<user>/.local/bin/claude auth status
+```
+
+If the CLI OAuth session has expired or the account does not have Claude Code access, authenticate the CLI or use an account/plan that includes Claude Code.
+
+### MCP access for managed sessions
+
+When MCP agent access is enabled, Omvra starts its local `/mcp` listener before a managed task session is created and passes the active endpoint to Claude through Claude’s native `--mcp-config` option. The MCP capability profile controls which tools are exposed; choose **Task Write** when the workflow needs task description, status, assignment, context, or review writes.
+
+The Claude desktop app being open does not make those tools available to the Claude Code CLI. The managed CLI process must receive Omvra’s endpoint and must be authenticated independently.
+
+### Session recovery and stale provider history
+
+Provider session IDs are persisted for supervision and diagnostics. Claude snapshots its MCP/tool inventory into a provider conversation, so reusing an old Claude session can preserve stale tool availability. Claude recovery therefore creates a fresh provider session and re-sends the authoritative Omvra task context instead of resuming the old provider history. ACP and Codex integrations retain their native resume behavior.
+
+If a session is interrupted, failed, or reports unavailable tools:
+
+1. Confirm the MCP listener is running and the intended capability profile is enabled.
+2. Use **Reconnect and continue** / **Resume task** in supervision to replace the stale Claude session.
+3. Check the agent output and runtime activity for the new session’s connection and tool events.
+
+Runtime output shown in supervision is retained as bounded event data so normal provider responses remain available for copying without storing private runtime payloads or credentials.
+
 ## MCP Integration (Desktop)
 
 Omvra includes an MCP endpoint served by Electron main process (`/mcp`, local bind by default).
