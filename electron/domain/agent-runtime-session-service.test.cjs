@@ -164,6 +164,22 @@ test('normalized message deltas preserve whitespace between streamed chunks', ()
   assert.equal(result.event.messagePreview, 'Current implementation ');
 });
 
+test('normalized message deltas retain normal-length agent output for supervision', () => {
+  const { service } = harness();
+  const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
+  const output = `${'agent output '.repeat(200)}complete.`;
+  const result = service.appendEvent(null, {
+    bindingId: binding.id,
+    runtimeProfileId: 'runtime-1',
+    kind: 'message',
+    nativeEventType: 'item/agentMessage/delta',
+    messagePreview: output,
+    idempotencyKey: 'message-long-1',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.event.messagePreview, output);
+});
+
 test('permission events persist only redacted runtime authority facts and native correlation', () => {
   const { service } = harness();
   const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;

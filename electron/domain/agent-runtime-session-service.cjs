@@ -33,6 +33,7 @@ const TURN_TRANSITIONS = new Map([
 ]);
 const MAX_EVENTS = 2_000;
 const MAX_READ_LIMIT = 100;
+const MAX_MESSAGE_PREVIEW_LENGTH = 20_000;
 const FORBIDDEN_KEYS = new Set(['authorization', 'body', 'chainOfThought', 'cookie', 'credential', 'evidenceBody', 'hiddenReasoning', 'messages', 'opaqueSessionRef', 'password', 'prompt', 'rawPrompt', 'response', 'secret', 'token', 'toolPayload', 'toolResponse', 'transcript']);
 const RUNTIME_PROTOCOLS = new Set(['acp', 'codex-app-server', 'claude-stream-json', 'unknown']);
 const PERMISSION_STATES = new Set(['requested', 'allowed', 'denied', 'cancelled', 'unknown']);
@@ -302,7 +303,7 @@ function createAgentRuntimeSessionService({
       ...(normalizeProviderDetail(input.providerDetail || input.errorDetail) ? {
         providerDetail: normalizeProviderDetail(input.providerDetail || input.errorDetail),
       } : {}),
-      ...(typeof input.messagePreview === 'string' && input.messagePreview.trim() ? { messagePreview: input.messagePreview.slice(0, 500) } : {}),
+      ...(typeof input.messagePreview === 'string' && input.messagePreview.trim() ? { messagePreview: input.messagePreview.slice(0, MAX_MESSAGE_PREVIEW_LENGTH) } : {}),
       ...(safeIdentifier(input.requestId === undefined || input.requestId === null ? '' : String(input.requestId)) ? { requestId: safeIdentifier(String(input.requestId)) } : {}),
       ...(safeIdentifier(input.turnId, 160) ? { turnId: safeIdentifier(input.turnId, 160) } : {}),
       ...(safeIdentifier(input.toolName) ? { toolName: safeIdentifier(input.toolName) } : {}),

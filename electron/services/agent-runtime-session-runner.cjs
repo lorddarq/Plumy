@@ -87,6 +87,15 @@ function createAgentRuntimeSessionRunner({
     return { ok: true };
   }
 
+  function clientOptions(profile, workspacePath, mcpReadiness) {
+    const options = { workspacePath, logger };
+    const endpoint = mcpReadiness?.listenerStatus?.boundUrl;
+    if (profile?.integrationMode === 'claude-stream-json-stdio' && typeof endpoint === 'string' && endpoint.trim()) {
+      options.mcpEndpoint = endpoint.trim();
+    }
+    return options;
+  }
+
   function sanitizedElicitation(bindingId, message) {
     if (message?.id === undefined || message?.id === null) return null;
     const approvalMethod = typeof message.method === 'string' && [
@@ -541,7 +550,7 @@ function createAgentRuntimeSessionRunner({
     log('info', 'binding.created', { taskId: payload.taskId, bindingId: binding.id, runtimeProfileId: profile.id });
     let client;
     try {
-      client = createClient(profile, { workspacePath: payload.workspacePath, logger });
+      client = createClient(profile, clientOptions(profile, payload.workspacePath, mcpReadiness));
       log('info', 'runtime.initializing', { bindingId: binding.id, runtimeProfileId: profile.id });
       const negotiated = await client.initialize();
       log('info', 'runtime.initialized', { bindingId: binding.id, authentication: negotiated.authentication || 'unknown', capabilities: Object.keys(negotiated.capabilities || {}).filter(key => negotiated.capabilities[key] === true) });
@@ -607,7 +616,7 @@ function createAgentRuntimeSessionRunner({
     const binding = bindingResult.binding;
     let client;
     try {
-      client = createClient(profileResolution.profile, { workspacePath: payload.workspacePath, logger });
+      client = createClient(profileResolution.profile, clientOptions(profileResolution.profile, payload.workspacePath, mcpReadiness));
       const negotiated = await client.initialize();
       attachClient(binding, client);
       const session = await client.startSession();
@@ -723,15 +732,15 @@ function createAgentRuntimeSessionRunner({
     if (!starting.ok) return starting;
     let client;
     try {
-      client = createClient(profileResolution.profile, { workspacePath, logger });
+      client = createClient(profileResolution.profile, clientOptions(profileResolution.profile, workspacePath, mcpReadiness));
       const negotiated = await client.initialize();
       attachClient(starting.binding, client);
-      await client.resumeSession(current.opaqueSessionRef);
+      const session = await client.resumeSession(current.opaqueSessionRef);
       const ready = updateBinding(store, {
         bindingId,
         expectedRevision: starting.binding.revision,
         state: 'ready',
-        opaqueSessionRef: current.opaqueSessionRef,
+        opaqueSessionRef: session.sessionId,
         capabilities: Object.entries(negotiated.capabilities || {}).filter(([, supported]) => supported === true).map(([id]) => ({ id, support: 'supported' })),
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The session could not be resumed.'), { code: ready.error });
@@ -743,7 +752,7 @@ function createAgentRuntimeSessionRunner({
         const promptText = contextPack.text || 'Resume working on the assigned task. Re-read its current state before making changes.';
         appendRuntimeEvent({ bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${ready.binding.revision}` });
         beginTurn(bindingId, { state: 'starting' });
-        await client.prompt(current.opaqueSessionRef, promptText);
+        await client.prompt(session.sessionId, promptText);
       }
       return { ...ready, binding: bindingFor(bindingId) || ready.binding };
     } catch (error) {

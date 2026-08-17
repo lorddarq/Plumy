@@ -261,6 +261,34 @@ test('Claude stream-json events become runner-compatible turn notifications', as
   client.close();
 });
 
+test('Claude receives the Omvra MCP endpoint through native mcp-config', async () => {
+  const launches = [];
+  const client = createNativeRuntimeClient({ integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude' }, {
+    workspacePath: '/tmp/workspace', mcpEndpoint: 'http://127.0.0.1:3456/mcp',
+    spawnProcess: (command, args, options) => { launches.push({ command, args, options }); return createChild(() => {}); },
+  });
+  await client.startSession({ sessionId: '00000000-0000-4000-8000-000000000001' });
+  const configIndex = launches[0].args.indexOf('--mcp-config');
+  assert.ok(configIndex >= 0);
+  assert.deepEqual(JSON.parse(launches[0].args[configIndex + 1]), { mcpServers: { omvra: { type: 'http', url: 'http://127.0.0.1:3456/mcp' } } });
+  client.close();
+});
+
+test('Claude recovery replaces the persisted provider session instead of resuming stale history', async () => {
+  const launches = [];
+  const client = createNativeRuntimeClient({ integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude' }, {
+    workspacePath: '/tmp/workspace', spawnProcess: (command, args, options) => {
+      launches.push({ command, args, options });
+      return createChild(() => {});
+    },
+  });
+  const recovered = await client.resumeSession('00000000-0000-4000-8000-000000000001');
+  assert.match(recovered.sessionId, /^[0-9a-f-]{36}$/i);
+  assert.equal(launches[0].args.includes('--resume'), false);
+  assert.equal(launches[0].args.includes('--session-id'), true);
+  client.close();
+});
+
 test('transport rejects malformed runtime messages and bounds pending requests', async () => {
   const child = createChild(() => {});
   const transport = new JsonLineTransport('/usr/bin/fixture', [], {

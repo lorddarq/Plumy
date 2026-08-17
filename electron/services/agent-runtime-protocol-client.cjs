@@ -464,19 +464,20 @@ class ClaudeStreamJsonClient {
       throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session ID must be a UUID.');
     }
     const selectedModel = requestedModel(this.profile, model);
-    const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId, ...(selectedModel ? ['--model', selectedModel] : [])];
+    const mcpConfig = this.options.mcpEndpoint
+      ? JSON.stringify({ mcpServers: { omvra: { type: 'http', url: this.options.mcpEndpoint } } })
+      : null;
+    const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId, ...(selectedModel ? ['--model', selectedModel] : []), ...(mcpConfig ? ['--mcp-config', mcpConfig] : [])];
     this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath, messageMapper: message => this.#mapStreamMessage(message) }));
     return Promise.resolve({ sessionId: this.sessionId });
   }
 
   resumeSession(sessionId) {
-    this.sessionId = validateSessionRef(sessionId);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(this.sessionId)) {
-      throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session ID must be a UUID.');
-    }
-    const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--resume', this.sessionId];
-    this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath, messageMapper: message => this.#mapStreamMessage(message) }));
-    return Promise.resolve({ sessionId: this.sessionId });
+    validateSessionRef(sessionId);
+    // Claude snapshots MCP tools into the provider conversation. Reusing the
+    // persisted ID can therefore resurrect stale tool history, so recovery
+    // starts a fresh provider session and receives the current task context.
+    return this.startSession({ sessionId: randomUUID() });
   }
 
   onNotification(listener) {
