@@ -213,6 +213,18 @@ test('Claude client launches the exact native stream-json contract and writes ra
   await client.closeSession();
 });
 
+test('Claude accepts lifecycle subscriptions before the stdio session is started', async () => {
+  const client = createNativeRuntimeClient({ integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude' }, {
+    workspacePath: '/tmp/workspace', spawnProcess: () => createChild(() => {}),
+  });
+  const lifecycle = [];
+  client.onLifecycle(event => lifecycle.push(event));
+  client.onNotification(() => {});
+  const session = await client.startSession({ sessionId: '00000000-0000-4000-8000-000000000001' });
+  assert.equal(session.sessionId, '00000000-0000-4000-8000-000000000001');
+  client.close();
+});
+
 test('Claude passes a per-profile model preference through native stream-json startup', async () => {
   const launches = [];
   const client = createNativeRuntimeClient({ integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude', modelPreference: 'claude-sonnet' }, {

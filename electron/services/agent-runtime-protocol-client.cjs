@@ -422,6 +422,14 @@ class ClaudeStreamJsonClient {
     this.workspacePath = validateWorkspacePath(options.workspacePath);
     this.sessionId = null;
     this.transport = null;
+    this.notificationListeners = new Set();
+    this.lifecycleListeners = new Set();
+  }
+
+  #attachTransport(transport) {
+    this.transport = transport;
+    for (const listener of this.notificationListeners) transport.onNotification(listener);
+    for (const listener of this.lifecycleListeners) transport.onLifecycle(listener);
   }
 
   initialize() {
@@ -438,7 +446,7 @@ class ClaudeStreamJsonClient {
     }
     const selectedModel = requestedModel(this.profile, model);
     const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId, ...(selectedModel ? ['--model', selectedModel] : [])];
-    this.transport = new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath });
+    this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath }));
     return Promise.resolve({ sessionId: this.sessionId });
   }
 
@@ -448,18 +456,20 @@ class ClaudeStreamJsonClient {
       throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session ID must be a UUID.');
     }
     const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--resume', this.sessionId];
-    this.transport = new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath });
+    this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath }));
     return Promise.resolve({ sessionId: this.sessionId });
   }
 
   onNotification(listener) {
-    if (!this.transport) throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session has not started.');
-    return this.transport.onNotification(listener);
+    this.notificationListeners.add(listener);
+    if (this.transport) this.transport.onNotification(listener);
+    return () => this.notificationListeners.delete(listener);
   }
 
   onLifecycle(listener) {
-    if (!this.transport) throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session has not started.');
-    return this.transport.onLifecycle(listener);
+    this.lifecycleListeners.add(listener);
+    if (this.transport) this.transport.onLifecycle(listener);
+    return () => this.lifecycleListeners.delete(listener);
   }
 
   isAlive() { return Boolean(this.transport && !this.transport.closed); }
