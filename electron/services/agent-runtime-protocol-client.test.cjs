@@ -240,6 +240,27 @@ test('Claude passes a per-profile model preference through native stream-json st
   client.close();
 });
 
+test('Claude stream-json events become runner-compatible turn notifications', async () => {
+  const notifications = [];
+  const child = createChild((message, currentChild) => {
+    if (message.type === 'user') {
+      currentChild.stdout.write(`${JSON.stringify({ type: 'system', subtype: 'init' })}\n`);
+      currentChild.stdout.write(`${JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Working' }] } })}\n`);
+      currentChild.stdout.write(`${JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'Done' })}\n`);
+    }
+  });
+  const client = createNativeRuntimeClient({ integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude' }, {
+    workspacePath: '/tmp/workspace', spawnProcess: () => child,
+  });
+  client.onNotification(message => notifications.push(message));
+  const session = await client.startSession({ sessionId: '00000000-0000-4000-8000-000000000001' });
+  await client.prompt(session.sessionId, 'Start');
+  assert.deepEqual(notifications.map(message => message.method), ['turn/started', 'item/agentMessage/delta', 'turn/completed']);
+  assert.equal(notifications[1].params.delta, 'Working');
+  assert.equal(notifications[2].params.status, 'completed');
+  client.close();
+});
+
 test('transport rejects malformed runtime messages and bounds pending requests', async () => {
   const child = createChild(() => {});
   const transport = new JsonLineTransport('/usr/bin/fixture', [], {

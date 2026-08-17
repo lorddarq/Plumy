@@ -73,6 +73,7 @@ class JsonLineTransport {
     this.stderr = '';
     this.closed = false;
     this.jsonRpc = options.jsonRpc === true;
+    this.messageMapper = typeof options.messageMapper === 'function' ? options.messageMapper : null;
     this.logger = options.logger || null;
     this.lifecycleListeners = new Set();
     const spawnProcess = options.spawnProcess || spawn;
@@ -179,8 +180,11 @@ class JsonLineTransport {
         this.#fail(runtimeError('ACP_PROTOCOL_INCOMPATIBLE', 'Runtime emitted malformed JSON.'));
         return;
       }
-      if (typeof message.method === 'string') {
-        for (const listener of this.listeners) listener(message);
+      const notification = typeof message.method === 'string'
+        ? message
+        : this.messageMapper?.(message);
+      if (notification && typeof notification.method === 'string') {
+        for (const listener of this.listeners) listener(notification);
       } else if (Object.prototype.hasOwnProperty.call(message, 'id') && this.pending.has(message.id)) {
         const pending = this.pending.get(message.id);
         this.pending.delete(message.id);
@@ -432,6 +436,21 @@ class ClaudeStreamJsonClient {
     for (const listener of this.lifecycleListeners) transport.onLifecycle(listener);
   }
 
+  #mapStreamMessage(message) {
+    if (!message || typeof message.type !== 'string') return null;
+    if (message.type === 'system') return { method: 'turn/started', params: { state: 'active', subtype: message.subtype || null } };
+    if (message.type === 'assistant') {
+      const blocks = Array.isArray(message.message?.content) ? message.message.content : [];
+      const text = blocks.filter(block => block?.type === 'text').map(block => block.text).filter(Boolean).join('');
+      return { method: 'item/agentMessage/delta', params: { state: 'active', ...(text ? { delta: text } : {}) } };
+    }
+    if (message.type === 'result') {
+      const failed = message.is_error === true || message.subtype === 'error';
+      return { method: 'turn/completed', params: { status: failed ? 'failed' : 'completed', ...(failed && message.result ? { error: message.result } : {}) } };
+    }
+    return { method: `claude/${message.type}`, params: { state: 'active' } };
+  }
+
   initialize() {
     return Promise.resolve({
       implementationName: 'Claude Code', adapterVersion: null, authentication: 'unknown',
@@ -446,7 +465,7 @@ class ClaudeStreamJsonClient {
     }
     const selectedModel = requestedModel(this.profile, model);
     const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId, ...(selectedModel ? ['--model', selectedModel] : [])];
-    this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath }));
+    this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath, messageMapper: message => this.#mapStreamMessage(message) }));
     return Promise.resolve({ sessionId: this.sessionId });
   }
 
@@ -456,7 +475,7 @@ class ClaudeStreamJsonClient {
       throw runtimeError('ACP_SESSION_NOT_FOUND', 'Claude session ID must be a UUID.');
     }
     const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--resume', this.sessionId];
-    this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath }));
+    this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath, messageMapper: message => this.#mapStreamMessage(message) }));
     return Promise.resolve({ sessionId: this.sessionId });
   }
 
