@@ -188,6 +188,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     preferencesRef: persistence.preferencesRef,
     goalPolicyRef: persistence.goalPolicyRef,
     pendingCanonicalWritesRef: persistence.pendingCanonicalWritesRef,
+    suppressNextPersistRef: persistence.suppressNextPersistRef,
   });
 
   const actions = useWorkspaceActions({

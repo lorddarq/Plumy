@@ -45,6 +45,19 @@ export function useWorkspacePersistence(state: WorkspacePersistenceState) {
   const pendingCanonicalWritesRef = useRef<Record<string, number>>({});
   const pendingWorkspaceWritesRef = useRef<Record<string, unknown>>({});
   const pendingWorkspaceFlushRef = useRef<Promise<void> | null>(null);
+  // Set by useCanonicalWorkspaceHydration right before it applies a genuinely
+  // new externally-synced value. Consumed (and cleared) once by the matching
+  // persistence effect below so an incoming external sync (e.g. an MCP write)
+  // is never echoed straight back to storage, which would otherwise raise
+  // pendingCanonicalWritesRef and drop a second external sync that lands
+  // while that pointless echo write is still in flight.
+  const suppressNextPersistRef = useRef<Record<string, boolean>>({});
+
+  const shouldSkipPersist = useCallback((key: string) => {
+    if (!suppressNextPersistRef.current[key]) return false;
+    suppressNextPersistRef.current[key] = false;
+    return true;
+  }, []);
 
   const persistWorkspaceJSON = useCallback((key: string, value: unknown) => {
     if (!(key in pendingWorkspaceWritesRef.current)) {
@@ -79,33 +92,33 @@ export function useWorkspacePersistence(state: WorkspacePersistenceState) {
   useEffect(() => { goalPolicyRef.current = goalPolicy; }, [goalPolicy]);
 
   useEffect(() => {
-    if (!hasHydratedCanonicalWorkspace) return;
+    if (!hasHydratedCanonicalWorkspace || shouldSkipPersist(TASKS_KEY)) return;
     persistWorkspaceJSON(TASKS_KEY, tasks);
-  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, tasks]);
+  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, shouldSkipPersist, tasks]);
   useEffect(() => {
-    if (!hasHydratedCanonicalWorkspace) return;
+    if (!hasHydratedCanonicalWorkspace || shouldSkipPersist(SWIMLANES_KEY)) return;
     persistWorkspaceJSON(SWIMLANES_KEY, timelineSwimlanes);
-  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, timelineSwimlanes]);
+  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, shouldSkipPersist, timelineSwimlanes]);
   useEffect(() => {
-    if (!hasHydratedCanonicalWorkspace) return;
+    if (!hasHydratedCanonicalWorkspace || shouldSkipPersist(PEOPLE_KEY)) return;
     persistWorkspaceJSON(PEOPLE_KEY, people);
-  }, [hasHydratedCanonicalWorkspace, people, persistWorkspaceJSON]);
+  }, [hasHydratedCanonicalWorkspace, people, persistWorkspaceJSON, shouldSkipPersist]);
   useEffect(() => {
-    if (!hasHydratedCanonicalWorkspace) return;
+    if (!hasHydratedCanonicalWorkspace || shouldSkipPersist(MILESTONES_KEY)) return;
     persistWorkspaceJSON(MILESTONES_KEY, milestones);
-  }, [hasHydratedCanonicalWorkspace, milestones, persistWorkspaceJSON]);
+  }, [hasHydratedCanonicalWorkspace, milestones, persistWorkspaceJSON, shouldSkipPersist]);
   useEffect(() => {
-    if (!hasHydratedCanonicalWorkspace) return;
+    if (!hasHydratedCanonicalWorkspace || shouldSkipPersist(STATUS_COLUMNS_KEY)) return;
     persistWorkspaceJSON(STATUS_COLUMNS_KEY, statusColumns);
-  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, statusColumns]);
+  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, shouldSkipPersist, statusColumns]);
   useEffect(() => {
-    if (!hasHydratedCanonicalWorkspace) return;
+    if (!hasHydratedCanonicalWorkspace || shouldSkipPersist(PREFERENCES_KEY)) return;
     persistWorkspaceJSON(PREFERENCES_KEY, preferences);
-  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, preferences]);
+  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, preferences, shouldSkipPersist]);
   useEffect(() => {
-    if (!hasHydratedCanonicalWorkspace) return;
+    if (!hasHydratedCanonicalWorkspace || shouldSkipPersist(GOAL_POLICY_KEY)) return;
     persistWorkspaceJSON(GOAL_POLICY_KEY, goalPolicy);
-  }, [goalPolicy, hasHydratedCanonicalWorkspace, persistWorkspaceJSON]);
+  }, [goalPolicy, hasHydratedCanonicalWorkspace, persistWorkspaceJSON, shouldSkipPersist]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
     if (!goalPolicyImpactInitializedRef.current) {
@@ -129,5 +142,6 @@ export function useWorkspacePersistence(state: WorkspacePersistenceState) {
     preferencesRef,
     goalPolicyRef,
     pendingCanonicalWritesRef,
+    suppressNextPersistRef,
   };
 }

@@ -126,7 +126,6 @@ export class McpClient {
     return {} as T;
   }
 
-  // TODO(phase-2): add authenticated write-call pathways when token-based auth lands.
   private async rpcCall<T>(method: string, params?: unknown): Promise<T> {
     if (!this.config.enabled) {
       throw new McpClientDisabledError();

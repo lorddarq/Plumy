@@ -108,7 +108,7 @@ function setStoreEntries(store, entries) {
 }
 
 function normalizeString(value) {
-  return typeof value === 'string' ? value.trim() : '';
+  return typeof value === 'string' ? value : '';
 }
 
 function normalizeTaskIdList(value) {
@@ -1156,16 +1156,19 @@ function updateGoalArtifactReferences(store, {
 function getWorkspaceSnapshot(store) {
   // TODO(next-phase): unify storage source of truth. The renderer currently persists
   // most workspace state in localStorage; MCP should read from a canonical backend store.
-  const storedSnapshot = store?.store;
-  const snapshotStore = storedSnapshot && typeof storedSnapshot === 'object'
-    ? { get: key => storedSnapshot[key], set: (key, value) => store.set(key, value) }
-    : store;
-  const tasks = readArray(snapshotStore, TASKS_KEY).map(normalizeTaskForMcp);
-  const milestones = listMilestones(snapshotStore);
-  const people = readArray(snapshotStore, PEOPLE_KEY).map(normalizePersonForMcp);
-  const projects = readArray(snapshotStore, SWIMLANES_KEY).map(normalizeProjectForMcp);
-  const statusColumns = readArray(snapshotStore, STATUS_COLUMNS_KEY).map(normalizeStatusColumnForMcp);
-  const goals = listGoals(snapshotStore);
+  //
+  // store.get(key) already resolves dot-notation keys correctly (electron-store
+  // nests 'omvra.tasks.v1' as store.store.omvra.tasks.v1). A prior version of
+  // this function took a `store.store` snapshot and indexed it with the flat
+  // dotted key string (storedSnapshot['omvra.tasks.v1']), which only ever
+  // matched a flat-keyed test double -- against the real nested store it
+  // silently returned undefined for every field, producing an empty snapshot.
+  const tasks = readArray(store, TASKS_KEY).map(normalizeTaskForMcp);
+  const milestones = listMilestones(store);
+  const people = readArray(store, PEOPLE_KEY).map(normalizePersonForMcp);
+  const projects = readArray(store, SWIMLANES_KEY).map(normalizeProjectForMcp);
+  const statusColumns = readArray(store, STATUS_COLUMNS_KEY).map(normalizeStatusColumnForMcp);
+  const goals = listGoals(store);
 
   return {
     schemaVersion: '1',
@@ -1184,7 +1187,7 @@ function getWorkspaceSnapshot(store) {
     },
     meta: {
       source: 'electron-store',
-      mcpAgentAccessEnabled: isMcpAgentAccessEnabled(snapshotStore),
+      mcpAgentAccessEnabled: isMcpAgentAccessEnabled(store),
       fieldSemantics: buildAgentInstructionsFieldSemantics(),
       counts: {
         tasks: tasks.length,
@@ -1196,10 +1199,6 @@ function getWorkspaceSnapshot(store) {
       },
     },
   };
-}
-
-function normalizeString(value) {
-  return typeof value === 'string' ? value : '';
 }
 
 function listKanbanCards(store, filters = {}) {

@@ -503,9 +503,6 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
           status: task.status,
         }));
     },
-
-
-    // TODO(phase-2): expose write operations once auth scopes and audit log are implemented.
   };
 }
 

@@ -151,22 +151,41 @@ test('workspace snapshot contract has expected keys and stable counts', () => {
   assert.equal(snapshot.meta.counts.statusColumns, snapshot.workspace.statusColumns.length);
 });
 
-test('workspace snapshot reads a production store snapshot once', () => {
-  const source = makeStoreFromFixture('workspace-basic');
-  let snapshotReads = 0;
-  const store = {
-    get: key => source.get(key),
-    set: (key, value) => source.set(key, value),
-    get store() {
-      snapshotReads += 1;
-      return Object.fromEntries(source.map);
-    },
-  };
+// getWorkspaceSnapshot previously took a `store.store` snapshot and indexed
+// it with flat dotted-key strings (storedSnapshot['omvra.tasks.v1']). That
+// worked only against a flat-keyed test double whose own `.store` getter
+// happened to return a flat object -- the fixture-backed MemoryStore used
+// throughout this file's other tests does not even expose a `.store`
+// getter, so none of those tests exercised the buggy branch either. Real
+// electron-store nests dotted keys (`store.store` is `{omvra:{tasks:{v1:
+// [...]}}}`), so the flat lookup silently returned undefined for every
+// field, producing an empty snapshot in production (the empty Diagnostics
+// panel this test now guards against). getWorkspaceSnapshot now always
+// calls store.get(key) directly, which resolves dot-notation correctly for
+// both electron-store and the MemoryStore test double.
+test('workspace snapshot reads correctly from a real (nested) electron-store instance', () => {
+  const Store = require('electron-store');
+  const os = require('os');
+  const store = new Store({ name: `workspace-snapshot-test-${Date.now()}-${Math.random().toString(36).slice(2)}`, cwd: os.tmpdir() });
+  try {
+    store.set(TASKS_KEY, [{ id: 'task-1', title: 'Real electron-store task', status: 'open' }]);
+    store.set('omvra.people.v1', [{ id: 'person-1', name: 'Ada', kind: 'human' }]);
+    store.set('omvra.swimlanes.v1', [{ id: 'lane-1', name: 'Lane One' }]);
+    store.set(STATUS_COLUMNS_KEY, [{ id: 'open', title: 'Open' }]);
 
-  const snapshot = getWorkspaceSnapshot(store);
+    // Sanity check: confirm this store really does nest, so this test would
+    // have failed against the old flat-key implementation.
+    assert.deepEqual(Object.keys(store.store), ['omvra']);
 
-  assert.ok(snapshot.workspace.tasks.length >= 0);
-  assert.equal(snapshotReads, 1);
+    const snapshot = getWorkspaceSnapshot(store);
+    assert.equal(snapshot.workspace.tasks.length, 1, 'tasks must be read from the real nested store, not silently empty');
+    assert.equal(snapshot.workspace.tasks[0].title, 'Real electron-store task');
+    assert.equal(snapshot.workspace.people.length, 1);
+    assert.equal(snapshot.workspace.projects.length, 1);
+    assert.equal(snapshot.workspace.statusColumns.length, 1);
+  } finally {
+    store.clear();
+  }
 });
 
 test('kanban and timeline card projections include board and swimlane descriptions', () => {
@@ -1117,4 +1136,14 @@ test('Goal agent dispatch read model preserves canonical, ephemeral, and unavail
   assert.equal(agents[1].agentDispatch.profileSource, 'none');
   assert.equal(agents[2].agentDispatch.status, 'unavailable');
   assert.equal(agents[2].agentDispatch.recruitmentFallback, 'overseer-managed-temporary-agent');
+});
+
+test('workspace-service declares each shared normalization helper exactly once', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'workspace-service.cjs'), 'utf8');
+  const normalizeStringDeclarations = source.match(/function normalizeString\(/g) || [];
+  assert.equal(
+    normalizeStringDeclarations.length,
+    1,
+    'a second normalizeString declaration would silently override the first via function hoisting'
+  );
 });

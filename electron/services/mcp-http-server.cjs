@@ -574,8 +574,6 @@ function startMcpHttpServer(store, { logger = console, onStatusChange, skillsRoo
       lastStartedAt: new Date().toISOString(),
       restartRequired: false,
     });
-    // TODO(next-phase): add client authentication and session binding before exposing beyond local development.
-    // TODO(next-phase): enable write tools only after safe-write implementation is complete.
   });
 
   return server;

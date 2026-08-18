@@ -26,6 +26,7 @@ const { createAgentRuntimeSessionRunner } = require('./services/agent-runtime-se
 const { readDefaults: readAgentRuntimeDefaults, resolveProfile: resolveAgentRuntimeProfile } = require('./domain/agent-runtime-profile-service.cjs');
 const { registerTaskContextIpcHandlers } = require('./ipc/task-context.cjs');
 const { captureMeaningfulTaskCheckpoints } = require('./domain/task-context-checkpoint-service.cjs');
+const { getAtPath, diffStoreSnapshots, leafPathsOf } = require('./domain/store-diff.cjs');
 const { startMcpHttpServer, waitForMcpHttpServerReady } = require('./services/mcp-http-server.cjs');
 const { getMcpServerConfig, getMcpCapabilityProfile } = require('./services/workspace-service.cjs');
 const {
@@ -56,6 +57,9 @@ const {
   prepareAgentRuntimeSessionArchive,
   reconcileInterruptedAgentRuntimeSessions,
   updateAgentRuntimeSessionBinding,
+  transitionTaskContribution,
+  moveTaskToStatus,
+  getTaskById,
 } = require('./services/workspace-service.cjs');
 const { recordGoalPolicyChangeImpact } = require('./services/goal-policy.cjs');
 const { createGoalLifecycleService } = require('./services/goal-lifecycle-service.cjs');
@@ -85,8 +89,8 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   store,
   resolveProfile: resolveAgentRuntimeProfile,
   confirmStart: (runtimeStore, payload) => confirmAgentExecutionStart(runtimeStore, payload),
-  transitionContribution: (runtimeStore, payload) => require('./services/workspace-service.cjs').transitionTaskContribution(runtimeStore, payload),
-  moveTaskToStatus: (runtimeStore, payload) => require('./services/workspace-service.cjs').moveTaskToStatus(runtimeStore, payload),
+  transitionContribution: (runtimeStore, payload) => transitionTaskContribution(runtimeStore, payload),
+  moveTaskToStatus: (runtimeStore, payload) => moveTaskToStatus(runtimeStore, payload),
   finalizeTaskAttempt: (runtimeStore, payload) => finalizeAgentRuntimeAttempt(runtimeStore, payload),
   createBinding: (runtimeStore, payload) => createAgentRuntimeSessionBinding(runtimeStore, payload),
   updateBinding: (runtimeStore, payload) => updateAgentRuntimeSessionBinding(runtimeStore, payload),
@@ -94,7 +98,7 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   emitRuntimeEvent: (payload) => broadcastAgentRuntimeEvent(payload),
   updateTaskExecutionState: (runtimeStore, payload) => updateAgentRuntimeTaskExecution(runtimeStore, payload),
   listSessions: (runtimeStore, payload) => listAgentRuntimeSessions(runtimeStore, payload),
-  getTaskById: (runtimeStore, taskId) => require('./services/workspace-service.cjs').getTaskById(runtimeStore, taskId),
+  getTaskById: (runtimeStore, taskId) => getTaskById(runtimeStore, taskId),
   listTaskContext: (runtimeStore, payload) => listTaskContextEntries(runtimeStore, payload),
   getTaskContextEntry: (runtimeStore, payload) => getTaskContextEntry(runtimeStore, payload),
   ensureMcpReady: () => ensureMcpServerReady(),
@@ -507,23 +511,28 @@ app.whenReady().then(() => {
     pendingRendererStoreMutationKeys.clear();
     const changedKeys = hintedRendererKeys.size > 0
       ? hintedRendererKeys
-      : new Set([...Object.keys(nextStore || {}), ...Object.keys(previousStore || {})].filter(key => {
-        if (Object.is(nextStore?.[key], previousStore?.[key])) return false;
-        return !isDeepStrictEqual(nextStore?.[key], previousStore?.[key]);
-      }));
+      : diffStoreSnapshots(previousStore, nextStore, isDeepStrictEqual);
     if (changedKeys.has(TASKS_KEY)) {
       try {
         captureMeaningfulTaskCheckpoints(store, {
-          previousTasks: previousStore?.[TASKS_KEY],
-          nextTasks: nextStore?.[TASKS_KEY],
+          previousTasks: getAtPath(previousStore, TASKS_KEY),
+          nextTasks: getAtPath(nextStore, TASKS_KEY),
           appendTaskContextEntry,
         });
       } catch (error) {
         console.error('[task-context] checkpoint capture failed:', error?.message || error);
       }
     }
-    const runtimeOnlyChange = [...changedKeys].length > 0
-      && [...changedKeys].every(key => AGENT_RUNTIME_STORE_KEYS.has(key));
+    // leafPathsOf is used only to decide runtimeOnlyChange: broadcasting
+    // wants the full ancestor-inclusive set (so a canonical key like
+    // 'omvra.preferences.v1' is present even when only one field inside it
+    // changed) and lets each renderer listener's own exact-match filter pick
+    // out what it cares about; runtimeOnlyChange instead wants the most
+    // specific changed paths so an unrelated ancestor like bare 'omvra'
+    // doesn't make every actual change look ineligible for suppression.
+    const leafChangedKeys = leafPathsOf(changedKeys);
+    const runtimeOnlyChange = leafChangedKeys.length > 0
+      && leafChangedKeys.every(key => AGENT_RUNTIME_STORE_KEYS.has(key));
     if (!runtimeOnlyChange) broadcastStoreDidChange([...changedKeys]);
     if (changedKeys.has(PREFERENCES_KEY)) syncUpdateChannelFromStore();
   });
