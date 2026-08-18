@@ -12,6 +12,7 @@ import {
   ContextMenuItem,
 } from './ui/context-menu';
 import { TaskSessionComposer } from './TaskSessionComposer';
+import { RuntimePermissionCard, requestValueKey, type RuntimePermissionField, type RuntimePermissionRequest } from './RuntimePermissionCard';
 import { ExecutionNotice } from './ExecutionNotice';
 import { AgentLoadingState } from './AgentLoadingState';
 import { StateBadge } from './statuses/AppStatusBar';
@@ -63,22 +64,9 @@ interface SessionEvent extends AgentRuntimeActivityEvent {
   workScope?: string;
 }
 
-interface PendingRuntimeRequest {
-  bindingId: string;
-  turnId?: string;
-  requestId: string | number;
-  method: string;
-  responseKind?: 'elicitation' | 'codex-approval';
-  serverName: string;
-  mode: string;
-  message: string;
-  fields: Array<{ name: string; type: string; title: string; description: string; required: boolean; defaultValue?: unknown; options?: unknown[] }>;
-}
-
-const requestValueKey = (request: PendingRuntimeRequest, fieldName: string) => `${String(request.requestId)}:${fieldName}`;
-const requestFieldValue = (request: PendingRuntimeRequest, field: PendingRuntimeRequest['fields'][number], values: Record<string, unknown>) =>
+const requestFieldValue = (request: RuntimePermissionRequest, field: RuntimePermissionField, values: Record<string, unknown>) =>
   values[requestValueKey(request, field.name)] ?? field.defaultValue ?? (field.type === 'boolean' ? false : '');
-const requestFieldIsMissing = (request: PendingRuntimeRequest, field: PendingRuntimeRequest['fields'][number], values: Record<string, unknown>) => {
+const requestFieldIsMissing = (request: RuntimePermissionRequest, field: RuntimePermissionField, values: Record<string, unknown>) => {
   if (!field.required) return false;
   const value = requestFieldValue(request, field, values);
   if (field.type === 'boolean') return typeof value !== 'boolean';
@@ -143,7 +131,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const [error, setError] = useState<string | null>(null);
   const [binding, setBinding] = useState<SessionBinding | null>(null);
   const [events, setEvents] = useState<SessionEvent[]>([]);
-  const [pendingRequests, setPendingRequests] = useState<PendingRuntimeRequest[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<RuntimePermissionRequest[]>([]);
   const [requestValues, setRequestValues] = useState<Record<string, unknown>>({});
   const [mcpReadOnly, setMcpReadOnly] = useState<boolean | null>(null);
   const [, setHasMoreEvents] = useState(false);
@@ -482,7 +470,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     }
   };
 
-  const respondToRequest = async (request: PendingRuntimeRequest, action: 'accept' | 'decline') => {
+  const respondToRequest = async (request: RuntimePermissionRequest, action: 'accept' | 'decline') => {
     if (!binding || requestBusy) return;
     setRequestBusy(true);
     setError(null);
@@ -679,7 +667,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                 </div>
                 <div className="mt-3 flex items-center justify-between"><div className="text-xs font-semibold text-slate-700">Agent activity</div>{isTurnActive ? <AgentLoadingState label="Thinking through the task" variant="Dots" /> : <div className="text-[11px] text-slate-400">Task progress only</div>}</div>
                 <div className="mt-2 min-h-24 flex-1 space-y-1 overflow-auto rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600" aria-live="polite">
-                  {agentOutput && <div className="mb-2 rounded-lg border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                  {agentOutput && pendingRequests.length === 0 && <div className="animate-in fade-in-0 mb-2 rounded-lg border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] duration-200">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Agent output</div>
                       <div className="text-[10px] text-slate-400">{isTurnActive ? 'Streaming' : 'Latest response'}</div>
@@ -697,25 +685,14 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                   </div>) : <div className="px-1.5 py-1">The agent has not started work yet.</div>}
                 </div>
                 <div className="mt-3">
-                  {!terminalBinding && pendingRequests.length > 0 ? <div className="space-y-2">{pendingRequests.map(request => {
-                    const missingRequired = request.fields.some(field => requestFieldIsMissing(request, field, requestValues));
-                    return <ExecutionNotice key={`${request.method}-${request.requestId}`} tone="warning" title={getAttentionState('needs-input').label} nextStep={getAttentionState('needs-input').nextStep} assertive>
-                      <div>{request.message}</div>
-                      {request.serverName && <div className="mt-1 text-[11px] text-amber-700">Requested by {request.serverName}</div>}
-                      {request.fields.length > 0 && <div className="mt-3 space-y-2">{request.fields.map(field => {
-                        const key = requestValueKey(request, field.name);
-                        const value = requestFieldValue(request, field, requestValues);
-                        return <label key={field.name} className="block text-xs text-slate-700"><span className="font-medium">{field.title}{field.required ? ' *' : ''}</span>{field.description && <span className="ml-1 text-slate-500">{field.description}</span>}
-                          {field.type === 'boolean'
-                            ? <input type="checkbox" checked={Boolean(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.checked }))} className="ml-2 align-middle" />
-                            : field.options?.length
-                              ? <select value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5"><option value="">Select…</option>{field.options.map(option => <option key={String(option)} value={String(option)}>{String(option)}</option>)}</select>
-                              : <input type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'} value={String(value)} onChange={event => setRequestValues(current => ({ ...current, [key]: event.target.value }))} className="mt-1 block w-full rounded border border-amber-200 bg-white px-2 py-1.5" />}
-                        </label>;
-                      })}</div>}
-                      <div className="mt-3 flex flex-wrap justify-end gap-2"><button type="button" onClick={() => void respondToRequest(request, 'decline')} disabled={requestBusy} className="rounded border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-40">Decline</button><button type="button" onClick={() => void respondToRequest(request, 'accept')} disabled={requestBusy || missingRequired} className="rounded bg-amber-900 px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40">{request.responseKind === 'codex-approval' ? 'Allow' : 'Continue'}</button></div>
-                    </ExecutionNotice>;
-                  })}</div> : <TaskSessionComposer
+                  {!terminalBinding && pendingRequests.length > 0 ? <RuntimePermissionCard
+                    requests={pendingRequests}
+                    busy={requestBusy}
+                    getValue={(request, field) => requestFieldValue(request, field, requestValues)}
+                    isMissing={(request, field) => requestFieldIsMissing(request, field, requestValues)}
+                    onValueChange={(request, field, value) => setRequestValues(current => ({ ...current, [requestValueKey(request, field.name)]: value }))}
+                    onRespond={(request, action) => void respondToRequest(request, action)}
+                  /> : <TaskSessionComposer
                     value={steerText}
                     running={isTurnActive}
                     busy={operationBusy}
