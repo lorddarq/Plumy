@@ -42,6 +42,12 @@ test('runtime profiles validate executable paths, schemes, and credential-like a
   assert.equal(saveProfile(store, {
     id: 'claude', name: 'Claude', integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude', enabled: true,
   }).integrationMode, 'claude-stream-json-stdio');
+  assert.equal(saveProfile(store, {
+    id: 'claude-permissions', name: 'Claude', integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude', permissionMode: 'dontAsk', enabled: true,
+  }).permissionMode, 'dontAsk');
+  assert.throws(() => saveProfile(store, {
+    id: 'acp-permissions', name: 'ACP', integrationMode: 'acp-local-stdio', executablePath: '/usr/bin/agent', permissionMode: 'dontAsk', enabled: true,
+  }), /permissionMode/);
 });
 
 test('runtime resolution is deterministic and never silently falls back', () => {

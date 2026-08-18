@@ -240,6 +240,20 @@ test('Claude passes a per-profile model preference through native stream-json st
   client.close();
 });
 
+test('Claude passes its configured permission mode through native stream-json startup', async () => {
+  const launches = [];
+  const client = createNativeRuntimeClient({ integrationMode: 'claude-stream-json-stdio', executablePath: '/usr/bin/claude', permissionMode: 'dontAsk' }, {
+    workspacePath: '/tmp/workspace', spawnProcess: (command, args, options) => {
+      launches.push({ command, args, options });
+      return createChild(() => {});
+    },
+  });
+  await client.startSession({ sessionId: '00000000-0000-4000-8000-000000000001' });
+  const modeIndex = launches[0].args.indexOf('--permission-mode');
+  assert.equal(launches[0].args[modeIndex + 1], 'dontAsk');
+  client.close();
+});
+
 test('Claude stream-json events become runner-compatible turn notifications', async () => {
   const notifications = [];
   const child = createChild((message, currentChild) => {

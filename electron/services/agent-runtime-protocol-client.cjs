@@ -475,7 +475,7 @@ class ClaudeStreamJsonClient {
     const mcpConfig = this.options.mcpEndpoint
       ? JSON.stringify({ mcpServers: { omvra: { type: 'http', url: this.options.mcpEndpoint, ...(this.options.mcpHeaders ? { headers: this.options.mcpHeaders } : {}) } } })
       : null;
-    const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId, ...(selectedModel ? ['--model', selectedModel] : []), ...(mcpConfig ? ['--mcp-config', mcpConfig] : [])];
+    const args = [...(this.profile.fixedArgs || []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--session-id', this.sessionId, ...(this.profile.permissionMode ? ['--permission-mode', this.profile.permissionMode] : []), ...(selectedModel ? ['--model', selectedModel] : []), ...(mcpConfig ? ['--mcp-config', mcpConfig] : [])];
     this.#attachTransport(new JsonLineTransport(this.profile.executablePath, args, { ...this.options, workspacePath: this.workspacePath, messageMapper: message => this.#mapStreamMessage(message) }));
     return Promise.resolve({ sessionId: this.sessionId });
   }

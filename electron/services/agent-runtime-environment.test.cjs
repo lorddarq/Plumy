@@ -16,4 +16,12 @@ test('runtime environment preserves the app environment and adds installed Node 
     filesystem: { existsSync: value => value === '/home/test/.local/bin', readdirSync: () => [] },
   });
   assert.equal(localNodeEnvironment.PATH, '/usr/bin:/bin:/home/test/.local/bin');
+  assert.equal(localNodeEnvironment.HOME, '/home/test');
+
+  const packagedEnvironment = buildRuntimeEnvironment({ PATH: '/usr/bin' }, {
+    homeDirectory: '/Users/tester',
+    candidatePaths: [],
+    filesystem: { existsSync: () => false, readdirSync: () => [] },
+  });
+  assert.equal(packagedEnvironment.HOME, '/Users/tester');
 });

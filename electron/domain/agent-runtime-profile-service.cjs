@@ -7,6 +7,7 @@ const HANDOFFS_STORE_KEY = 'omvra.externalAgentHandoffs.v1';
 const PROFILE_SCHEMA_VERSION = 1;
 const ALLOWED_EXTERNAL_SCHEMES = new Set(['codex', 'cursor', 'vscode', 'vscode-insiders', 'zed']);
 const CODEX_APPROVAL_POLICIES = new Set(['untrusted', 'on-request', 'never']);
+const CLAUDE_PERMISSION_MODES = new Set(['default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']);
 const SENSITIVE_ARGUMENT = /(?:^|[-_])(api[-_]?key|access[-_]?token|auth[-_]?token|token|password|secret)(?:$|[=_-])/i;
 
 function cleanString(value, field, maxLength = 512) {
@@ -53,6 +54,10 @@ function validateProfile(input, now = new Date().toISOString()) {
   if (approvalPolicy !== undefined && (integrationMode !== 'codex-app-server-stdio' || !CODEX_APPROVAL_POLICIES.has(approvalPolicy))) {
     throw new Error('approvalPolicy must be untrusted, on-request, or never for Codex app-server profiles.');
   }
+  const permissionMode = input.permissionMode;
+  if (permissionMode !== undefined && (integrationMode !== 'claude-stream-json-stdio' || !CLAUDE_PERMISSION_MODES.has(permissionMode))) {
+    throw new Error('permissionMode must be default, acceptEdits, plan, auto, dontAsk, or bypassPermissions for Claude stream-json profiles.');
+  }
   const modelPreference = input.modelPreference === undefined || input.modelPreference === null || input.modelPreference === ''
     ? undefined
     : cleanString(input.modelPreference, 'modelPreference', 256);
@@ -66,6 +71,7 @@ function validateProfile(input, now = new Date().toISOString()) {
     ...(executablePath ? { executablePath } : {}),
     fixedArgs: validateFixedArgs(input.fixedArgs),
     ...(approvalPolicy ? { approvalPolicy } : {}),
+    ...(permissionMode ? { permissionMode } : {}),
     ...(modelPreference ? { modelPreference } : {}),
     ...(externalUrlScheme ? { externalUrlScheme } : {}),
     enabled: input.enabled !== false,

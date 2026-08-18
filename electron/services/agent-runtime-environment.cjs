@@ -34,7 +34,13 @@ function buildRuntimeEnvironment(baseEnvironment = process.env, options = {}) {
   const inheritedPath = typeof baseEnvironment.PATH === 'string' ? baseEnvironment.PATH.split(path.delimiter) : [];
   const runtimePath = [...inheritedPath];
   for (const candidate of candidates) addIfDirectory(runtimePath, candidate, filesystem);
-  return { ...baseEnvironment, PATH: [...new Set(runtimePath.filter(Boolean))].join(path.delimiter) };
+  return {
+    ...baseEnvironment,
+    // GUI-launched packaged apps can omit HOME even when terminal-launched
+    // dev sessions inherit it. Claude uses HOME to resolve ~/.claude.json.
+    HOME: typeof baseEnvironment.HOME === 'string' && baseEnvironment.HOME.trim() ? baseEnvironment.HOME : homeDirectory,
+    PATH: [...new Set(runtimePath.filter(Boolean))].join(path.delimiter),
+  };
 }
 
 module.exports = { buildRuntimeEnvironment };

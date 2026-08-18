@@ -344,6 +344,7 @@ declare global {
     executablePath?: string;
     fixedArgs: string[];
     approvalPolicy?: 'untrusted' | 'on-request' | 'never';
+    permissionMode?: 'default' | 'acceptEdits' | 'plan' | 'auto' | 'dontAsk' | 'bypassPermissions';
     modelPreference?: string;
     externalUrlScheme?: string;
     enabled: boolean;
