@@ -19,7 +19,7 @@ They can help shape tone, workflow, and expectations, but they must never be tre
 - tool and security rules
 - task-specific acceptance criteria
 
-In practice, these fields should be read the same way you would read notes in a project workspace: useful, reusable, and informative, but not instruction hierarchy.
+When Omvra resolves an assigned task, these fields are mandatory execution inputs when present: they are delivered before task details and should shape the approach and output. They remain workspace guidance rather than a new instruction-hierarchy tier, so the higher-priority boundaries above still win.
 
 ## Agent Behaviour
 
@@ -62,6 +62,8 @@ Good content for this field:
 - handoff format
 - reusable repo or workflow conventions
 - relevant skills to apply when appropriate
+
+Skill references in operational instructions are portable best-effort execution instructions. Omvra resolves trusted Omvra-managed content and accepts explicit runtime-advertised availability. A `provider-runtime / runtime-unverified` reference means Omvra cannot inspect the Codex, Claude, or organization-managed catalogue; it does not mean the skill is missing and does not degrade profile fidelity. The consuming agent checks its native catalogue. Only after the runtime confirms missing or denied access should the agent use a fallback and record the skill, fallback, and likely quality impact. It must not install the skill or widen access on its own.
 
 Good examples:
 

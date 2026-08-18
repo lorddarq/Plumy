@@ -48,3 +48,21 @@ test('person context blocks missing tasks and allows the documented unassigned f
   assert.equal(unassigned.canStart, true);
   assert.equal(unassigned.error, 'TASK_UNASSIGNED');
 });
+
+test('person context preserves partial assigned persona guidance during fallback', () => {
+  const people = [{
+    id: 'agent-1',
+    kind: 'agentic',
+    name: 'Agent One',
+    agentInstructions: 'Keep the review evidence-led.',
+  }];
+  const service = makeService({ people, tasks: [{ id: 'task-1', assigneeId: 'agent-1' }] });
+
+  const result = service.resolveTaskExecutionContext({}, 'task-1');
+
+  assert.equal(result.canStart, true);
+  assert.equal(result.error, 'ASSIGNEE_CONTEXT_INCOMPLETE');
+  assert.equal(result.assignee.id, 'agent-1');
+  assert.equal(result.context.agentInstructions, 'Keep the review evidence-led.');
+  assert.equal(result.context.agentOperationalInstructions, '');
+});

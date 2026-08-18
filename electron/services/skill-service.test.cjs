@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
-const { getBundledSkillsRoot, getUserSkillsRoot, listBundledSkills, listAvailableSkills, getAvailableSkill, resolveRequiredSkills } = require('./skill-service.cjs');
+const { getBundledSkillsRoot, getUserSkillsRoot, listBundledSkills, listAvailableSkills, getAvailableSkill, resolveRequiredSkills, resolveInstructionSkills } = require('./skill-service.cjs');
 
 const skillsRoot = path.resolve(__dirname, '../../src/skills');
 
@@ -92,6 +92,58 @@ test('required skill failures are typed and block setup without installation', (
   assert.equal(failed.ok, false);
   assert.deepEqual(failed.blockingResults.map(item => item.code), ['UNTRUSTED_SKILL', 'INTEGRITY_FAILURE', 'MISSING_SKILL']);
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('persona instruction skills resolve Omvra skills and defer provider-native availability without degradation', () => {
+  const result = resolveInstructionSkills([
+    'For this task:',
+    '1. Inspect the current behavior.',
+    '2. Select skills by need:',
+    '   - Process: process-modeler, unavailable-review-skill',
+    '3. Complete the task using an allowed fallback when a skill is unavailable.',
+  ].join('\n'), { skillsRoot });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.requestedSkillIds, ['process-modeler', 'unavailable-review-skill']);
+  assert.equal(result.skills[0].skillId, 'process-modeler');
+  assert.match(result.skills[0].content, /process model/i);
+  assert.deepEqual(result.unavailable, []);
+  assert.deepEqual(result.deferred, [{
+    skillId: 'unavailable-review-skill',
+    authority: 'provider-runtime',
+    resolution: 'runtime-unverified',
+    status: 'runtime-unverified',
+    code: 'RUNTIME_SKILL_UNVERIFIED',
+    message: 'Skill "unavailable-review-skill" is not visible to Omvra. Use it if the provider runtime makes it available; otherwise use an allowed fallback and report the limitation.',
+  }]);
+  assert.equal(result.skills[0].authority, 'omvra-managed');
+  assert.equal(result.skills[0].resolution, 'resolved');
+  assert.equal(result.profileFidelity, 'full');
+  assert.equal(Object.hasOwn(result, 'install'), false);
+});
+
+test('persona instruction skills report runtime permission denial without widening access', () => {
+  const result = resolveInstructionSkills('Skills: org-review-skill', {
+    skillsRoot,
+    agentSkills: [{
+      skillId: 'org-review-skill',
+      content: '# Restricted organization skill',
+      permissionStatus: 'denied',
+    }],
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.skills, []);
+  assert.deepEqual(result.unavailable, [{
+    skillId: 'org-review-skill',
+    authority: 'runtime-advertised',
+    resolution: 'provider-permission-denied',
+    status: 'denied',
+    code: 'SKILL_PERMISSION_DENIED',
+    message: 'Skill "org-review-skill" is permission-denied. Use an allowed fallback and report the limitation in the task resolution notes.',
+  }]);
+  assert.equal(result.profileFidelity, 'degraded');
+  assert.equal(Object.hasOwn(result, 'install'), false);
 });
 
 test('malformed bundled manifests produce a typed resolver result', () => {

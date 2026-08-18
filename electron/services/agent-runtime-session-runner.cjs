@@ -19,6 +19,7 @@ function createAgentRuntimeSessionRunner({
   appendEvent,
   listSessions,
   getTaskById = null,
+  resolveTaskContext = null,
   listTaskContext = null,
   getTaskContextEntry = null,
   ensureMcpReady = null,
@@ -186,14 +187,20 @@ function createAgentRuntimeSessionRunner({
     const context = typeof listTaskContext === 'function'
       ? listTaskContext(store, { taskId: task.id, limit: 12 })
       : null;
+    const resolved = typeof resolveTaskContext === 'function'
+      ? resolveTaskContext(store, task.id)
+      : null;
+    if (resolved?.canStart === false) return failure(resolved.error, resolved.message, { executionContext: resolved });
     return buildContextPack(store, {
       taskId: task.id,
       taskRevision: Number(task.__mcpRevision || 0),
       taskTitle: task.title,
       taskDescription: task.notes,
       taskStatus: task.status,
+      taskMetadata: task,
       contributionId: binding.scope.contributionId,
       contextEntryIds: context?.ok ? (context.entries || []).map(entry => entry.id) : [],
+      executionProfile: resolved?.executionProfile,
     });
   }
 
@@ -500,8 +507,16 @@ function createAgentRuntimeSessionRunner({
     }
     const profile = profileResolution.profile;
     log('info', 'start.preflight-ready', { taskId: payload.taskId, runtimeProfileId: profile.id, integrationMode: profile.integrationMode });
+    const resolvedContext = typeof resolveTaskContext === 'function'
+      ? resolveTaskContext(store, confirmed.contractSnapshot.taskId)
+      : confirmed.context;
+    if (resolvedContext?.canStart === false) return failure(resolvedContext.error, resolvedContext.message, { preflight: confirmed, executionContext: resolvedContext });
     const contextPack = buildContextPack
-      ? buildContextPack(store, confirmed.contractSnapshot)
+      ? buildContextPack(store, {
+          ...confirmed.contractSnapshot,
+          executionProfile: resolvedContext?.executionProfile,
+          taskMetadata: resolvedContext?.task || confirmed.task,
+        })
       : { ok: true, pack: null, text: '' };
     if (!contextPack.ok) return failure(contextPack.error, contextPack.message, { preflight: confirmed });
     const mcpReadiness = await ensureOmvraMcpListener();

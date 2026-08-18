@@ -4,6 +4,8 @@ const crypto = require('crypto');
 
 const MANIFEST_NAME = 'manifest.json';
 const DEFAULT_VERSION = '0.0.0';
+const MAX_INSTRUCTION_SKILLS = 12;
+const MAX_INSTRUCTION_SKILL_BYTES = 16 * 1024;
 
 function getBundledSkillsRoot({ isPackaged = false, appPath = process.cwd(), resourcesPath = process.resourcesPath } = {}) {
   if (typeof arguments[0]?.skillsRoot === 'string' && arguments[0].skillsRoot.trim()) return path.resolve(arguments[0].skillsRoot);
@@ -160,6 +162,118 @@ function normalizeRuntimeSkills(skills = []) {
   }).filter(Boolean);
 }
 
+function extractInstructionSkillIds(value, knownSkillIds = []) {
+  const text = typeof value === 'string' ? value : '';
+  const requested = [];
+  const add = skillId => {
+    const normalized = normalizeSkillId(skillId);
+    if (normalized && !requested.includes(normalized) && requested.length < MAX_INSTRUCTION_SKILLS) requested.push(normalized);
+  };
+  const escaped = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const skillId of knownSkillIds) {
+    const normalized = normalizeSkillId(skillId);
+    if (normalized && new RegExp(`(^|[^a-zA-Z0-9])${escaped(normalized)}(?=$|[^a-zA-Z0-9])`, 'i').test(text)) add(normalized);
+  }
+  for (const match of text.matchAll(/(?:`|\$)([a-z0-9]+(?::[a-z0-9-]+)?(?:-[a-z0-9]+)*)(?:`|\b)/gi)) add(match[1]);
+
+  let skillSection = false;
+  for (const line of text.split(/\r?\n/)) {
+    if (/^\s*\d+[.)]\s+/.test(line) && !/\bskills?\b/i.test(line)) skillSection = false;
+    if (/\bskills?\b/i.test(line) && /:/.test(line)) skillSection = true;
+    if (!skillSection) continue;
+    const candidates = line.includes(':') ? line.slice(line.indexOf(':') + 1) : line;
+    for (const token of candidates.split(/[,;]/)) {
+      const match = token.trim().match(/^([a-z0-9]+(?::[a-z0-9-]+)?(?:-[a-z0-9]+)+)\b/i);
+      if (match) add(match[1]);
+    }
+  }
+  return requested;
+}
+
+function resolveInstructionSkills(instructions, options = {}) {
+  let available = [];
+  const diagnostics = [];
+  try {
+    available = listAvailableSkills(options);
+  } catch (error) {
+    diagnostics.push({ code: 'SKILL_CATALOG_UNAVAILABLE', message: error.message || String(error) });
+  }
+  const requestedSkillIds = extractInstructionSkillIds(instructions, available.map(skill => skill.skillId));
+  if (requestedSkillIds.length === 0) {
+    return { ok: true, requestedSkillIds, skills: [], unavailable: [], deferred: [], diagnostics, profileFidelity: 'full' };
+  }
+
+  const resolution = resolveRequiredSkills(requestedSkillIds.map(skillId => ({ skillId })), options);
+  diagnostics.push(...resolution.diagnostics);
+  const unavailableById = new Map(resolution.blockingResults.map(item => [item.skillId, item]));
+  const resolvedById = new Map(resolution.skills.map(item => [item.skillId, item]));
+  const runtimeSkills = normalizeRuntimeSkills(options.agentSkills || options.availableSkills);
+  const skills = [];
+  const unavailable = [];
+  const deferred = [];
+  let includedBytes = 0;
+
+  const deferToRuntime = skillId => deferred.push({
+    skillId,
+    authority: 'provider-runtime',
+    resolution: 'runtime-unverified',
+    status: 'runtime-unverified',
+    code: 'RUNTIME_SKILL_UNVERIFIED',
+    message: `Skill "${skillId}" is not visible to Omvra. Use it if the provider runtime makes it available; otherwise use an allowed fallback and report the limitation.`,
+  });
+
+  for (const skillId of requestedSkillIds) {
+    const runtimeSkill = runtimeSkills.find(skill => skill.skillId === skillId);
+    if (runtimeSkill && (runtimeSkill.permissionStatus === 'denied' || runtimeSkill.permission === 'denied' || runtimeSkill.available === false)) {
+      unavailable.push({
+        skillId,
+        authority: 'runtime-advertised',
+        resolution: 'provider-permission-denied',
+        status: 'denied',
+        code: 'SKILL_PERMISSION_DENIED',
+        message: `Skill "${skillId}" is permission-denied. Use an allowed fallback and report the limitation in the task resolution notes.`,
+      });
+      continue;
+    }
+    const blocked = unavailableById.get(skillId);
+    if (blocked) {
+      deferToRuntime(skillId);
+      continue;
+    }
+
+    const metadata = resolvedById.get(skillId);
+    const localSkill = metadata?.source === 'agent-runtime' ? runtimeSkill : getAvailableSkill(skillId, options);
+    const content = typeof localSkill?.content === 'string' ? localSkill.content : metadata?.source === 'agent-runtime' ? '' : null;
+    if (content === null) {
+      deferToRuntime(skillId);
+      continue;
+    }
+    const bytes = Buffer.byteLength(content);
+    if (bytes + includedBytes > MAX_INSTRUCTION_SKILL_BYTES) {
+      deferToRuntime(skillId);
+      continue;
+    }
+    includedBytes += bytes;
+    skills.push({
+      ...metadata,
+      authority: metadata?.source === 'agent-runtime' ? 'runtime-advertised' : 'omvra-managed',
+      resolution: metadata?.source === 'agent-runtime' ? 'runtime-available' : 'resolved',
+      status: 'available',
+      ...(content ? { content } : {}),
+    });
+  }
+
+  return {
+    ok: true,
+    requestedSkillIds,
+    skills,
+    unavailable,
+    deferred,
+    diagnostics,
+    profileFidelity: unavailable.length > 0 ? 'degraded' : 'full',
+  };
+}
+
 function resolveRequiredSkills(requirements = [], options = {}) {
   const requested = Array.isArray(requirements) ? requirements : [];
   let bundled = [];
@@ -218,4 +332,4 @@ function collectSkillRequirements(goal) {
   return sources.flatMap(value => Array.isArray(value) ? value : value ? [value] : []).filter(item => item && typeof item === 'object' && item.skillId);
 }
 
-module.exports = { getBundledSkillsRoot, getUserSkillsRoot, listBundledSkills, discoverUserSkills, listAvailableSkills, getAvailableSkill, resolveRequiredSkills, collectSkillRequirements, normalizeSkill };
+module.exports = { getBundledSkillsRoot, getUserSkillsRoot, listBundledSkills, discoverUserSkills, listAvailableSkills, getAvailableSkill, resolveRequiredSkills, resolveInstructionSkills, extractInstructionSkillIds, collectSkillRequirements, normalizeSkill };

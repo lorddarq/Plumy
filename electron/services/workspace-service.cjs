@@ -9,6 +9,7 @@ const { createTaskCollaborationService, COLLABORATION_SCHEMA_VERSION } = require
 const { createTaskCollaborationLifecycleService } = require('../domain/task-collaboration-lifecycle-service.cjs');
 const { createTaskContextLedgerService, TASK_CONTEXT_SCHEMA_VERSION } = require('../domain/task-context-ledger-service.cjs');
 const { createAgentExecutionPreflightService } = require('../domain/agent-execution-preflight-service.cjs');
+const { createAgentRuntimeContextPack } = require('../domain/agent-runtime-context-pack.cjs');
 const {
   SESSION_BINDINGS_KEY,
   SESSION_EVENTS_KEY,
@@ -18,6 +19,7 @@ const {
 const { OBSERVATIONS_STORE_KEY, resolveProfile: resolveRuntimeProfile } = require('../domain/agent-runtime-profile-service.cjs');
 const { migrateGoalRecords, normalizeAgentConfiguration, normalizeGoalInputs, normalizeGoalCapabilities, normalizeGoalProjectBindings } = require('./goal-state-service.cjs');
 const { isAgentMutationAllowed } = require('./goal-policy.cjs');
+const { resolveInstructionSkills } = require('./skill-service.cjs');
 
 const PREFERENCES_KEY = 'omvra.preferences.v1';
 const TASKS_KEY = 'omvra.tasks.v1';
@@ -1686,6 +1688,10 @@ const taskContextLedgerService = createTaskContextLedgerService({
   },
 });
 
+const taskExecutionContextPack = createAgentRuntimeContextPack({
+  getEntry: (store, payload) => taskContextLedgerService.get(store, payload),
+});
+
 const agentRuntimeSessionService = createAgentRuntimeSessionService({
   readBindings: store => store.get(SESSION_BINDINGS_KEY),
   writeBindings: (store, bindings) => store.set(SESSION_BINDINGS_KEY, bindings),
@@ -1716,11 +1722,67 @@ const {
   listAssignedWorkForAgent,
 } = personContextService;
 
-function resolveTaskExecutionContext(store, taskId) {
+function resolveTaskExecutionContext(store, taskId, options = {}) {
   const preflight = resolvePersonTaskExecutionContext(store, taskId);
   if (!preflight.task) return preflight;
   const projection = taskContextLedgerService.project(store, { taskId });
-  return projection.ok ? { ...preflight, taskContext: projection.taskContext } : preflight;
+  const taskContext = projection.ok ? projection.taskContext : null;
+  const preferences = store.get(PREFERENCES_KEY) || {};
+  const skillResolution = preflight.context
+    ? resolveInstructionSkills(preflight.context.agentOperationalInstructions, {
+        skillsRoot: options.skillsRoot || preferences.skillsRoot,
+        skillRoots: options.skillRoots || preferences.skillRoots,
+        userDataPath: options.userDataPath || options.userSkillsRoot || preferences.userDataPath,
+        agentSkills: options.agentSkills || preferences.agentSkills,
+        availableSkills: options.availableSkills || preferences.availableSkills,
+      })
+    : { ok: true, requestedSkillIds: [], skills: [], unavailable: [], deferred: [], diagnostics: [], profileFidelity: 'standard' };
+  const resolutionNotes = [];
+  if (!preflight.ok && preflight.canStart && preflight.userNotice) resolutionNotes.push(preflight.userNotice);
+  if (skillResolution.unavailable.length > 0) {
+    resolutionNotes.push(`One or more requested skills were unavailable or denied (${skillResolution.unavailable.map(item => item.skillId).join(', ')}); execution may be less than ideal.`);
+  }
+  const executionProfile = {
+    schemaVersion: 1,
+    profileFidelity: !preflight.context ? 'standard' : (!preflight.ok || skillResolution.profileFidelity === 'degraded' ? 'degraded' : 'full'),
+    assignee: preflight.assignee ? {
+      id: preflight.assignee.id,
+      name: preflight.assignee.name,
+      role: preflight.assignee.role,
+    } : null,
+    personaInstructions: preflight.context?.agentInstructions || '',
+    operationalInstructions: preflight.context?.agentOperationalInstructions || '',
+    requestedSkillIds: skillResolution.requestedSkillIds,
+    skills: skillResolution.skills,
+    unavailableSkills: skillResolution.unavailable,
+    runtimeUnverifiedSkills: skillResolution.deferred,
+    resolutionNotes,
+  };
+  const contextEntryIds = taskContext
+    ? [taskContext.latestCheckpoint, ...(taskContext.entriesSinceCheckpoint || []), ...(taskContext.recentHistory || [])]
+        .filter(Boolean).map(entry => entry.id).slice(0, 12)
+    : [];
+  const contract = taskExecutionContextPack.build(store, {
+    taskId: preflight.task.id,
+    taskRevision: Number(preflight.task.__mcpRevision || 0),
+    taskTitle: preflight.task.title,
+    taskDescription: preflight.task.notes,
+    taskStatus: preflight.task.status,
+    taskMetadata: preflight.task,
+    contextEntryIds,
+    executionProfile,
+  });
+  if (!contract.ok) return { ...preflight, taskContext, executionProfile, skillResolution, contractError: contract };
+  return {
+    ...preflight,
+    taskContext,
+    executionProfile,
+    skillResolution,
+    executionContract: {
+      schemaVersion: 1,
+      text: contract.text,
+    },
+  };
 }
 
 const agentExecutionPreflightService = createAgentExecutionPreflightService({

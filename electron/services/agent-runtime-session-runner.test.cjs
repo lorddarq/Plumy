@@ -208,6 +208,18 @@ test('injects the bounded Omvra context pack while leaving MCP configuration to 
       ok: true,
       canStart: true,
       task: { __mcpRevision: 4 },
+      context: {
+        executionProfile: {
+          schemaVersion: 1,
+          profileFidelity: 'degraded',
+          assignee: { id: 'agent-1', name: 'Edgar' },
+          personaInstructions: 'Use a calm, evidence-led review style.',
+          operationalInstructions: 'Use the relevant resolved skills before task execution.',
+          skills: [{ skillId: 'process-modeler', content: '# Process modeler\nModel the process before implementation.' }],
+          unavailableSkills: [{ skillId: 'unavailable-review-skill', status: 'unavailable', code: 'MISSING_SKILL' }],
+          resolutionNotes: ['Skill unavailable-review-skill was unavailable; execution may be less than ideal.'],
+        },
+      },
       contractSnapshot: { taskId: 'task-1', taskRevision: 4, contributionId: null, contextEntryIds: ['checkpoint-1'] },
       contractDigest: 'digest',
     }),
@@ -246,6 +258,11 @@ test('injects the bounded Omvra context pack while leaving MCP configuration to 
   assert.equal(mcpConfiguration, undefined);
   assert.equal('mcpGrantId' in bindingInputs[0], false);
   assert.equal(prompts.length, 1);
+  assert.ok(prompts[0].indexOf('Agent behavioural instructions:') < prompts[0].indexOf('Task instructions:'));
+  assert.match(prompts[0], /Use a calm, evidence-led review style/);
+  assert.match(prompts[0], /# Process modeler/);
+  assert.match(prompts[0], /unavailable-review-skill/);
+  assert.match(prompts[0], /task resolution notes/i);
   assert.match(prompts[0], /Continue from accepted checkpoint/);
   assert.equal(result.binding.state, 'ready');
   assert.equal(result.binding.turn.state, 'active');
@@ -305,6 +322,16 @@ test('resuming interrupted task work immediately sends the current authoritative
     appendEvent: (_store, event) => { events.push(event); return { ok: true }; },
     listSessions: () => ({ bindings: [binding], events: [] }),
     getTaskById: () => ({ id: 'task-1', title: 'Test task', notes: 'Update the task description with the agent details.', status: 'in-progress', __mcpRevision: 4 }),
+    resolveTaskContext: () => ({
+      canStart: true,
+      executionProfile: {
+        profileFidelity: 'full',
+        personaInstructions: 'Review evidence before making claims.',
+        operationalInstructions: 'Use the current task state.',
+        skills: [],
+        unavailableSkills: [],
+      },
+    }),
     listTaskContext: () => ({ ok: true, entries: [{ id: 'checkpoint-1' }] }),
     getTaskContextEntry: () => ({ ok: true, entry: { id: 'checkpoint-1', kind: 'context-checkpoint', fromRevision: 4, toRevision: 4, summary: 'Use the accepted task brief.', sourceRefs: [] } }),
     createClient: () => ({
@@ -323,6 +350,7 @@ test('resuming interrupted task work immediately sends the current authoritative
   assert.equal(prompts.length, 1);
   assert.match(prompts[0], /Title: Test task/);
   assert.match(prompts[0], /Update the task description with the agent details/);
+  assert.ok(prompts[0].indexOf('Review evidence before making claims.') < prompts[0].indexOf('Title: Test task'));
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent'), true);
   notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
   await new Promise(resolve => setTimeout(resolve, 10));
@@ -330,6 +358,7 @@ test('resuming interrupted task work immediately sends the current authoritative
   assert.equal((await runner.continueTask('binding-resume')).ok, true);
   assert.equal(prompts.length, 2);
   assert.match(prompts[1], /Update the task description with the agent details/);
+  assert.ok(prompts[1].indexOf('Review evidence before making claims.') < prompts[1].indexOf('Title: Test task'));
 });
 
 test('automatically starts the next bounded batch after a completed turn', async () => {

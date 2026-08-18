@@ -175,7 +175,16 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
           error: invalidParams('Invalid params: "id" (or "taskId") is required for tasks.get.'),
         };
       }
-      return { result: makeToolResult(getTaskById(store, taskId)) };
+      const task = getTaskById(store, taskId);
+      if (!task) return { result: makeToolResult(null) };
+      const resolved = resolveTaskExecutionContext(store, taskId, { skillsRoot, userDataPath: userSkillsRoot });
+      const { task: _resolvedTask, ...executionContext } = resolved;
+      return {
+        result: makeToolResult(
+          { ...task, executionContext },
+          { resultText: resolved.executionContract?.text }
+        ),
+      };
     }
 
     case 'tasks.context.list': {
@@ -209,8 +218,13 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
           error: invalidParams('Invalid params: "taskId" is required for agent.resolve_task_context.'),
         };
       }
-      const preflight = resolveTaskExecutionContext(store, taskId);
-      return { result: makeToolResult(preflight, { isError: !preflight.canStart }) };
+      const preflight = resolveTaskExecutionContext(store, taskId, { skillsRoot, userDataPath: userSkillsRoot });
+      return {
+        result: makeToolResult(preflight, {
+          isError: !preflight.canStart,
+          resultText: preflight.executionContract?.text,
+        }),
+      };
     }
 
     case 'cards.kanban.list': {

@@ -60,6 +60,7 @@ const {
   transitionTaskContribution,
   moveTaskToStatus,
   getTaskById,
+  resolveTaskExecutionContext,
 } = require('./services/workspace-service.cjs');
 const { recordGoalPolicyChangeImpact } = require('./services/goal-policy.cjs');
 const { createGoalLifecycleService } = require('./services/goal-lifecycle-service.cjs');
@@ -99,6 +100,14 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   updateTaskExecutionState: (runtimeStore, payload) => updateAgentRuntimeTaskExecution(runtimeStore, payload),
   listSessions: (runtimeStore, payload) => listAgentRuntimeSessions(runtimeStore, payload),
   getTaskById: (runtimeStore, taskId) => getTaskById(runtimeStore, taskId),
+  resolveTaskContext: (runtimeStore, taskId) => resolveTaskExecutionContext(runtimeStore, taskId, {
+    skillsRoot: getBundledSkillsRoot({
+      isPackaged: app.isPackaged,
+      appPath: app.getAppPath(),
+      resourcesPath: process.resourcesPath,
+    }),
+    userDataPath: app.getPath('userData'),
+  }),
   listTaskContext: (runtimeStore, payload) => listTaskContextEntries(runtimeStore, payload),
   getTaskContextEntry: (runtimeStore, payload) => getTaskContextEntry(runtimeStore, payload),
   ensureMcpReady: () => ensureMcpServerReady(),

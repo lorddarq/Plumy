@@ -12,7 +12,7 @@ ACP owns live interaction. Existing task collaboration, Goal lifecycle, context 
 
 The first release supports explicitly configured local stdio runtimes using native ACP, native Codex app-server, or native Claude stream-json, plus a user-invoked external handoff. Omvra launches the installed runtime directly; it does not require a separately installed protocol-conversion executable. Generic ACP profiles remain application-neutral: any conforming runtime can be configured with its exact executable and fixed launch arguments, including OpenCode with `acp`. Stdio is a locality and process-lifecycle choice, not a single-agent restriction: Omvra may coordinate multiple concurrent sessions in one capable runtime and/or multiple explicitly started runtime subprocesses. Distributed runtime pools and remote transports remain deferred.
 
-Agent-runtime and MCP transports are independent. ACP, Codex app-server, or Claude stream-json carries runtime/session control over local stdio; MCP carries governed Omvra reads and writes over Omvra's configured HTTP endpoint. The selected runtime is authoritative for its MCP server registry, configuration, and credentials. Omvra exposes the endpoint and waits for its listener to be ready, but does not disable, replace, inject, or gate provider MCP configuration during session start or resume. Authentication remains owned by the selected runtime and Omvra does not collect provider credentials. Codex exposes authentication during model-free preflight through `account/read`; Claude authentication remains `unknown` until an explicitly started session reports it because its CLI exposes no model-free authentication handshake. The release does not add automatic spawning, watcher dispatch, remote gateways, arbitrary runtime plugins, or silent failover.
+Agent-runtime and MCP transports are independent. ACP, Codex app-server, or Claude stream-json carries runtime/session control over local stdio; MCP carries governed Omvra reads and writes over Omvra's configured HTTP endpoint. The selected runtime is authoritative for its general MCP registry and provider credentials. Omvra exposes only its own endpoint and may attach a session-scoped Omvra grant when a provider adapter requires explicit connection material. This grant does not copy, disable, or replace the provider's other MCP entries. Authentication remains owned by the selected runtime and Omvra does not collect provider credentials. Codex exposes authentication during model-free preflight through `account/read`; Claude authentication remains `unknown` until an explicitly started session reports it because its CLI exposes no model-free authentication handshake. The release does not add automatic spawning, watcher dispatch, remote gateways, arbitrary runtime plugins, or silent failover.
 
 ## Decision drivers
 
@@ -21,7 +21,7 @@ Agent-runtime and MCP transports are independent. ACP, Codex app-server, or Clau
 - Task collaboration already has stable contribution and execution-attempt IDs, distinct attempt/contribution/task lifecycle states, and separate append-only event history.
 - Runtime, session, transcript, credential, and usage fields are rejected from the task collaboration projection.
 - Goal execution already owns acknowledgement, dispatch, retry, evidence, acceptance, and completion independently of any provider session.
-- `agent.resolve_task_context` is the canonical assigned-task preflight; the task-context ledger is the bounded, source-linked portability seam.
+- `resolveTaskExecutionContext` is the canonical provider-neutral task contract used by managed sessions, `agent.resolve_task_context`, and assigned `tasks.get` reads; the task-context ledger is the bounded, source-linked portability seam.
 - MCP transports and runtime protocol clients must remain separate adapters over the domain layer.
 - Codex, Claude, and conforming ACP runtimes own the MCP configuration they expose to their sessions; Omvra owns only its endpoint and governed tool behavior.
 - MCP audit records are bounded and redacted. Workspace backup/restore preserves versioned workspace records and unknown fields.
@@ -33,6 +33,36 @@ Agent-runtime and MCP transports are independent. ACP, Codex app-server, or Clau
 - Store no provider credentials, raw prompts, raw responses, raw tool payloads, hidden reasoning, or full transcripts.
 - Do not place MCP credentials in prompts, task records, launch arguments, general audit, or provider-owned session metadata.
 - Do not infer unsupported ACP capabilities or missing token/cost values.
+
+## Universal task execution contract
+
+Managed runtime sessions and direct MCP consumers use the same resolution and composition order:
+
+1. resolve the exact task id and its minimal assignment metadata;
+2. resolve the exact assigned agent, if any;
+3. apply available behavioural and operational persona instructions;
+4. classify skill references by the authority that can observe them without installing anything or widening permissions;
+5. present Omvra-resolved instructions, runtime-advertised availability, and provider-runtime checks as distinct states;
+6. present the authoritative task instructions and bounded task-context history;
+7. execute and report any degraded profile or skill fallback in task resolution notes and the final handoff.
+
+The contract guarantees delivery and ordering, not provider-internal semantic obedience. Persona and skill content remain user-authored workspace guidance below system, developer, security, permission, sandbox, tool, and task-acceptance constraints. A missing task is a hard stop. An unassigned task or absent/incomplete persona uses standard allowed agentic behaviour. Runtime-confirmed missing or permission-denied skills do not alone block task completion: the agent uses an allowed substitute where possible and reports the skill, fallback, and likely impact. It must never install a skill or broaden access unless the user separately requests that action.
+
+### Skill authority and location
+
+The same skill id may exist in different locations. Availability is always scoped to an authority; absence from one catalogue is not evidence about another:
+
+| Authority | Location and observer | Contract resolution | Effect on fidelity |
+| --- | --- | --- | --- |
+| `omvra-managed` | Omvra bundled/configured skill roots; Omvra can read trust, integrity, and content | `resolved`, or rejected for Omvra-governed use | Resolved content is included; rejected content is never loaded |
+| `runtime-advertised` | A selected ACP/runtime explicitly reports the skill or a permission decision | `runtime-available`, `runtime-missing`, or `provider-permission-denied` | Confirmed missing/denied degrades fidelity and requires fallback notes |
+| `provider-runtime` | Codex, Claude, or organization-managed private catalogues that Omvra cannot inspect | `runtime-unverified` until the consumer checks locally | Does not degrade fidelity; lack of Omvra visibility is not unavailability |
+
+Persona operational instructions are portable best-effort references. A bare reference resolves from a trusted Omvra catalogue when possible. Otherwise Omvra returns `provider-runtime / runtime-unverified` and tells the consumer to use the skill if its native runtime provides it. Only the runtime can turn that state into confirmed available, missing, or permission-denied. Omvra does not inspect provider-private directories and does not reinterpret an untrusted Omvra candidate as proof that the provider-native skill is denied.
+
+Goal requirements use a separate strict contract. A pre-dispatch requirement must resolve from an Omvra-managed catalogue or explicit runtime advertisement; an unverifiable provider-private reference cannot satisfy a required Goal capability. This strict Goal rule does not convert portable persona references into blocking requirements.
+
+`tasks.get` automatically exposes this contract with the task so copying a task id into a direct MCP-capable client does not create a weaker persona path. `agent.resolve_task_context` exposes the same structured result explicitly. Managed start, continue, and resume prompts rebuild it from current workspace state. Full persona, prompt, and skill bodies are composed on demand and are not persisted in attempts, session events, audit records, or backups.
 - Keep one Electron deployment and one workspace. No service split or plugin framework is justified.
 
 ### Quality goals
@@ -283,7 +313,7 @@ The existing task attempt `runtimeExecution` remains a compatibility mirror for 
 
 ## Provider-owned MCP configuration contract
 
-Starting or resuming a runtime session does not create an MCP configuration. Codex, Claude, or another ACP runtime loads the same MCP roster it would use when launched directly. Omvra must not pass `mcp_servers`, `mcpServers`, `--mcp-config`, provider CLI overrides, or provider credentials as part of task execution.
+Starting or resuming a runtime session does not create or own the provider's general MCP registry. Codex, Claude, or another ACP runtime otherwise loads the same MCP roster it would use when launched directly. Where a provider has no inherited way to receive Omvra's endpoint, its adapter may pass a bounded Omvra-only connection entry and session-scoped bearer grant. No provider credential is included, and the grant is limited to the bound execution scope.
 
 Omvra remains responsible for:
 
@@ -291,7 +321,7 @@ Omvra remains responsible for:
 - enforcing the normal workspace capability, revision, policy, evidence, audit, and acceptance contracts on each tool call;
 - reporting provider MCP startup and tool events as observations without treating unrelated server failures as an Omvra task-start failure.
 
-If the provider has no usable Omvra MCP entry, the provider owns that configuration failure. Omvra reports the observed limitation and never manufactures a second registry, substitutes a dev endpoint, or broadens credentials. External handoff likewise receives no Omvra-generated MCP configuration.
+If the provider cannot accept either its existing Omvra entry or the adapter's scoped Omvra grant, Omvra reports the observed limitation. It never manufactures a second general registry, substitutes a dev endpoint, or broadens credentials. External handoff receives no Omvra-generated MCP configuration.
 
 ## Lifecycle contract
 
@@ -357,7 +387,7 @@ Active and interrupted bindings retain the opaque reference so a supported resum
 - Generic ACP profiles accept any conforming executable and fixed arguments. OpenCode uses its installed executable with `acp`; its advertised ACP version, capabilities, and authentication methods are handled by the same generic client.
 - Launch requires an explicit user or already-governed Goal action. Assignment, delegation eligibility, watcher changes, and board polling cannot launch it.
 - The executable path is exact, fixed arguments are an array, the workspace directory is validated, and no shell interpolation is used.
-- Only the selected runtime receives the bounded context pack. MCP configuration is inherited from that runtime unchanged.
+- Only the selected runtime receives the bounded execution contract. Provider MCP configuration remains unchanged except for an adapter-required, Omvra-only scoped grant.
 - The first migrated policy permits one in-flight task/Goal turn across the workspace while allowing multiple idle reusable sessions. Per-runtime multiplexing is deferred until a provider-neutral advertised-capacity contract exists. Join behavior is based on accepted durable outputs, never shared transcripts or session proximity.
 - This is local multi-agent execution, not a remote/shared agent pool. Remote ACP over HTTP/WebSocket may later expand deployment location and independent scaling without changing the collaboration, session-binding, provider-owned MCP, or acceptance contracts.
 - Remote gateways, hosted agents, Omvra-owned provider credentials, provider SDKs, arbitrary runtime/plugin installation, recursive agent trees, background relaunch, and silent runtime failover are out of scope.
@@ -462,7 +492,7 @@ Rollback preserves runtime profiles, bindings, attempts, events, and unknown fie
 - Session closing, process exit, crash, and cancellation cannot complete or abandon Omvra work.
 - Provider credentials and raw transcripts are forbidden from workspace records.
 - Unsupported and unknown capabilities fail visibly and are never simulated.
-- Runtime and MCP transports are independent; every runtime session inherits the provider's MCP configuration unchanged.
+- Runtime and MCP transports are independent; every runtime session inherits the provider's MCP configuration except for any adapter-required, Omvra-only scoped grant.
 - Local stdio permits bounded concurrent multi-agent work without implying a distributed runtime pool.
 - Automatic spawning, watcher dispatch, remote gateways, arbitrary plugins, and silent failover remain outside the first release.
 

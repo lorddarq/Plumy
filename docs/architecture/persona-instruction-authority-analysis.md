@@ -1,5 +1,7 @@
 # Persona instruction authority: why Codex "takes on a more nuanced shape" and Claude doesn't
 
+> Implementation update (2026-08-19): the delivery gap described below is resolved by the universal provider-neutral task execution contract. Managed start/continue/resume prompts and direct MCP `tasks.get` / `agent.resolve_task_context` results now use one resolver and place the assigned profile plus skill-resolution contract before task details. Raw persona text was not promoted into provider system/developer authority. Skill authority distinguishes Omvra-managed, runtime-advertised, and provider-runtime-private catalogues; lack of Omvra visibility is `runtime-unverified`, not a degraded profile. Runtime-confirmed missing or denied skills use a reported best-effort fallback, and skills are never installed automatically. The historical investigation below is retained as the rationale for this decision.
+
 Status: research finding, not yet an accepted contract change
 Date: 2026-08-18
 Method: two parallel primary-source investigations — one against this codebase (`electron/services/agent-runtime-protocol-client.cjs`, `electron/domain/agent-runtime-context-pack.cjs`, `electron/domain/person-context-service.cjs`, `electron/services/workspace-service.cjs`, `docs/agentic/agent-instructions.md`), one against Anthropic's and OpenAI's own published documentation (Model Spec, Codex app-server protocol docs, Claude's Constitution, Claude Code Agent SDK docs, both companies' prompt-injection research).

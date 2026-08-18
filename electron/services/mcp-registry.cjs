@@ -53,7 +53,7 @@ const READ_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.get',
-    description: 'Gets a single task by id.',
+    description: 'Gets a single task by id and automatically returns its provider-neutral execution contract. Assigned agent profile and referenced skill instructions precede the task. Omvra-managed, runtime-advertised, and provider-runtime-unverified skills remain distinct; runtime-unverified does not degrade execution or authorize installation.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -111,7 +111,7 @@ const READ_TOOL_DEFINITIONS = [
   },
   {
     name: 'agent.resolve_task_context',
-    description: 'Strict execution preflight. Resolves a task by id, then its exact assignee id and required agent context. A failed result must prevent task work from starting.',
+    description: 'Canonical task execution preflight for managed runtimes and direct MCP use. Resolves task, exact assignee, persona, operational instructions, referenced skills, then task context in that order. Skill authority distinguishes Omvra-managed, runtime-advertised, and provider-runtime-unverified references. Runtime-unverified means Omvra lacks visibility and does not degrade fidelity. Only runtime-confirmed missing or denied skills require a reported fallback. Never install skills or widen permissions automatically.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,

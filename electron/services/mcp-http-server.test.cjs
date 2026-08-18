@@ -1820,6 +1820,39 @@ test('agent.resolve_task_context enforces the exact assignee preflight contract'
   }
 });
 
+test('assigned task reads and execution preflight expose the same mandatory profile-first contract', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PEOPLE_KEY, store.get(PEOPLE_KEY).map(person => person.id === 'agent-1'
+    ? {
+        ...person,
+        agentInstructions: 'Use a calm, evidence-led review style.',
+        agentOperationalInstructions: 'Select skills by need:\n- Process: process-modeler, unavailable-review-skill\nThen complete the task using an allowed fallback.',
+      }
+    : person));
+  const dispatch = createRequestDispatcher(store, { skillsRoot: path.resolve(__dirname, '../../src/skills') });
+  const call = (id, name) => dispatch({
+    jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: { taskId: 'task-1' } },
+  }, makeReq());
+
+  const preflight = call('profile-preflight', 'agent.resolve_task_context');
+  const taskRead = call('profile-task-read', 'tasks.get');
+  const resolved = preflight.result.structuredContent;
+
+  assert.equal(resolved.canStart, true);
+  assert.equal(resolved.executionProfile.profileFidelity, 'full');
+  assert.equal(resolved.executionProfile.personaInstructions, 'Use a calm, evidence-led review style.');
+  assert.equal(resolved.executionProfile.skills[0].skillId, 'process-modeler');
+  assert.match(resolved.executionProfile.skills[0].content, /process model/i);
+  assert.deepEqual(resolved.executionProfile.unavailableSkills, []);
+  assert.deepEqual(resolved.executionProfile.runtimeUnverifiedSkills.map(item => item.skillId), ['unavailable-review-skill']);
+  assert.ok(resolved.executionContract.text.indexOf('Agent behavioural instructions:') < resolved.executionContract.text.indexOf('Task instructions:'));
+  assert.match(resolved.executionContract.text, /use an allowed fallback/i);
+  assert.match(resolved.executionContract.text, /unavailable-review-skill.*runtime-unverified/is);
+  assert.equal(taskRead.result.structuredContent.id, 'task-1');
+  assert.deepEqual(taskRead.result.structuredContent.executionContext.executionProfile, resolved.executionProfile);
+  assert.equal(taskRead.result.content[0].text, resolved.executionContract.text);
+});
+
 test('task context MCP tools append, retrieve sources, and enrich bounded preflight', () => {
   const store = makeStoreFromFixture('workspace-basic');
   store.set(PREFERENCES_KEY, { mcpAgentAccessEnabled: true, mcpCapabilityProfile: 'task_write' });

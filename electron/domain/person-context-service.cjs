@@ -42,7 +42,7 @@ function createPersonContextService({
       agentOperationalInstructions: agentOperationalInstructions || undefined,
     };
   }
-  function buildTaskExecutionContextFailure(code, message, validation = {}, task = null, { canStart = false } = {}) {
+  function buildTaskExecutionContextFailure(code, message, validation = {}, task = null, { canStart = false, assignee = null, context = null } = {}) {
     return {
       ok: false,
       canStart,
@@ -54,8 +54,8 @@ function createPersonContextService({
         ? 'Unable to retrieve or use the assigned agent or instructions; reverting to standard agentic operation.'
         : message,
       task,
-      assignee: null,
-      context: null,
+      assignee,
+      context,
       validation: {
         taskFound: Boolean(task),
         taskAssigned: false,
@@ -137,7 +137,14 @@ function createPersonContextService({
           agentOperationalInstructionsPresent,
         },
         task,
-        { canStart: true }
+        {
+          canStart: true,
+          assignee,
+          context: {
+            agentInstructions,
+            agentOperationalInstructions,
+          },
+        }
       );
     }
   
