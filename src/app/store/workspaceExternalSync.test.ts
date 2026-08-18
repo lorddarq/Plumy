@@ -1,25 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as React from 'react';
-import TestRenderer from 'react-test-renderer';
-import os from 'node:os';
-import { isDeepStrictEqual } from 'node:util';
-import type { Person, ProjectMilestone, Task, TimelineSwimlane } from '../types.ts';
-import { swimlanes as defaultSwimlanes } from '../constants/swimlanes.ts';
-import { sanitizeGoalPolicy } from '../utils/goalPolicy.ts';
-import { DEFAULT_MARKDOWN_APPEARANCE } from '../utils/markdownAppearance.ts';
-import type { StatusColumnState } from '../utils/workspaceSanitizers.ts';
-import type { AppPreferences } from './workspaceStore.tsx';
-import { useWorkspacePersistence, TASKS_KEY } from './workspacePersistence.ts';
-import { useCanonicalWorkspaceHydration, type WorkspaceSeeds } from './workspaceHydration.ts';
+import { existsSync } from 'node:fs';
+import type { Task } from '../types.ts';
+import { TASKS_KEY } from './workspacePersistence.ts';
+import { createWorkspaceExternalSyncTestHost, type WorkspaceExternalSyncTestHost } from './workspaceExternalSyncTestHost.ts';
 import mcpHandlers from '../../../electron/services/mcp-handlers.cjs';
-import testFixtures from '../../../electron/services/test-fixtures.cjs';
-import ElectronStore from 'electron-store';
-import storeDiff from '../../../electron/domain/store-diff.cjs';
 
 const { handleToolCall } = mcpHandlers as { handleToolCall: (store: unknown, req: unknown, params: unknown) => { error?: { message: string }; result?: { structuredContent: Record<string, unknown> } } };
-const { loadFixture } = testFixtures as { loadFixture: (name: string) => Record<string, unknown> };
-const { diffStoreSnapshots } = storeDiff as { diffStoreSnapshots: (previousNode: unknown, nextNode: unknown, isEqual: (a: unknown, b: unknown) => boolean) => Set<string> };
 
 // This exercises the real production MCP write path (electron/services/
 // mcp-handlers.cjs's handleToolCall, over a real electron-store instance --
@@ -45,212 +32,13 @@ const { diffStoreSnapshots } = storeDiff as { diffStoreSnapshots: (previousNode:
 // including where it's still wrong -- not to assert a hand-picked "should"
 // and shape the scenario until it agrees.
 
-const { act, create } = TestRenderer as unknown as {
-  act: (callback: () => void | Promise<void>) => Promise<void>;
-  create: (element: React.ReactElement) => { unmount: () => void };
-};
-
-const SEEDS: WorkspaceSeeds = { tasks: [], timelineSwimlanes: [], people: [], milestones: [] };
-
-function makeDefaultPreferences(): AppPreferences {
-  return {
-    executionLoadStatusIds: ['in-progress'],
-    pipelineLoadStatusIds: ['open'],
-    cleanupGoalArtifacts: false,
-    goalAuditArchiveDirectory: '',
-    skillRoots: [],
-    customScrollbarsEnabled: true,
-    condensedUI: false,
-    performanceLoggingEnabled: false,
-    updateChannel: 'stable' as const,
-    markdownAppearance: { ...DEFAULT_MARKDOWN_APPEARANCE },
-    mcpAgentAccessEnabled: false,
-    mcpCapabilityProfile: 'task_write' as const,
-    mcpBindHost: '127.0.0.1',
-    mcpPort: 4173,
-    mcpServerAddress: 'http://127.0.0.1:4173',
-    mcpAccessToken: '',
-    mcpAccessTokenIssuedAt: undefined,
-    mcpAccessTokenTtlMinutes: 60,
-  };
-}
-
-interface Bridge {
-  mcpStore: InstanceType<typeof ElectronStore>;
-  electron: Record<string, unknown>;
-  storeChangedListener: ((payload: { keys: string[] }) => void) | null;
-  storeSetManyCalls: Array<Record<string, unknown>>;
-  pendingStoreSetManyReleases: Array<{ keys: string[]; release: () => void }>;
-  releaseStoreSetManyForKey: (key: string) => void;
-  storeGetManyCallsForTasks: number;
-  // Wraps a store mutation the way electron/main.cjs's store.onDidAnyChange
-  // handler observes one: snapshot before, run the mutation, snapshot after,
-  // derive the real changed dotted keys via diffStoreSnapshots (the same
-  // function main.cjs uses), and broadcast exactly that -- not a key the
-  // test assumes is correct.
-  emitRealStoreChangeAround: <T>(mutate: () => T) => T;
-}
-
-// Bridges the renderer's window.electron surface onto a real electron-store
-// instance (not the flat-keyed MemoryStore test double used elsewhere in
-// this repo's MCP tests), so "agent" writes (via handleToolCall) and
-// "renderer" writes (via the persistence hook, exactly mirroring
-// electron/ipc/store.cjs's real store/set-many handler above) mutate the
-// SAME store with the SAME dot-notation nesting behavior production has.
-// storeSetMany defers via an explicit release so the test controls the race
-// window deterministically instead of racing real time.
-function makeBridge(fixtureName: string): Bridge {
-  const fixture = loadFixture(fixtureName);
-  const mcpStore = new ElectronStore({
-    name: `workspace-external-sync-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    cwd: os.tmpdir(),
-  });
-  for (const [key, value] of Object.entries(fixture)) mcpStore.set(key, value);
-  const state: Bridge = {
-    mcpStore,
-    electron: undefined as unknown as Record<string, unknown>,
-    storeChangedListener: null,
-    storeSetManyCalls: [],
-    pendingStoreSetManyReleases: [],
-    storeGetManyCallsForTasks: 0,
-    emitRealStoreChangeAround: <T,>(mutate: () => T): T => {
-      const before = JSON.parse(JSON.stringify(mcpStore.store));
-      const result = mutate();
-      const after = JSON.parse(JSON.stringify(mcpStore.store));
-      const changedKeys = diffStoreSnapshots(before, after, isDeepStrictEqual);
-      state.storeChangedListener?.({ keys: [...changedKeys] });
-      return result;
-    },
-    // Initial hydration primes every canonical key present in
-    // hasHydratedCanonicalWorkspace's dependency list, including ones the
-    // fixture doesn't define (e.g. this fixture has no milestones/goalPolicy
-    // entry, so those two persist their untouched defaults once on mount).
-    // Those unrelated priming writes queue in the same
-    // pendingStoreSetManyReleases list, so releases must target the batch
-    // that actually contains the key under test rather than blindly
-    // releasing in FIFO order.
-    releaseStoreSetManyForKey: (key: string) => {
-      const index = state.pendingStoreSetManyReleases.findIndex(entry => entry.keys.includes(key));
-      if (index === -1) return;
-      const [entry] = state.pendingStoreSetManyReleases.splice(index, 1);
-      entry.release();
-    },
-  };
-  state.electron = {
-    storeGetMany: async (keys: string[]) => {
-      if (keys.includes(TASKS_KEY)) state.storeGetManyCallsForTasks += 1;
-      const out: Record<string, unknown> = {};
-      for (const key of keys) out[key] = mcpStore.get(key);
-      return out;
-    },
-    storeSetMany: (values: Record<string, unknown>) => {
-      state.storeSetManyCalls.push(values);
-      return new Promise<void>(resolve => {
-        state.pendingStoreSetManyReleases.push({
-          keys: Object.keys(values),
-          release: () => {
-            // Matches electron/ipc/store.cjs's store/set-many handler: a raw
-            // per-key overwrite with no revision check whatsoever.
-            Object.entries(values).forEach(([key, value]) => mcpStore.set(key, value));
-            resolve();
-          },
-        });
-      });
-    },
-    onStoreChanged: (listener: (payload: { keys: string[] }) => void) => {
-      state.storeChangedListener = listener;
-      return () => { state.storeChangedListener = null; };
-    },
-  };
-  return state;
-}
-
-function useHarness() {
-  const [tasks, setTasks] = React.useState<Task[]>([]);
-  const [timelineSwimlanes, setTimelineSwimlanes] = React.useState<TimelineSwimlane[]>([]);
-  const [people, setPeople] = React.useState<Person[]>([]);
-  const [milestones, setMilestones] = React.useState<ProjectMilestone[]>([]);
-  const [statusColumns, setStatusColumns] = React.useState<StatusColumnState[]>(defaultSwimlanes as unknown as StatusColumnState[]);
-  const [preferences, setPreferences] = React.useState(makeDefaultPreferences());
-  const [goalPolicy, setGoalPolicy] = React.useState(sanitizeGoalPolicy(undefined).policy);
-  const [hasHydratedCanonicalWorkspace, setHasHydratedCanonicalWorkspace] = React.useState(false);
-
-  const persistence = useWorkspacePersistence({
-    tasks, timelineSwimlanes, people, milestones, statusColumns, preferences, goalPolicy, hasHydratedCanonicalWorkspace,
-  });
-
-  useCanonicalWorkspaceHydration({
-    seeds: SEEDS,
-    hasHydratedCanonicalWorkspace,
-    setHasHydratedCanonicalWorkspace,
-    setTasks,
-    setTimelineSwimlanes,
-    setPeople,
-    setMilestones,
-    setStatusColumns,
-    setPreferences,
-    setGoalPolicy,
-    timelineSwimlanesRef: persistence.timelineSwimlanesRef,
-    statusColumnsRef: persistence.statusColumnsRef,
-    preferencesRef: persistence.preferencesRef,
-    goalPolicyRef: persistence.goalPolicyRef,
-    pendingCanonicalWritesRef: persistence.pendingCanonicalWritesRef,
-    suppressNextPersistRef: persistence.suppressNextPersistRef,
-  });
-
-  return { tasks, setTasks, hasHydratedCanonicalWorkspace, pendingCanonicalWritesRef: persistence.pendingCanonicalWritesRef };
-}
-
-async function flushMicrotasks(rounds = 5) {
-  for (let i = 0; i < rounds; i += 1) {
-    await act(async () => { await Promise.resolve(); });
-  }
-}
-
-async function setUpHarness(bridge: Bridge) {
-  const originalWindow = (globalThis as { window?: unknown }).window;
-  (globalThis as { window: unknown }).window = {
-    electron: bridge.electron,
-    setTimeout: global.setTimeout.bind(global),
-    clearTimeout: global.clearTimeout.bind(global),
-  };
-
-  let latest: ReturnType<typeof useHarness> | undefined;
-  function Probe() {
-    latest = useHarness();
-    return null;
-  }
-
-  let renderer: ReturnType<typeof create> | undefined;
-  await act(async () => {
-    renderer = create(React.createElement(Probe));
-  });
-  await flushMicrotasks();
-
-  return {
-    get: () => {
-      if (!latest) throw new Error('harness result not available yet');
-      return latest;
-    },
-    cleanup: async () => {
-      // Must be wrapped in act() so effect cleanups (which clear pending
-      // retry timers via window.clearTimeout) flush synchronously before
-      // the window global below is torn down; otherwise a timer firing
-      // after teardown throws "window is not defined" into a detached tree.
-      await act(async () => { renderer?.unmount(); });
-      if (originalWindow === undefined) delete (globalThis as { window?: unknown }).window;
-      else (globalThis as { window: unknown }).window = originalWindow;
-      bridge.mcpStore.clear();
-    },
-  };
-}
 
 // Performs the real MCP write AND derives/emits the store/did-change
 // broadcast the same way electron/main.cjs would for a live agent session --
 // via bridge.emitRealStoreChangeAround, not a hand-picked key. Must be
 // called inside act() by the caller, since the broadcast synchronously
 // triggers renderer state updates.
-function realAgentDescriptionWrite(bridge: Bridge, taskId: string, description: string) {
+function realAgentDescriptionWrite(bridge: WorkspaceExternalSyncTestHost, taskId: string, description: string) {
   return bridge.emitRealStoreChangeAround(() => {
     const before = handleToolCall(bridge.mcpStore, {}, { name: 'tasks_get', arguments: { taskId } });
     assert.equal(before.error, undefined, 'tasks_get must succeed before the agent can write');
@@ -267,7 +55,7 @@ function realAgentDescriptionWrite(bridge: Bridge, taskId: string, description: 
 // Performs the real MCP task creation AND derives/emits the store/did-change
 // broadcast the same way electron/main.cjs would -- see
 // realAgentDescriptionWrite. Must be called inside act().
-function realAgentTaskCreate(bridge: Bridge) {
+function realAgentTaskCreate(bridge: WorkspaceExternalSyncTestHost) {
   return bridge.emitRealStoreChangeAround(() => {
     const write = handleToolCall(bridge.mcpStore, {}, {
       name: 'task_write',
@@ -287,84 +75,86 @@ function realAgentTaskCreate(bridge: Bridge) {
 }
 
 test('a task created through the real MCP write path appears in renderer state', async () => {
-  const bridge = makeBridge('workspace-basic');
-  const harness = await setUpHarness(bridge);
+  const bridge = await createWorkspaceExternalSyncTestHost();
   try {
-    const idsBeforeCreate = new Set(harness.get().tasks.map(item => item.id));
+    const idsBeforeCreate = new Set(bridge.get().tasks.map(item => item.id));
     const callsBeforeSync = bridge.storeSetManyCalls.length;
     let created: Task | undefined;
 
-    await act(async () => { created = realAgentTaskCreate(bridge).task; });
-    await flushMicrotasks();
+    await bridge.runInAct(async () => { created = realAgentTaskCreate(bridge).task; });
+    await bridge.flushMicrotasks();
 
     assert.ok(created);
     assert.equal(idsBeforeCreate.has(created!.id), false, 'the task must begin outside renderer state');
 
-    assert.equal(harness.get().tasks.find(item => item.id === created!.id)?.title, 'Externally created task');
-    assert.equal(harness.get().tasks.find(item => item.id === created!.id)?.swimlaneId, 'lane-1');
+    assert.equal(bridge.get().tasks.find(item => item.id === created!.id)?.title, 'Externally created task');
+    assert.equal(bridge.get().tasks.find(item => item.id === created!.id)?.swimlaneId, 'lane-1');
     assert.equal(bridge.storeSetManyCalls.length, callsBeforeSync, 'applying the external create must not echo the full task array back to storage');
   } finally {
-    await harness.cleanup();
+    await bridge.cleanup();
   }
 });
 
 test('a real MCP write applied while the renderer is idle is not echoed back to storage', async () => {
-  const bridge = makeBridge('workspace-basic');
-  const harness = await setUpHarness(bridge);
+  const taskId = 'task-idle-external-sync';
+  const bridge = await createWorkspaceExternalSyncTestHost({
+    initialTask: { id: taskId, description: 'Idle sync initial description', revision: 7 },
+  });
   try {
-    const taskId = 'task-1';
-    assert.equal(harness.get().tasks.find(item => item.id === taskId)?.notes, 'Implement drag', 'sanity check against the workspace-basic fixture\'s real initial content');
+    assert.equal(bridge.get().tasks.find(item => item.id === taskId)?.notes, 'Idle sync initial description', 'the host must hydrate the configured initial task state');
 
+    // Capture the baseline before the external change so any persistence
+    // call caused by applying that change is observable as an echo.
     const callsBeforeSync = bridge.storeSetManyCalls.length;
-    await act(async () => { realAgentDescriptionWrite(bridge, taskId, 'Real agent update via handleToolCall'); });
-    await flushMicrotasks();
+    let updated: Record<string, unknown> | undefined;
+    await bridge.runInAct(async () => { updated = realAgentDescriptionWrite(bridge, taskId, 'Real agent update via handleToolCall'); });
+    await bridge.flushMicrotasks();
 
-    assert.equal(harness.get().tasks.find(item => item.id === taskId)?.notes, 'Real agent update via handleToolCall', 'the real MCP write should be reflected in the renderer');
+    assert.equal(updated?.revision, 8, 'the MCP mutation must advance the configured starting revision');
+    assert.equal(bridge.get().tasks.find(item => item.id === taskId)?.notes, 'Real agent update via handleToolCall', 'the real MCP write should be reflected in the renderer');
     assert.equal(bridge.storeSetManyCalls.length, callsBeforeSync, 'applying the external sync must not itself trigger a new write-back');
-    assert.equal(harness.get().pendingCanonicalWritesRef.current?.[TASKS_KEY] ?? 0, 0, 'the local-write guard must not be raised by an external sync');
+    assert.equal(bridge.get().pendingCanonicalWritesRef.current?.[TASKS_KEY] ?? 0, 0, 'the local-write guard must not be raised by an external sync');
   } finally {
-    await harness.cleanup();
+    await bridge.cleanup();
   }
 });
 
 test('a real MCP write landing while a local edit is still persisting: the drop is fixed, the write-clobber is not (reported honestly)', async () => {
-  const bridge = makeBridge('workspace-basic');
-  const harness = await setUpHarness(bridge);
-  const taskId = 'task-1';
+  const taskId = 'task-concurrent-external-sync';
+  const bridge = await createWorkspaceExternalSyncTestHost({
+    initialTask: { id: taskId, description: 'Concurrent sync initial description', revision: 11 },
+  });
   try {
     // Drain the initial-mount priming write (this fixture has no milestones
     // or goalPolicy entry, so those two persist their untouched defaults
-    // once on mount -- see makeBridge's comment). useWorkspacePersistence
+    // once on mount). useWorkspacePersistence
     // shares ONE flush queue across all seven keys, so leaving this pending
     // would queue the local edit below behind it instead of giving tasks
     // its own flush, which is not what this test is exercising.
-    while (bridge.pendingStoreSetManyReleases.length > 0) {
-      await act(async () => { bridge.pendingStoreSetManyReleases.shift()?.release(); });
-      await flushMicrotasks();
-    }
-    assert.ok(Object.values(harness.get().pendingCanonicalWritesRef.current ?? {}).every(count => !count), 'no write should still be in flight before the scenario starts');
+    await bridge.releaseAllStoreSetMany();
+    assert.ok(Object.values(bridge.get().pendingCanonicalWritesRef.current ?? {}).every(count => !count), 'no write should still be in flight before the scenario starts');
 
     // A human edits the task locally (no MCP involved -- this is exactly how
     // local edits work today; see electron/ipc/store.cjs above).
-    await act(async () => {
-      harness.get().setTasks(previous => previous.map(item => item.id === taskId ? { ...item, notes: 'Local human edit' } : item));
+    await bridge.runInAct(async () => {
+      bridge.get().setTasks(previous => previous.map(item => item.id === taskId ? { ...item, notes: 'Local human edit' } : item));
     });
-    await flushMicrotasks();
+    await bridge.flushMicrotasks();
 
-    assert.equal(harness.get().tasks.find(item => item.id === taskId)?.notes, 'Local human edit');
-    assert.ok(harness.get().pendingCanonicalWritesRef.current?.[TASKS_KEY], 'the guard should be up while the local edit is still persisting');
+    assert.equal(bridge.get().tasks.find(item => item.id === taskId)?.notes, 'Local human edit');
+    assert.ok(bridge.get().pendingCanonicalWritesRef.current?.[TASKS_KEY], 'the guard should be up while the local edit is still persisting');
     assert.ok(bridge.pendingStoreSetManyReleases.some(entry => entry.keys.includes(TASKS_KEY)), 'the local edit should have started its own tasks write-back');
     const getCallsBeforeAgentWrite = bridge.storeGetManyCallsForTasks;
 
     // While that local write is still in flight (not yet echoed to the
     // shared store), a real agent MCP write lands on the same task.
-    await act(async () => { realAgentDescriptionWrite(bridge, taskId, 'Agent update while human was editing'); });
-    await flushMicrotasks();
+    await bridge.runInAct(async () => { realAgentDescriptionWrite(bridge, taskId, 'Agent update while human was editing'); });
+    await bridge.flushMicrotasks();
 
     // Fixed behavior: the in-flight local edit is not clobbered mid-write,
     // and the sync was not silently dropped -- it must be retried, not just
     // discarded once and forgotten.
-    assert.equal(harness.get().tasks.find(item => item.id === taskId)?.notes, 'Local human edit', 'the external sync must not overwrite an edit that is still being persisted');
+    assert.equal(bridge.get().tasks.find(item => item.id === taskId)?.notes, 'Local human edit', 'the external sync must not overwrite an edit that is still being persisted');
 
     // The local edit's write-back now completes. Per electron/ipc/store.cjs,
     // this is a raw, revision-blind overwrite of the shared store -- it will
@@ -372,8 +162,7 @@ test('a real MCP write landing while a local edit is still persisting: the drop 
     // in the real app today. This is the separately-scoped OCC-asymmetry
     // gap (local edits aren't revision-guarded the way MCP writes are), not
     // part of what this pass fixed.
-    await act(async () => { bridge.releaseStoreSetManyForKey(TASKS_KEY); });
-    await flushMicrotasks();
+    await bridge.releaseStoreSetManyForKey(TASKS_KEY);
 
     const storedNotesAfterClobber = (bridge.mcpStore.get(TASKS_KEY) as Array<{ id: string; notes?: string }>).find(item => item.id === taskId)?.notes;
     assert.equal(storedNotesAfterClobber, 'Local human edit', 'REPORTED, NOT ASSERTED-AS-CORRECT: the local edit\'s unguarded write-back overwrote the agent\'s change in the shared store itself -- this is the write-side OCC gap from our design discussion, reproduced faithfully, and is not fixed by this change.');
@@ -381,8 +170,8 @@ test('a real MCP write landing while a local edit is still persisting: the drop 
     // Give the bounded retry backstop room to fire and confirm it actually
     // re-checked rather than giving up after the first drop.
     const getCallsBeforeRetryWindow = bridge.storeGetManyCallsForTasks;
-    await act(async () => { await new Promise(resolve => global.setTimeout(resolve, 250)); });
-    await flushMicrotasks();
+    await bridge.runInAct(async () => { await new Promise(resolve => global.setTimeout(resolve, 250)); });
+    await bridge.flushMicrotasks();
 
     assert.ok(bridge.storeGetManyCallsForTasks > getCallsBeforeRetryWindow, 'the retry backstop must re-fetch the blocked key rather than dropping it after one attempt');
     assert.ok(bridge.storeGetManyCallsForTasks > getCallsBeforeAgentWrite + 1, 'at least one retry attempt beyond the original blocked sync must have occurred');
@@ -391,8 +180,24 @@ test('a real MCP write landing while a local edit is still persisting: the drop 
     // edit -- not the agent's now-overwritten change. The retry mechanism
     // did its job (it did not drop the sync); the data loss happened one
     // layer down, at the unguarded write-back.
-    assert.equal(harness.get().tasks.find(item => item.id === taskId)?.notes, 'Local human edit', 'the retry re-applies whatever is actually in the store -- it cannot recover data already overwritten by the unguarded local write-back');
+    assert.equal(bridge.get().tasks.find(item => item.id === taskId)?.notes, 'Local human edit', 'the retry re-applies whatever is actually in the store -- it cannot recover data already overwritten by the unguarded local write-back');
   } finally {
-    await harness.cleanup();
+    await bridge.cleanup();
   }
+});
+
+test('host cleanup drains writes, clears timers, restores window, and removes its temporary store', async () => {
+  const hadWindow = 'window' in globalThis;
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  const host = await createWorkspaceExternalSyncTestHost();
+  const storePath = host.mcpStore.path;
+
+  assert.equal(existsSync(storePath), true);
+  await host.cleanup();
+
+  assert.equal(host.pendingStoreSetManyReleases.length, 0);
+  assert.equal(host.activeTimerCount, 0);
+  assert.equal(existsSync(storePath), false);
+  assert.equal('window' in globalThis, hadWindow);
+  if (hadWindow) assert.equal((globalThis as { window?: unknown }).window, originalWindow);
 });

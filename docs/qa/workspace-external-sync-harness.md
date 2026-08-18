@@ -1,6 +1,6 @@
 # Workspace external-sync harness
 
-`src/app/store/workspaceExternalSync.test.ts` is an integration-style renderer test for task changes made outside the renderer. Its main purpose is to reproduce the race between an agent's MCP task write and a human edit that the renderer is still persisting.
+`src/app/store/workspaceExternalSync.test.ts` is an integration-style renderer test for task changes made outside the renderer. Its reusable host lives in `src/app/store/workspaceExternalSyncTestHost.ts`. The main deterministic scenarios reproduce the race between an agent's MCP task write and a human edit that the renderer is still persisting; a later live Codex test can mount the same production renderer hooks without copying the bridge and teardown machinery.
 
 The harness uses the same MCP task dispatcher and task-domain write logic as production. It does not start an ACP runtime session. In production, an ACP-supervised agent can reach these MCP tools through its scoped MCP grant; this test begins at the MCP tool-call boundary and focuses on what happens after that write reaches the workspace store.
 
@@ -18,7 +18,7 @@ It is also included in:
 npm run test:workspace-contracts
 ```
 
-Last focused verification on 2026-08-18: 3 tests passed, 0 failed.
+Last focused verification on 2026-08-19: 4 tests passed, 0 failed.
 
 **2026-08-18 revision**: an earlier version of this harness used a flat-keyed `MemoryStore` test double and manually emitted `{keys: ['omvra.tasks.v1']}` on every MCP mutation. That could not reproduce (and briefly masked) a real production bug: `electron-store` nests dotted keys by default (`store.set('omvra.tasks.v1', x)` is stored as `store.store.omvra.tasks.v1`), so `electron/main.cjs`'s `store.onDidAnyChange` handler, which used to diff `Object.keys(nextStore)` directly, only ever saw the single top-level key `'omvra'` — never `'omvra.tasks.v1'` — for any externally-originated write (every MCP write; anything not hinted by the renderer's own IPC calls). The renderer's exact-match key filter silently discarded that notification. Restart-triggered hydration was unaffected (it does a full fetch, not a keyed one), which is why a live MCP write appeared invisible until the app was restarted. Fixed in `electron/domain/store-diff.cjs` (`diffStoreSnapshots`, `getAtPath`, `leafPathsOf`; see its test file for the real-`electron-store`-backed regression coverage) and wired into `electron/main.cjs`. `electron/services/workspace-service.cjs`'s `getWorkspaceSnapshot` had a related bug (a flat-key lookup into the same nested `store.store` snapshot, producing an always-empty Diagnostics panel), fixed by reading through `store.get(key)` directly instead. This harness now uses a real `electron-store` instance (not `MemoryStore`) and derives every broadcast via `diffStoreSnapshots` — the exact function `main.cjs` uses — instead of assuming the correct key, closing the gap that let the original bug through undetected.
 
@@ -33,11 +33,11 @@ The harness intentionally uses production code on both sides of the synchronizat
 - `src/app/store/workspaceHydration.ts`: `useCanonicalWorkspaceHydration` reads changed canonical keys, applies external values, suppresses echo writes, and retries synchronization blocked by a local write.
 - `electron/services/fixtures/workspace-basic.json`: supplies the initial task and a `task_write` MCP capability profile.
 
-`react-test-renderer` mounts the real hooks in a small `Probe` component, so state transitions and effects run without mounting the full application.
+`react-test-renderer` mounts the real hooks in the host's small `Probe` component, so state transitions and effects run without mounting the full application.
 
 ## Test bridge
 
-`makeBridge` gives the MCP handler and renderer hooks one shared, real `electron-store` instance (seeded from the fixture JSON, on a temp-dir-backed store file) -- not a flat-keyed test double. It replaces only the Electron IPC transport itself:
+`createWorkspaceExternalSyncTestHost` gives the MCP handler and renderer hooks one shared, real `electron-store` instance (seeded from the fixture JSON, on a uniquely named temp-dir-backed store file) -- not a flat-keyed test double. It replaces only the Electron IPC transport itself:
 
 ```text
 MCP handleToolCall
@@ -49,12 +49,33 @@ shared real electron-store <---- deferred storeSetMany ---- renderer persistence
 derived store/did-change event ----> renderer hydration hook
 ```
 
-The bridge implements:
+The host implements:
 
 - `storeGetMany(keys)` reads the requested canonical values from the shared store (dot-notation resolved, via `.get(key)`) and counts task reads so retry behavior can be asserted.
 - `storeSetMany(values)` records the renderer write but does not apply it immediately. The test releases it explicitly, creating a deterministic concurrent-write window.
 - `onStoreChanged(listener)` captures the hydration listener.
 - `emitRealStoreChangeAround(mutate)` snapshots the store before and after `mutate()`, runs `diffStoreSnapshots` on the two nested snapshots, and fires the listener with exactly those derived keys -- not a key the test assumes is correct. `realAgentDescriptionWrite`/`realAgentTaskCreate` are both built on this.
+- `runInAct` and `flushMicrotasks` keep React updates deterministic for either test layer.
+- `releaseStoreSetManyForKey(key)` preserves key-specific control when renderer writes are in flight. `releaseAllStoreSetMany()` is used explicitly when a scenario needs to drain initial-hydration priming writes.
+- `cleanup()` unmounts the probe, releases unresolved renderer writes, clears tracked hook timers, restores the previous global `window`, clears the store, and removes its temporary file.
+
+The optional `initialTask` host input changes only fixture state. It can assign a unique task ID, initial description, and starting `__mcpRevision` before hydration. Expected mutations are never written through that input: deterministic tests still use the production MCP dispatcher, while a later live test can use its real transport/provider path.
+
+```ts
+const host = await createWorkspaceExternalSyncTestHost({
+  initialTask: {
+    id: 'unique-task-id',
+    description: 'Initial fixture description',
+    revision: 7,
+  },
+});
+
+try {
+  // Drive the deterministic MCP dispatcher or a live external writer here.
+} finally {
+  await host.cleanup();
+}
+```
 
 The deferred `storeSetMany` is important: using real timing would make the human-write/agent-write ordering nondeterministic and the race test flaky.
 
@@ -87,7 +108,7 @@ The regression checks are the unchanged `storeSetMany` call count across synchro
 
 ### MCP write during a local write
 
-The third test first drains unrelated writes produced by initial hydration. It then:
+The third test explicitly calls `releaseAllStoreSetMany()` to drain unrelated writes produced by initial hydration. It then:
 
 1. changes the task description in renderer state;
 2. holds the renderer's `storeSetMany` write open;
@@ -117,12 +138,14 @@ Those boundaries have separate service and protocol tests. A true ACP-to-rendere
 
 ## Extending the harness
 
-Use the existing bridge and production handler instead of assigning fixture JSON directly.
+Use the extracted host and production handler instead of assigning expected fixture JSON directly.
 
 - Add task shapes to an existing MCP fixture only when the fixture remains coherent for its other consumers; otherwise add a focused fixture.
+- Use `initialTask` only to establish initial state when a test needs a unique task ID, description, or starting revision.
 - Read the task with `tasks_get` before every write and pass its current revision.
 - Release pending writes by canonical key with `releaseStoreSetManyForKey`; initial hydration can queue unrelated keys.
-- Wrap React updates, listener calls, timer advancement, and unmounting in `act`.
+- Keep initial-hydration priming explicit with `releaseAllStoreSetMany`; setup never drains it implicitly.
+- Wrap React updates, listener calls, and timer advancement with `runInAct`; always call `cleanup` in `finally`.
 - Assert both renderer state and shared-store state. They can intentionally diverge while a write is in flight.
 - For retry scenarios, assert an additional `storeGetMany` call rather than depending only on elapsed time.
 
