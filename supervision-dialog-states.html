@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Omvra supervision dialog · state board</title>
+  <style>
+    :root { color-scheme: light; font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --ink:#27364f; --muted:#71809a; --line:#dfe7f2; --surface:#f6f8fb; --navy:#111427; --blue:#1769ff; --green:#11b981; --amber:#f59e0b; --red:#e11d48; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-width:1040px; color:var(--ink); background:#eef1f5; }
+    header { padding:28px 34px 20px; background:#fff; border-bottom:1px solid var(--line); }
+    h1 { margin:0 0 6px; font-size:24px; letter-spacing:-.02em; }
+    header p { margin:0; color:var(--muted); }
+    .layout { display:grid; grid-template-columns:270px minmax(620px, 760px); gap:28px; padding:28px 34px 50px; align-items:start; }
+    nav { position:sticky; top:20px; padding:14px; background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:0 8px 24px #24324b0d; }
+    nav h2 { margin:3px 8px 12px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+    nav button { display:block; width:100%; padding:9px 10px; border:0; border-radius:9px; text-align:left; color:var(--ink); background:transparent; cursor:pointer; }
+    nav button:hover, nav button.active { color:var(--blue); background:#edf4ff; }
+    .dialog { overflow:hidden; background:#fff; border:1px solid #d8e0ec; border-radius:18px; box-shadow:0 18px 50px #24324b1c; }
+    .dialog-head { padding:22px 24px 19px; border-bottom:1px solid var(--line); }
+    .dialog-head h2 { margin:0; font-size:20px; letter-spacing:-.02em; }
+    .dialog-head p { margin:4px 0 0; color:var(--muted); }
+    .body { padding:20px 24px 0; }
+    .badges { display:flex; flex-wrap:wrap; gap:16px; margin-bottom:12px; color:#556a87; }
+    .badge { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+    .pill { display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border:1px solid var(--line); border-radius:99px; font-size:12px; color:#778296; background:#fff; }
+    .dot { width:8px; height:8px; border-radius:50%; background:#c7d1df; }
+    .dot.green { background:var(--green); } .dot.amber { background:var(--amber); } .dot.red { background:var(--red); } .dot.blue { background:var(--blue); }
+    .notice { margin:12px 0 16px; color:var(--blue); font-size:13px; }
+    .notice.error { color:var(--red); }
+    .section { margin:16px 0; }
+    .section-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-weight:600; }
+    .section-title small { color:#94a1b7; font-weight:400; }
+    .stages, .activity, .permission, .input-request { padding:14px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+    .stage { display:flex; justify-content:space-between; gap:20px; padding:4px 0; }
+    .stage span:first-child { display:flex; align-items:center; gap:9px; } .stage span:last-child { color:#637695; }
+    .output { padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; }
+    .eyebrow { display:flex; justify-content:space-between; color:#526886; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+    .output p { margin:12px 0 0; white-space:pre-line; }
+    .output-actions { display:flex; gap:16px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); color:#637695; font-size:12px; }
+    .permission { background:#fff; border-color:#cbd7e8; }
+    .permission h3, .input-request h3 { margin:0 0 5px; font-size:15px; }
+    .permission p, .input-request p { margin:0; color:var(--muted); }
+    .permission code { display:block; margin:12px 0; padding:10px; overflow:auto; border-radius:8px; color:#3d4d67; background:#f1f4f8; }
+    .fields { display:grid; gap:9px; margin-top:12px; }
+    input, textarea { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; color:var(--ink); background:#fff; }
+    textarea { min-height:72px; resize:vertical; }
+    .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+    .button { padding:9px 13px; border:1px solid var(--line); border-radius:8px; color:#52627c; background:#fff; font:inherit; cursor:pointer; }
+    .button.primary { border-color:var(--navy); color:#fff; background:var(--navy); }
+    .button.danger { border-color:#fecdd3; color:#be123c; background:#fff1f2; }
+    .composer { margin:16px 0 20px; padding:14px; border:1px solid var(--line); border-radius:12px; color:#98a5b9; }
+    .footer { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 24px; border-top:1px solid var(--line); }
+    .footer-copy { color:#637695; font-size:12px; }
+    .footer-actions { display:flex; justify-content:flex-end; gap:8px; }
+    .hidden { display:none; }
+    .legend { margin-top:14px; padding:13px 14px; border:1px dashed #cbd7e8; border-radius:12px; color:#637695; font-size:12px; background:#fff; }
+    @media (max-width: 900px) { body { min-width:0; } .layout { grid-template-columns:1fr; } nav { position:static; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Supervision dialog · state board</h1>
+    <p>Static design reference for task execution, provider sessions, permissions, input, MCP, and completion states.</p>
+  </header>
+  <main class="layout">
+    <nav aria-label="Dialog states">
+      <h2>States</h2>
+      <button class="active" data-state="starting">Starting</button>
+      <button data-state="working">Working</button>
+      <button data-state="permission">Permission request</button>
+      <button data-state="input">Input request</button>
+      <button data-state="batch">Batch completed</button>
+      <button data-state="interrupted">Interrupted / resume</button>
+      <button data-state="failed">Failed / restart</button>
+      <button data-state="mcp">MCP unavailable</button>
+      <button data-state="completed">Task completed</button>
+      <button data-state="blocked">Blocked by task state</button>
+      <div class="legend"><strong>Action rule</strong><br>One contextual primary action. Session controls belong in an overflow menu.</div>
+    </nav>
+
+    <section class="dialog" aria-live="polite">
+      <div class="dialog-head"><h2>Open supervision</h2><p>Follow the agent’s task progress, blockers, and outcome. Guidance is optional.</p></div>
+      <div class="body">
+        <div class="badges"><span class="badge">Agent status <span class="pill" data-value="agent"><i class="dot green"></i>Agent is starting</span></span><span class="badge">Execution status <span class="pill" data-value="execution"><i class="dot amber"></i>Starting batch 1</span></span><span class="badge">Task status <span class="pill"><i class="dot green"></i>In progress</span></span></div>
+        <div class="notice" data-value="notice">ⓘ Connecting to the agent</div>
+        <div class="section"><div class="section-title">Work stages</div><div class="stages"><div class="stage"><span><i class="dot green"></i>Agent connection</span><span data-value="connection">Connecting</span></div><div class="stage"><span><i class="dot"></i>Task instructions</span><span data-value="instructions">Not sent yet</span></div><div class="stage"><span><i class="dot"></i>Agent work</span><span data-value="work">Not started</span></div></div></div>
+        <div class="section"><div class="section-title">Agent activity <small>Task progress only</small></div><div class="activity">
+          <div class="output" data-panel="output"><div class="eyebrow"><span>Agent output</span><span>Latest response</span></div><p data-value="output">The runtime is starting. Detailed activity will appear when the provider reports it.</p><div class="output-actions"><span>▢ Copy output</span><span>⊞ Use as follow-up</span></div></div>
+          <div class="permission hidden" data-panel="permission"><h3>Permission needed</h3><p>The agent is requesting access before continuing.</p><code>mcp__omvra__tasks_update<br>Update the current task description</code><div class="actions"><button class="button">Deny</button><button class="button primary">Allow</button></div></div>
+          <div class="input-request hidden" data-panel="input"><h3>Agent needs input</h3><p>Answer the question below to let the agent continue.</p><div class="fields"><textarea placeholder="Your response"></textarea></div><div class="actions"><button class="button primary">Send response</button></div></div>
+        </div></div>
+        <div class="composer">Start an optional follow-up</div>
+      </div>
+      <footer class="footer"><div class="footer-copy" data-value="footer">Omvra is starting this task turn.</div><div class="footer-actions"><button class="button">Minimize supervision</button><button class="button primary" data-value="primary">Continue work</button></div></footer>
+    </section>
+  </main>
+  <script>
+    const states = {
+      starting:{agent:'Agent is starting',execution:'Starting batch 1',notice:'ⓘ Connecting to the agent',connection:'Connecting',instructions:'Not sent yet',work:'Not started',output:'The runtime is starting. Detailed activity will appear when the provider reports it.',footer:'Omvra is starting this task turn.',primary:'Cancel start',panel:'output'},
+      working:{agent:'Working',execution:'Batch 1 in progress',notice:'',connection:'Connected',instructions:'Sent and accepted',work:'In progress',output:'The agent is working on the task. New activity will appear here as it is reported.',footer:'The agent is working on this task.',primary:'Minimize',panel:'output'},
+      permission:{agent:'Waiting for permission',execution:'Blocked by approval',notice:'⚠ The agent is waiting for permission',connection:'Connected',instructions:'Sent and accepted',work:'Waiting for approval',output:'',footer:'Allow or deny the request to continue.',primary:'',panel:'permission'},
+      input:{agent:'Waiting for input',execution:'Blocked by input',notice:'ⓘ The agent needs your input',connection:'Connected',instructions:'Sent and accepted',work:'Waiting for input',output:'',footer:'Answer the agent’s question to continue.',primary:'',panel:'input'},
+      batch:{agent:'Last batch completed',execution:'Batch finished · Batch 5',notice:'ⓘ Last batch completed',connection:'Connected',instructions:'Sent and accepted',work:'Batch finished',output:'The latest batch completed successfully. The task remains open for more work.',footer:'The agent completed its latest work batch.',primary:'Continue work',panel:'output'},
+      interrupted:{agent:'Session interrupted',execution:'Paused',notice:'⚠ The provider session is no longer connected',connection:'Disconnected',instructions:'Previously accepted',work:'Interrupted',output:'The provider session ended unexpectedly. Task context is preserved.',footer:'Resume work to reconnect the provider session.',primary:'Resume work',panel:'output'},
+      failed:{agent:'Previous runtime unavailable',execution:'Failed',notice:'⚠ Failed execution',connection:'Unavailable',instructions:'Not sent',work:'Not started',output:'The previous provider session failed before completing this turn. Task context is preserved.',footer:'Restart work to create a fresh provider session.',primary:'Restart work',panel:'output'},
+      mcp:{agent:'MCP unavailable',execution:'Blocked before start',notice:'⚠ Omvra MCP could not be reached',connection:'Connected',instructions:'Not sent',work:'Blocked',output:'The provider started, but the Omvra MCP server did not become available. Review runtime diagnostics before retrying.',footer:'Fix MCP connectivity, then restart work.',primary:'Restart work',panel:'output'},
+      completed:{agent:'Completed',execution:'Batch finished',notice:'✓ Task completed',connection:'Closed',instructions:'Accepted',work:'Completed',output:'The agent reported a completed outcome for this task.',footer:'This task is complete. Follow-up is unavailable unless the task is reopened.',primary:'Close',panel:'output'},
+      blocked:{agent:'Ready',execution:'Not started',notice:'⚠ Task cannot start',connection:'Not started',instructions:'Not sent',work:'Blocked',output:'Resolve the task blocker or required repository/runtime configuration before starting work.',footer:'No provider session has been created.',primary:'Review blockers',panel:'output'}
+    };
+    const setText=(key,value)=>document.querySelectorAll(`[data-value="${key}"]`).forEach(el=>el.textContent=value);
+    function show(name){const s=states[name]; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.state===name)); ['permission','input'].forEach(panel=>document.querySelector(`[data-panel="${panel}"]`).classList.toggle('hidden',s.panel!==panel)); document.querySelector('[data-panel="output"]').classList.toggle('hidden',s.panel!=='output'); Object.entries(s).forEach(([k,v])=>setText(k,v)); document.querySelector('[data-value="notice"]').classList.toggle('error',['failed','mcp'].includes(name)); document.querySelector('[data-value="primary"]').classList.toggle('hidden',!s.primary); }
+    document.querySelectorAll('nav button').forEach(button=>button.addEventListener('click',()=>show(button.dataset.state)));
+  </script>
+</body>
+</html>
