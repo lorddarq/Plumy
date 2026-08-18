@@ -13,6 +13,7 @@ import {
 } from './ui/context-menu';
 import { TaskSessionComposer } from './TaskSessionComposer';
 import { RuntimePermissionCard, requestValueKey, type RuntimePermissionField, type RuntimePermissionRequest } from './RuntimePermissionCard';
+import { buildPermissionResponse } from './runtimePermissionResponse';
 import { ExecutionNotice } from './ExecutionNotice';
 import { AgentLoadingState } from './AgentLoadingState';
 import { StateBadge } from './statuses/AppStatusBar';
@@ -475,12 +476,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setRequestBusy(true);
     setError(null);
     try {
-      const content = action === 'accept'
-        ? Object.fromEntries(request.fields.map(field => [field.name, requestFieldValue(request, field, requestValues)]))
-        : null;
-      const response = request.responseKind === 'codex-approval'
-        ? { decision: action === 'accept' ? 'accept' : 'decline' }
-        : { action, content, _meta: null };
+      const response = buildPermissionResponse(request, action, Object.fromEntries(request.fields.map(field => [field.name, requestFieldValue(request, field, requestValues)])));
       const result = await window.electron?.agentRuntime?.sessions?.respond?.({
         bindingId: binding.id,
         requestId: request.requestId,
