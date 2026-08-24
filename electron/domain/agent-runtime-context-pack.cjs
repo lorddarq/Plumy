@@ -53,9 +53,30 @@ function normalizeExecutionProfile(value) {
 
 function normalizeTaskMetadata(value) {
   if (!value || typeof value !== 'object') return null;
+  const timelineProject = value.timelineProject && typeof value.timelineProject === 'object'
+    ? {
+        status: boundedText(value.timelineProject.status, 80) || null,
+        id: boundedText(value.timelineProject.id, 160) || null,
+        name: boundedText(value.timelineProject.name, 240) || null,
+        description: boundedText(value.timelineProject.description, 2_000) || null,
+        repositoryFolder: boundedText(value.timelineProject.repositoryFolder, 2_000) || null,
+      }
+    : null;
+  const workspaceResolution = value.workspaceResolution && typeof value.workspaceResolution === 'object'
+    ? {
+        status: boundedText(value.workspaceResolution.status, 80) || null,
+        source: boundedText(value.workspaceResolution.source, 80) || null,
+        repositoryFolder: boundedText(value.workspaceResolution.repositoryFolder, 2_000) || null,
+        timelineProjectId: boundedText(value.workspaceResolution.timelineProjectId, 160) || null,
+      }
+    : null;
   return {
     assigneeId: boundedText(value.assigneeId, 160) || null,
     projectId: boundedText(value.projectId, 160) || null,
+    projectIds: (Array.isArray(value.projectIds) ? value.projectIds : []).slice(0, 100).map(id => boundedText(id, 160)).filter(Boolean),
+    swimlaneId: boundedText(value.swimlaneId, 160) || null,
+    timelineProject,
+    workspaceResolution,
     milestoneId: boundedText(value.milestoneId, 160) || null,
     dependencyIds: (Array.isArray(value.dependencyIds) ? value.dependencyIds : []).slice(0, 100).map(id => boundedText(id, 160)).filter(Boolean),
     priority: boundedText(value.priority, 80) || null,

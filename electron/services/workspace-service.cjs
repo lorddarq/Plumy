@@ -1722,9 +1722,48 @@ const {
   listAssignedWorkForAgent,
 } = personContextService;
 
+function resolveTimelineProjectExecutionContext(store, task) {
+  const timelineProjectId = normalizeString(task?.swimlaneId).trim();
+  const taskRepositoryFolder = normalizeString(task?.repositoryFolder).trim();
+  if (!timelineProjectId) {
+    return {
+      timelineProject: { status: 'unassigned', id: null, name: null, description: null, repositoryFolder: null },
+      workspaceResolution: {
+        status: taskRepositoryFolder ? 'resolved' : 'missing',
+        source: taskRepositoryFolder ? 'task-override' : null,
+        repositoryFolder: taskRepositoryFolder || null,
+        timelineProjectId: null,
+      },
+    };
+  }
+
+  const project = readArray(store, SWIMLANES_KEY)
+    .map(normalizeProjectForMcp)
+    .find(candidate => normalizeString(candidate?.id).trim() === timelineProjectId);
+  const projectRepositoryFolder = normalizeString(project?.repositoryFolder).trim();
+  const repositoryFolder = taskRepositoryFolder || projectRepositoryFolder;
+
+  return {
+    timelineProject: {
+      status: project ? (projectRepositoryFolder ? 'resolved' : 'repository-unconfigured') : 'not-found',
+      id: timelineProjectId,
+      name: normalizeString(project?.name).trim() || null,
+      description: normalizeString(project?.description).trim() || null,
+      repositoryFolder: projectRepositoryFolder || null,
+    },
+    workspaceResolution: {
+      status: repositoryFolder ? 'resolved' : 'missing',
+      source: taskRepositoryFolder ? 'task-override' : projectRepositoryFolder ? 'timeline-project' : null,
+      repositoryFolder: repositoryFolder || null,
+      timelineProjectId,
+    },
+  };
+}
+
 function resolveTaskExecutionContext(store, taskId, options = {}) {
   const preflight = resolvePersonTaskExecutionContext(store, taskId);
   if (!preflight.task) return preflight;
+  const { timelineProject, workspaceResolution } = resolveTimelineProjectExecutionContext(store, preflight.task);
   const projection = taskContextLedgerService.project(store, { taskId });
   const taskContext = projection.ok ? projection.taskContext : null;
   const preferences = store.get(PREFERENCES_KEY) || {};
@@ -1768,13 +1807,15 @@ function resolveTaskExecutionContext(store, taskId, options = {}) {
     taskTitle: preflight.task.title,
     taskDescription: preflight.task.notes,
     taskStatus: preflight.task.status,
-    taskMetadata: preflight.task,
+    taskMetadata: { ...preflight.task, timelineProject, workspaceResolution },
     contextEntryIds,
     executionProfile,
   });
-  if (!contract.ok) return { ...preflight, taskContext, executionProfile, skillResolution, contractError: contract };
+  if (!contract.ok) return { ...preflight, timelineProject, workspaceResolution, taskContext, executionProfile, skillResolution, contractError: contract };
   return {
     ...preflight,
+    timelineProject,
+    workspaceResolution,
     taskContext,
     executionProfile,
     skillResolution,

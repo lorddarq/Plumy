@@ -12,6 +12,10 @@ _Avoid_: App state, runtime state
 A consistent observation of the Workspace after a complete mutation. Runtime Operations and UI Session changes do not invalidate it.
 _Avoid_: Runtime snapshot, UI state
 
+**Timeline Project Binding**:
+The current Timeline project to which a task belongs. It is the authoritative project relationship for resolving that task's default working repository and changes when the task is moved.
+_Avoid_: Roadmap project, cached workspace
+
 **Runtime Operations**:
 The live operational activity of agents and connections, including ACP sessions, MCP availability, watches, and their current observations.
 _Avoid_: Workspace, agent state

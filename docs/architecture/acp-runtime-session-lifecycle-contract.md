@@ -63,6 +63,9 @@ Persona operational instructions are portable best-effort references. A bare ref
 Goal requirements use a separate strict contract. A pre-dispatch requirement must resolve from an Omvra-managed catalogue or explicit runtime advertisement; an unverifiable provider-private reference cannot satisfy a required Goal capability. This strict Goal rule does not convert portable persona references into blocking requirements.
 
 `tasks.get` automatically exposes this contract with the task so copying a task id into a direct MCP-capable client does not create a weaker persona path. `agent.resolve_task_context` exposes the same structured result explicitly. Managed start, continue, and resume prompts rebuild it from current workspace state. Full persona, prompt, and skill bodies are composed on demand and are not persisted in attempts, session events, audit records, or backups.
+
+The contract also resolves the task's current Timeline project binding on every read. `task.swimlaneId` identifies the authoritative Timeline project; the response includes that project's bounded metadata and repository folder plus the effective workspace source. This projection is never copied back onto the task, so moving a task to another Timeline project or changing that project's repository folder changes the next `tasks.get`, `agent.resolve_task_context`, managed start, continue, or resume result. An explicit task repository-folder override remains higher precedence for the effective working directory, while the Timeline project binding remains visible.
+
 - Keep one Electron deployment and one workspace. No service split or plugin framework is justified.
 
 ### Quality goals

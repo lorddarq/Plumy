@@ -1853,6 +1853,50 @@ test('assigned task reads and execution preflight expose the same mandatory prof
   assert.equal(taskRead.result.content[0].text, resolved.executionContract.text);
 });
 
+test('task execution context resolves the current Timeline project repository after reassignment', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set('omvra.swimlanes.v1', store.get('omvra.swimlanes.v1').map(project => ({
+    ...project,
+    repositoryFolder: project.id === 'lane-1' ? '/repos/project-a' : '/repos/project-b',
+  })));
+  const dispatch = createRequestDispatcher(store);
+  const call = (id, name) => dispatch({
+    jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: { taskId: 'task-1' } },
+  }, makeReq()).result;
+  const resolve = id => call(id, 'agent.resolve_task_context').structuredContent;
+
+  const initial = resolve('timeline-project-initial');
+  assert.equal(initial.timelineProject.id, 'lane-1');
+  assert.equal(initial.workspaceResolution.source, 'timeline-project');
+  assert.equal(initial.workspaceResolution.repositoryFolder, '/repos/project-a');
+  assert.match(initial.executionContract.text, /"swimlaneId":"lane-1"/);
+  assert.match(initial.executionContract.text, /\/repos\/project-a/);
+
+  store.set(TASKS_KEY, store.get(TASKS_KEY).map(task => task.id === 'task-1'
+    ? { ...task, swimlaneId: 'lane-2' }
+    : task));
+
+  const reassigned = resolve('timeline-project-reassigned');
+  assert.equal(reassigned.timelineProject.id, 'lane-2');
+  assert.equal(reassigned.timelineProject.name, 'Project B');
+  assert.equal(reassigned.workspaceResolution.repositoryFolder, '/repos/project-b');
+  assert.match(reassigned.executionContract.text, /"swimlaneId":"lane-2"/);
+  assert.doesNotMatch(reassigned.executionContract.text, /\/repos\/project-a/);
+
+  const taskRead = call('timeline-project-task-read', 'tasks.get');
+  assert.equal(taskRead.structuredContent.executionContext.timelineProject.id, 'lane-2');
+  assert.equal(taskRead.structuredContent.executionContext.workspaceResolution.repositoryFolder, '/repos/project-b');
+  assert.match(taskRead.content[0].text, /\/repos\/project-b/);
+
+  store.set(TASKS_KEY, store.get(TASKS_KEY).map(task => task.id === 'task-1'
+    ? { ...task, swimlaneId: null, repositoryFolder: '/repos/task-override' }
+    : task));
+  const explicitlyLocated = resolve('timeline-project-unassigned-with-override');
+  assert.equal(explicitlyLocated.timelineProject.status, 'unassigned');
+  assert.equal(explicitlyLocated.workspaceResolution.source, 'task-override');
+  assert.equal(explicitlyLocated.workspaceResolution.repositoryFolder, '/repos/task-override');
+});
+
 test('task context MCP tools append, retrieve sources, and enrich bounded preflight', () => {
   const store = makeStoreFromFixture('workspace-basic');
   store.set(PREFERENCES_KEY, { mcpAgentAccessEnabled: true, mcpCapabilityProfile: 'task_write' });
