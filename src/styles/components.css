@@ -804,19 +804,13 @@
 }
 
 .roadmap-toolbar-center {
-  pointer-events: none;
-  position: absolute;
-  left: 50%;
-  top: 50%;
   display: inline-flex;
+  flex: 1 1 auto;
+  min-width: 0;
   align-items: center;
+  justify-content: center;
   gap: 0.75rem;
-  transform: translate(-50%, -50%);
   white-space: nowrap;
-}
-
-.roadmap-toolbar-center > * {
-  pointer-events: auto;
 }
 
 .kanban-filter-control {
@@ -1462,11 +1456,9 @@
   }
 
   .roadmap-toolbar-center {
-    position: static;
     order: 2;
     width: 100%;
     justify-content: space-between;
-    transform: none;
     white-space: normal;
   }
 }

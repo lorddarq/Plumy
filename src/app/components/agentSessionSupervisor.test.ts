@@ -94,9 +94,11 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(statusBar, /pendingRequest\.message/);
   assert.match(statusBar, /Input request unavailable/);
   const activityIndex = execution.indexOf('Agent activity');
-  const pendingDecisionIndex = execution.indexOf("respondToRequest(request, 'decline')");
-  assert.ok(pendingDecisionIndex > activityIndex, 'Pending request actions must remain beside the anchored composer area');
-  assert.match(execution, />Decline<\/button>/);
+  const pendingActionsIndex = execution.indexOf("onRespond={(request, action) => void respondToRequest(request, action)}");
+  assert.ok(pendingActionsIndex > activityIndex, 'Pending request actions must remain beside the anchored composer area');
+  const permissionCard = readComponent('RuntimePermissionCard.tsx');
+  assert.match(permissionCard, />Deny<\/button>/);
+  assert.match(permissionCard, /onRespond\(request, 'decline'\)/);
   assert.match(execution, /requestFieldIsMissing/);
   assert.match(execution, /Reconnect session/);
   assert.match(execution, /onBlockedByBinding\(result\.binding/);
@@ -107,7 +109,7 @@ test('Timeline scroll does not publish unchanged horizontal metrics', () => {
   const source = readComponent('views/TimelineView.tsx');
   assert.match(source, /HORIZONTAL_METRICS_STEP_PX = 64/);
   assert.match(source, /Math\.abs\(nextMetrics\.scrollLeft - publishedMetrics\.scrollLeft\) >= HORIZONTAL_METRICS_STEP_PX/);
-  assert.match(source, /leftList\.style\.transform = `translate3d\(0, -\$\{scrollTop\}px, 0\)`/);
+  assert.match(source, /leftListContent\.style\.transform = `translate3d\(0, -\$\{scrollTop\}px, 0\)`/);
 });
 
 test('task supervision prefers an in-flight turn or reusable ready session over closed history', () => {

@@ -215,7 +215,7 @@ interface AnchoredPanelNavProps {
 
 export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: AnchoredPanelNavProps) {
   return (
-    <nav className="omvra-settings-nav min-h-0 overflow-x-auto overflow-y-hidden px-2 pb-2 pt-7" aria-label="Panel sections">
+    <nav className="omvra-settings-nav min-h-0 overflow-x-auto overflow-y-hidden sm:overflow-y-auto px-2 pb-2 pt-7" aria-label="Panel sections">
       <div className="flex min-w-max gap-4 sm:min-w-0 sm:block">
         {onBack && (
           <Button type="button" variant="ghost" onClick={onBack} className="justify-start px-3">
