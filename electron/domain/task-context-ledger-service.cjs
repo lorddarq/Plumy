@@ -1,6 +1,7 @@
 const { randomUUID } = require('crypto');
 const { isDeepStrictEqual } = require('util');
 
+const TASK_CONTEXT_ENTRIES_KEY = 'omvra.taskContextEntries.v1';
 const TASK_CONTEXT_SCHEMA_VERSION = 1;
 const TASK_CONTEXT_KINDS = new Set([
   'requirement-change',
@@ -459,6 +460,7 @@ function createTaskContextLedgerService({
 }
 
 module.exports = {
+  TASK_CONTEXT_ENTRIES_KEY,
   TASK_CONTEXT_SCHEMA_VERSION,
   TASK_CONTEXT_KINDS,
   TASK_CONTEXT_PROVENANCE,

@@ -1,6 +1,88 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
 const { createAgentRuntimeSessionRunner } = require('./agent-runtime-session-runner.cjs');
+
+test('Electron shutdown disposes the runtime runner before other main-process resources', () => {
+  const mainSource = readFileSync(require.resolve('../main.cjs'), 'utf8');
+  const shutdownStart = mainSource.indexOf("app.on('before-quit'");
+  const shutdown = mainSource.slice(shutdownStart, mainSource.indexOf('registerStoreIpcHandlers({', shutdownStart));
+  assert.match(shutdown, /agentRuntimeSessionRunner\.dispose\(\)/);
+  assert.ok(shutdown.indexOf('agentRuntimeSessionRunner.dispose()') < shutdown.indexOf('mcpHttpServer.close()'));
+});
+
+test('runner disposal closes live resources and reconciles session state exactly once', async () => {
+  let binding = {
+    id: 'binding-shutdown', revision: 2, runtimeProfileId: 'runtime-1', state: 'interrupted', opaqueSessionRef: 'thread-1',
+    scope: { kind: 'task', taskId: 'task-1' },
+  };
+  let notify;
+  let closeCount = 0;
+  let unsubscribeCount = 0;
+  let interruptedSessionTransitions = 0;
+  const events = [];
+  const timers = [];
+  const clearedTimers = new Set();
+  const runner = createAgentRuntimeSessionRunner({
+    store: {},
+    resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1', integrationMode: 'codex-app-server-stdio' } }),
+    confirmStart: () => ({ canStart: false }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: () => ({ ok: false }),
+    updateBinding: (_store, input) => {
+      if (input.state === 'interrupted' && binding.state !== 'interrupted') interruptedSessionTransitions += 1;
+      const { bindingId: _bindingId, expectedRevision: _expectedRevision, ...updates } = input;
+      binding = { ...binding, ...updates, revision: binding.revision + 1 };
+      return { ok: true, binding };
+    },
+    appendEvent: (_store, event) => {
+      const stored = { id: `event-${events.length + 1}`, ...event };
+      events.push(stored);
+      return { ok: true, event: stored };
+    },
+    listSessions: (_store, input = {}) => ({ bindings: !input.bindingId || input.bindingId === binding.id ? [binding] : [], events }),
+    createClient: () => ({
+      initialize: async () => ({ capabilities: { resume: true, prompt: true, cancel: true } }),
+      onNotification: callback => { notify = callback; return () => { unsubscribeCount += 1; }; },
+      onLifecycle: () => () => { unsubscribeCount += 1; },
+      resumeSession: async () => ({ sessionId: 'thread-1' }),
+      prompt: async () => ({ accepted: true }),
+      cancel: async () => ({ acknowledged: false }),
+      close: () => { closeCount += 1; },
+    }),
+    setTimer: callback => {
+      const timer = { callback };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimer: timer => { clearedTimers.add(timer); },
+  });
+
+  assert.equal((await runner.resume(binding.id, { workspacePath: '/tmp/workspace' })).ok, true);
+  notify({ method: 'mcpServer/elicitation/request', id: 7, params: { message: 'Confirm?', requestedSchema: { type: 'object', properties: {} } } });
+  assert.equal(runner.listRequests(binding.id).length, 1);
+  assert.equal((await runner.invoke(binding.id, 'cancel')).ok, true);
+  assert.equal(timers.length, 1);
+
+  const disposed = runner.dispose();
+  assert.deepEqual(disposed, { ok: true, idempotent: false, closedClientCount: 1 });
+  assert.equal(closeCount, 1);
+  assert.equal(unsubscribeCount, 2);
+  assert.equal(clearedTimers.has(timers[0]), true);
+  assert.equal(runner.listRequests(binding.id).length, 0);
+  assert.equal(runner.hasLiveSessions(), false);
+  assert.equal(binding.state, 'interrupted');
+  assert.equal(binding.terminalReason, 'app-shutdown');
+  assert.equal(binding.turn.state, 'interrupted');
+  assert.equal(interruptedSessionTransitions, 1);
+  assert.equal(events.filter(event => event.nativeEventType === 'omvra/runtime/connection-lost').length, 1);
+
+  assert.deepEqual(runner.dispose(), { ok: true, idempotent: true, closedClientCount: 0 });
+  assert.equal(closeCount, 1);
+  assert.equal(interruptedSessionTransitions, 1);
+  await timers[0].callback();
+  assert.equal(interruptedSessionTransitions, 1, 'a cleared shutdown timer cannot mutate the binding later');
+});
 
 test('does not start a second active task turn', async () => {
   let confirmCalls = 0;
@@ -463,4 +545,131 @@ test('closing an orphaned interrupted binding allows replacement after app resta
   assert.equal(result.ok, true);
   assert.equal(result.binding.state, 'closed');
   assert.equal(result.binding.mcpGrantId, 'grant-old');
+});
+
+test('switching providers starts a fresh session from the same durable checkpoint', async () => {
+  const values = new Map();
+  const bindings = [];
+  const checkpointReads = [];
+  const prompts = [];
+  const resumedSessions = [];
+  const startedSessions = [];
+  const store = {
+    get: key => values.get(key),
+    set: (key, value) => values.set(key, value),
+  };
+  const runner = createAgentRuntimeSessionRunner({
+    store,
+    resolveProfile: (_store, payload) => ({
+      ok: true,
+      profile: {
+        id: payload.executionProfileId,
+        integrationMode: 'codex-app-server-stdio',
+        executablePath: `/tmp/${payload.executionProfileId}`,
+      },
+    }),
+    confirmStart: () => ({
+      canStart: true,
+      task: { id: 'task-1', __mcpRevision: 4 },
+      contractSnapshot: {
+        taskId: 'task-1',
+        taskRevision: 4,
+        taskTitle: 'Provider-portable task',
+        taskDescription: 'Continue from durable Omvra context.',
+        contributionId: null,
+        contextEntryIds: ['checkpoint-1'],
+      },
+      contractDigest: 'checkpoint-contract',
+    }),
+    transitionContribution: () => ({ ok: true }),
+    createBinding: (_store, input) => {
+      const binding = {
+        ...input,
+        id: `binding-${bindings.length + 1}`,
+        revision: 0,
+        state: 'starting',
+      };
+      bindings.push(binding);
+      return { ok: true, binding };
+    },
+    updateBinding: (_store, input) => {
+      const index = bindings.findIndex(binding => binding.id === input.bindingId);
+      const { bindingId: _bindingId, expectedRevision: _expectedRevision, ...changes } = input;
+      bindings[index] = { ...bindings[index], ...changes, revision: bindings[index].revision + 1 };
+      return { ok: true, binding: bindings[index] };
+    },
+    appendEvent: () => ({ ok: true }),
+    listSessions: (_store, input = {}) => ({
+      ok: true,
+      bindings: input.bindingId ? bindings.filter(binding => binding.id === input.bindingId) : bindings,
+      events: [],
+    }),
+    getTaskContextEntry: (_store, input) => {
+      checkpointReads.push(input.entryId);
+      return {
+        ok: true,
+        entry: {
+          id: 'checkpoint-1',
+          kind: 'context-checkpoint',
+          fromRevision: 4,
+          toRevision: 4,
+          summary: 'Continue from the accepted durable checkpoint.',
+          sourceRefs: [{ type: 'task-change', id: 'task-1@4' }],
+        },
+      };
+    },
+    createClient: profile => ({
+      initialize: async () => ({ capabilities: { prompt: true, resume: true } }),
+      onNotification: () => {},
+      onLifecycle: () => {},
+      startSession: async (...args) => {
+        startedSessions.push({ profileId: profile.id, args });
+        return { sessionId: `opaque-${profile.id}` };
+      },
+      resumeSession: async sessionId => {
+        resumedSessions.push({ profileId: profile.id, sessionId });
+        return { sessionId };
+      },
+      prompt: async (sessionId, text) => {
+        prompts.push({ profileId: profile.id, sessionId, text });
+        return { accepted: true };
+      },
+      closeSession: async () => {},
+      close: () => {},
+    }),
+  });
+
+  const first = await runner.start({
+    confirmed: true,
+    taskId: 'task-1',
+    executionProfileId: 'runtime-old',
+    workspacePath: '/tmp/workspace',
+    idempotencyKey: 'provider-old',
+  });
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.equal(first.binding.opaqueSessionRef, 'opaque-runtime-old');
+  assert.equal((await runner.close(first.binding.id)).ok, true);
+
+  const replacement = await runner.start({
+    confirmed: true,
+    taskId: 'task-1',
+    executionProfileId: 'runtime-new',
+    workspacePath: '/tmp/workspace',
+    idempotencyKey: 'provider-new',
+  });
+
+  assert.equal(replacement.ok, true, JSON.stringify(replacement));
+  assert.equal(replacement.binding.runtimeProfileId, 'runtime-new');
+  assert.equal(replacement.binding.opaqueSessionRef, 'opaque-runtime-new');
+  assert.equal(bindings[0].state, 'closed');
+  assert.equal(bindings[0].opaqueSessionRef, 'opaque-runtime-old');
+  assert.deepEqual(checkpointReads, ['checkpoint-1', 'checkpoint-1']);
+  assert.deepEqual(startedSessions, [
+    { profileId: 'runtime-old', args: [] },
+    { profileId: 'runtime-new', args: [] },
+  ]);
+  assert.deepEqual(resumedSessions, []);
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[0].text, /Continue from the accepted durable checkpoint/);
+  assert.match(prompts[1].text, /Continue from the accepted durable checkpoint/);
 });

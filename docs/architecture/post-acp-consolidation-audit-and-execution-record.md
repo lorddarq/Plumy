@@ -22,9 +22,9 @@ Decision: migrate named production consumers to an explicit composition object o
 
 ### 2. Persistence: characterize one adapter and retain the web mirror explicitly
 
-Renderer persistence uses `persistJSONWithElectronMirror`, writing localStorage and mirroring to electron-store. Hydration independently mirrors canonical exported values back to localStorage. Electron domain services write electron-store through injected callbacks. This is a deliberate Electron/web compatibility seam, but it creates duplicate serialization paths.
+Renderer persistence is owned by `src/app/store/workspacePersistence.ts`, which batches workspace-provider changes through the `persistJSONBatchWithElectronMirror` adapter in `src/app/utils/storage.ts`. In Electron that adapter writes the preload-exposed electron-store bridge, the canonical durable source. `src/app/store/workspaceHydration.ts` reads that canonical source first and mirrors hydrated values to localStorage for web portability. localStorage is written directly only when the Electron bridge is absent or its write fails; it is not a second canonical store. Electron domain services continue to receive their store operations through composition-root callbacks.
 
-Decision: define one documented persistence adapter/owner for canonical Electron-store writes and keep localStorage only as the explicit web/fallback mirror. Preserve canonical-first hydration, import/export, restart behavior, storage keys, and fallback behavior. Do not introduce a new storage system.
+Decision: `workspacePersistence.ts` is the workspace persistence owner and `persistJSONBatchWithElectronMirror` is its canonical renderer adapter. New workspace writes must enter through that owner; localStorage remains only the explicit web/fallback mirror. Preserve canonical-first hydration, import/export, restart behavior, storage keys, and fallback behavior. Do not introduce a new storage system.
 
 ### 3. Normalization: reduce plumbing only where caller inventory proves duplication
 

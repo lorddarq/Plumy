@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { toast } from 'sonner';
 import type { Task, TimelineSwimlane } from '../types';
 import { TaskExecutionAction } from './TaskExecutionAction';
-import { agentRuntimeTurnState, isAgentRuntimeTurnInFlight, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
+import { agentRuntimeTurnState, isAgentRuntimeTurnInFlight, projectAgentRuntimeSession, type AgentRuntimeDockState, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
 import { measurePerformanceOperation } from '../services/performanceLogging.ts';
 import { findNewCompletedTaskRuns, type RuntimeEvent } from '../utils/agentRuntimeNotifications.ts';
 import { areSerializedValuesEqual } from '../store/workspaceSelectors.ts';
@@ -44,7 +44,7 @@ interface AgentSessionLauncherContextValue {
 }
 
 export interface SessionDockProjection {
-  state: 'none' | 'starting' | 'working' | 'hidden-active' | 'ready' | 'needs-input' | 'interrupted' | 'failed' | 'history' | 'blocked';
+  state: AgentRuntimeDockState;
   binding?: SessionBinding;
   task?: Task;
   historyCount: number;
@@ -105,6 +105,32 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
         toast.success('Agent run finished', { id: run.eventId, description: task?.title || run.taskId });
       }
     };
+    const readPendingRequest = async (binding: SessionBinding) => {
+      const requests = await measurePerformanceOperation('acp', 'supervisor.requests.list', async () => (
+        window.electron?.agentRuntime?.sessions?.requests?.(binding.id)
+      ));
+      const request = Array.isArray(requests) ? requests[0] : undefined;
+      return request && typeof request.message === 'string' ? { requestId: request.requestId, message: request.message } : undefined;
+    };
+    const refreshPendingRequest = async (binding: SessionBinding) => {
+      if (agentRuntimeTurnState(binding) !== 'waiting-input') {
+        if (!disposed) setPendingRequestsByBinding(current => {
+          if (!(binding.id in current)) return current;
+          const next = { ...current };
+          delete next[binding.id];
+          return next;
+        });
+        return;
+      }
+      const nextRequest = await readPendingRequest(binding);
+      if (!disposed) setPendingRequestsByBinding(current => {
+        if (areSerializedValuesEqual(current[binding.id], nextRequest)) return current;
+        const next = { ...current };
+        if (nextRequest) next[binding.id] = nextRequest;
+        else delete next[binding.id];
+        return next;
+      });
+    };
     const refresh = async () => {
       if (refreshRunning || disposed) return;
       refreshRunning = true;
@@ -120,11 +146,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
         const requestEntries = await Promise.all(nextBindings
           .filter(binding => agentRuntimeTurnState(binding) === 'waiting-input')
           .map(async binding => {
-            const requests = await measurePerformanceOperation('acp', 'supervisor.requests.list', async () => (
-              window.electron?.agentRuntime?.sessions?.requests?.(binding.id)
-            ));
-            const request = Array.isArray(requests) ? requests[0] : undefined;
-            return [binding.id, request && typeof request.message === 'string' ? { requestId: request.requestId, message: request.message } : undefined] as const;
+            return [binding.id, await readPendingRequest(binding)] as const;
           }));
         if (!disposed) {
           setBindings(current => areSerializedValuesEqual(current, nextBindings) ? current : nextBindings);
@@ -136,11 +158,18 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       }
     };
     void refresh();
+    // Keep a bounded recovery poll for missed runtime events; live events update only their binding/request below.
     const timer = window.setInterval(() => void refresh(), 10000);
     const unsubscribe = window.electron?.agentRuntime?.sessions?.onEvent?.((payload) => {
       if (!payload?.binding) return;
-      if (payload.kind === 'event' && payload.event) notifyCompletedRuns([payload.event as RuntimeEvent], [payload.binding as SessionBinding]);
-      void refresh();
+      const nextBinding = payload.binding as SessionBinding;
+      if (payload.kind === 'event' && payload.event) notifyCompletedRuns([payload.event as RuntimeEvent], [nextBinding]);
+      setBindings(current => {
+        const index = current.findIndex(binding => binding.id === nextBinding.id);
+        const next = index < 0 ? [...current, nextBinding] : current.map(binding => binding.id === nextBinding.id ? nextBinding : binding);
+        return areSerializedValuesEqual(current, next) ? current : next;
+      });
+      void refreshPendingRequest(nextBinding);
     });
     return () => {
       disposed = true;
@@ -181,19 +210,18 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
     .slice(0, 8)
     .map(binding => ({ binding, task: tasks.find(task => task.id === binding.scope?.taskId), pendingRequest: pendingRequestsByBinding[binding.id] }));
   const blockedByActiveSession = Boolean(activeBinding && request && activeBinding.scope?.taskId !== request.task.id);
+  const activeSessionProjection = projectAgentRuntimeSession(activeBinding, [], {
+    blocked: blockedByActiveSession,
+    supervisionVisible,
+  });
   const sessionDock = useMemo<SessionDockProjection>(() => ({
-    state: blockedByActiveSession ? 'blocked' : activeBinding
-      ? ['queued', 'starting'].includes(agentRuntimeTurnState(activeBinding) || '') ? 'starting' : agentRuntimeTurnState(activeBinding) === 'waiting-input' ? 'needs-input' : supervisionVisible ? 'working' : 'hidden-active'
-      : readyBinding ? 'ready'
-      : historyBinding?.state === 'interrupted' ? 'interrupted'
-        : historyBinding?.state === 'failed' ? 'failed'
-          : historyBinding ? 'history' : 'none',
+    state: activeBinding ? activeSessionProjection.dockState : projectAgentRuntimeSession(readyBinding || historyBinding).dockState,
     binding: dockBinding,
     task: dockTask,
     historyCount: bindings.filter(binding => HISTORY_SESSION_STATES.has(binding.state)).length,
     items: dockItems,
     pendingRequest: dockBinding ? pendingRequestsByBinding[dockBinding.id] : undefined,
-  }), [activeBinding, bindings, blockedByActiveSession, dockBinding, dockItems, dockTask, historyBinding, pendingRequestsByBinding, readyBinding, supervisionVisible]);
+  }), [activeBinding, activeSessionProjection.dockState, bindings, dockBinding, dockItems, dockTask, historyBinding, pendingRequestsByBinding, readyBinding]);
   const value = useMemo(() => ({ requestTask, sessionDock, openSession: openBinding }), [openBinding, requestTask, sessionDock]);
   const launcherValue = useMemo(() => ({ requestTask }), [requestTask]);
   return (

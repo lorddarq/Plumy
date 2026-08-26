@@ -6,6 +6,7 @@ const path = require('node:path');
 const { EventEmitter } = require('node:events');
 
 const { createRequestDispatcher, waitForMcpHttpServerReady } = require('./mcp-http-server.cjs');
+const { recordToolAttempt } = require('./mcp-audit-adapter.cjs');
 const { issueScopedMcpGrant, _resetForTests } = require('./agent-runtime-mcp-grant.cjs');
 const {
   MILESTONES_KEY,
@@ -106,6 +107,24 @@ test('tools call audit events capture normalized metadata without payloads', () 
   assert.deepEqual(audit.target, { taskId: null, projectId: null, entityId: null });
   assert.equal(Object.prototype.hasOwnProperty.call(audit, 'arguments'), false);
   assert.equal(JSON.stringify(audit).includes('private payload must not persist'), false);
+  assert.deepEqual(Object.keys(audit).sort(), [
+    'agent', 'auditId', 'clientName', 'clientVersion', 'durationMs', 'failureClass', 'finishedAt', 'origin',
+    'outcome', 'schemaVersion', 'startedAt', 'target', 'timestamp', 'toolName', 'transport', 'type',
+  ].sort());
+  assert.deepEqual(Object.keys(audit.target).sort(), ['entityId', 'projectId', 'taskId']);
+});
+
+test('MCP audit adapter drops an unexpected otherwise-safe field before persistence', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const audit = recordToolAttempt(store, makeReq({ 'x-mcp-client': 'Codex' }), {
+    type: 'mcp_tool_call',
+    toolName: 'tasks.list',
+    outcome: 'success',
+    unexpectedSafeField: 'harmless-but-not-allow-listed',
+  });
+
+  assert.equal(Object.prototype.hasOwnProperty.call(audit, 'unexpectedSafeField'), false);
+  assert.equal(JSON.stringify(store.get('omvra.mcp.audit.v1')).includes('harmless-but-not-allow-listed'), false);
 });
 
 test('diagnostics audit summary returns aggregates without raw events', () => {

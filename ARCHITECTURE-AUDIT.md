@@ -44,13 +44,7 @@ A single component owns ~15 `useState` slots, preflight orchestration, blocker/w
 
 ### MCP
 
-**[HIGH] Two stale `TODO(next-phase)` comments in `electron/services/mcp-http-server.cjs:577-578` describe work that is already done.**
-```
-// TODO(next-phase): add client authentication and session binding before exposing beyond local development.
-// TODO(next-phase): enable write tools only after safe-write implementation is complete.
-```
-Bearer-token auth is implemented and wired (`extractBearerToken`, `authMode: serverConfig.accessToken ? 'token' : 'none'` at lines 45-59 and 171-213), scoped per-session grants exist (`electron/services/agent-runtime-mcp-grant.cjs`, consumed by the session runner for Claude sessions), and the `task_write` capability profile is live end-to-end (surfaced in `TaskExecutionAction.tsx`'s "Select Task Write under Settings → MCP Access" copy). These comments actively mislead anyone reading the file cold into thinking auth and write access are unimplemented.
-Matching stale comments: `src/app/services/mcp/client.ts:129` and `src/app/services/mcp/service.ts:508` (`TODO(phase-2): add authenticated write-call pathways` / `expose write operations once auth scopes and audit log are implemented`) — unverified whether the renderer MCP client itself has a real gap or these are simply orphaned copy-paste comments from the same era.
+**[NONE — resolved]** The stale MCP authentication and write-access TODOs were removed after their implementations were verified. Bearer-token auth, scoped session grants, and the `task_write` capability profile remain covered by the current MCP contracts.
 
 **[MEDIUM] The two largest MCP modules have no unit-level test seam.**
 `mcp-handlers.cjs` (1501 lines) and `mcp-registry.cjs` (1085 lines) — plus `mcp-resource-handlers.cjs`, `mcp-response.cjs`, `mcp-audit-adapter.cjs` — have no colocated `*.test.cjs`. Coverage exists only through `mcp-http-server.test.cjs` (2434 lines, transport-level integration) and `mcp-fixtures.test.cjs`. Defensible for a thin dispatcher, but at 2600+ combined lines these are the actual domain-translation modules for MCP; a regression inside them is only caught by exercising the full HTTP path, which makes failures harder to localize (locality loss).
@@ -98,7 +92,6 @@ The doc (status: "proposed implementation contract") cites `src/app/hooks/useAge
 ## Suggested triage order
 
 1. **`codex-watcher-handoff.md`** — cheapest fix (archive or rewrite), highest confusion risk if left as-is.
-2. **Stale MCP `TODO(next-phase)` comments** — cheap fix, same "misleads a cold reader" risk as #1.
-3. **Session-state derivation duplication** (`AgentSessionSupervisor` / `TaskExecutionAction`) — the real structural fix; everything else in this list is either already-flagged-and-tracked debt or a test-coverage gap, but this one is a live correctness/drift risk between two UI surfaces showing the same session to the user.
-4. **Dual-write persistence path** — already tracked twice in prior docs; this audit just confirms it's still live in code at `workspace-service.cjs:1157`.
-5. Test-seam gaps (`mcp-handlers.cjs`, `mcp-registry.cjs`, `milestone-service.cjs`, most of `src/app/store/`) — lower urgency, but each is a place where a regression currently has no focused signal.
+2. **Session-state derivation duplication** (`AgentSessionSupervisor` / `TaskExecutionAction`) — the real structural fix; everything else in this list is either already-flagged-and-tracked debt or a test-coverage gap, but this one is a live correctness/drift risk between two UI surfaces showing the same session to the user.
+3. **Dual-write persistence path** — already tracked twice in prior docs; this audit just confirms it's still live in code at `workspace-service.cjs:1157`.
+4. Test-seam gaps (`mcp-handlers.cjs`, `mcp-registry.cjs`, `milestone-service.cjs`, most of `src/app/store/`) — lower urgency, but each is a place where a regression currently has no focused signal.

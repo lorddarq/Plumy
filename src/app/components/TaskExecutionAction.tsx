@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Copy, Folder, Info, MessageSquarePlus, Play, Server, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Task } from '../types';
-import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
+import { agentRuntimeTurnState, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, projectAgentRuntimeSession, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
 import {
   agentRuntimeWorkspaceSourceLabel,
   resolveAgentRuntimeWorkspace,
@@ -257,9 +257,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const warnings = preflight?.warnings || [];
   const hasCapability = (id: string) => binding?.capabilities?.some(capability => capability.id === id && capability.support === 'supported') ?? false;
   const taskExecutionState = binding?.taskExecution?.state;
-  const lastBatchCompleted = taskExecutionState === 'batch-finished' || events.some(event => event.nativeEventType === 'turn/completed' && !['failed', 'interrupted'].includes(event.state || ''));
-  const turnState = agentRuntimeTurnState(binding || undefined);
-  const sessionSummary = binding ? describeAgentRuntimeSession(binding.state, events, lastBatchCompleted ? (taskExecutionState || 'batch-finished') : taskExecutionState, turnState) : null;
+  const sessionProjection = projectAgentRuntimeSession(binding || undefined, events);
+  const { lastBatchCompleted, turnState } = sessionProjection;
+  const sessionSummary = sessionProjection.summary;
   const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', 'outcome-unreconciled': 'Outcome needs review', complete: 'Complete' };
   const latestRunEvents = selectCurrentAgentRuntimeTurnEvents(events, binding?.turn?.id).filter(event =>
     ['turn/started', 'turn/completed', 'item/agentMessage/delta', 'item/started', 'item/completed', 'warning', 'error', 'omvra/taskBatch/automatic-continuing', 'omvra/taskBatch/automatic-limit-reached'].includes(event.nativeEventType || '')

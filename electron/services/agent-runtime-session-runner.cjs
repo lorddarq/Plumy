@@ -30,11 +30,16 @@ function createAgentRuntimeSessionRunner({
   now = () => new Date().toISOString(),
   logger = null,
   maxAutomaticBatches = 0,
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
 }) {
   const clients = new Map();
+  const clientSubscriptions = new Map();
   const pendingRequests = new Map();
   const automaticBatchCounts = new Map();
   const automaticContinuationInFlight = new Set();
+  const timersByBinding = new Map();
+  let disposed = false;
   const buildContextPack = typeof getTaskContextEntry === 'function'
     ? createAgentRuntimeContextPack({ getEntry: getTaskContextEntry }).build
     : null;
@@ -44,6 +49,7 @@ function createAgentRuntimeSessionRunner({
     'ACP_SESSION_NOT_FOUND',
     'This runtime session is not active in the current Omvra app process. It may belong to an earlier app process or provider history state. Start a new session; Omvra will keep the current task context.',
   );
+  const shuttingDown = () => failure('ACP_APP_SHUTDOWN', 'The Omvra app is shutting down and cannot start or continue runtime work.');
   const log = (level, event, details = {}) => logger?.[level]?.(`[agent-runtime] ${event}`, details);
   const emit = (payload) => {
     try { emitRuntimeEvent?.(payload); } catch (error) { log('warn', 'live-event.emit-failed', { message: error?.message || String(error) }); }
@@ -81,6 +87,48 @@ function createAgentRuntimeSessionRunner({
     'Another task turn is already active. Open its supervision before starting new work.',
     { bindingId: binding.id, turnId: binding.turn?.id, binding: safeBinding(binding) },
   );
+
+  function clearBindingTimers(bindingId) {
+    const timers = timersByBinding.get(bindingId);
+    if (timers) for (const timer of timers) clearTimer(timer);
+    timersByBinding.delete(bindingId);
+    automaticContinuationInFlight.delete(bindingId);
+    automaticBatchCounts.delete(bindingId);
+  }
+
+  function scheduleBindingTimer(bindingId, callback, delay) {
+    if (disposed) return null;
+    const timer = setTimer(async () => {
+      timersByBinding.get(bindingId)?.delete(timer);
+      if (timersByBinding.get(bindingId)?.size === 0) timersByBinding.delete(bindingId);
+      if (!disposed) await callback();
+    }, delay);
+    const timers = timersByBinding.get(bindingId) || new Set();
+    timers.add(timer);
+    timersByBinding.set(bindingId, timers);
+    return timer;
+  }
+
+  function clearClientSubscriptions(bindingId) {
+    for (const unsubscribe of clientSubscriptions.get(bindingId) || []) {
+      try { unsubscribe?.(); } catch (error) { log('debug', 'client.unsubscribe-failed', { bindingId, message: error?.message || String(error) }); }
+    }
+    clientSubscriptions.delete(bindingId);
+  }
+
+  function clearPendingRequests(bindingId) {
+    for (const key of pendingRequests.keys()) if (key.startsWith(`${bindingId}:`)) pendingRequests.delete(key);
+  }
+
+  function releaseClient(bindingId, { closeTransport = true } = {}) {
+    const session = clients.get(bindingId);
+    clearBindingTimers(bindingId);
+    clearClientSubscriptions(bindingId);
+    clearPendingRequests(bindingId);
+    clients.delete(bindingId);
+    if (closeTransport) session?.client?.close?.();
+    return Boolean(session);
+  }
 
   async function ensureOmvraMcpListener() {
     if (typeof ensureMcpReady === 'function') {
@@ -261,11 +309,10 @@ function createAgentRuntimeSessionRunner({
   }
 
   function reconcileBindingLoss(bindingId, lifecycle = {}) {
-    clients.delete(bindingId);
-    for (const key of pendingRequests.keys()) if (key.startsWith(`${bindingId}:`)) pendingRequests.delete(key);
+    releaseClient(bindingId);
     const current = bindingFor(bindingId);
     if (!current || ['interrupted', 'closed', 'failed'].includes(current.state)) return current;
-    const reason = lifecycle.code === 'ACP_RUNTIME_MISSING' ? 'runtime-missing' : lifecycle.kind === 'exit' ? 'process-exit' : 'protocol-error';
+    const reason = lifecycle.kind === 'shutdown' ? 'app-shutdown' : lifecycle.code === 'ACP_RUNTIME_MISSING' ? 'runtime-missing' : lifecycle.kind === 'exit' ? 'process-exit' : 'protocol-error';
     if (ACTIVE_TURN_STATES.has(current.turn?.state)) syncTurnState(bindingId, 'interrupted', { reason });
     const afterTurn = bindingFor(bindingId) || current;
     let updated = updateBinding(store, { bindingId, expectedRevision: afterTurn.revision, state: 'interrupted', terminalReason: reason });
@@ -290,8 +337,11 @@ function createAgentRuntimeSessionRunner({
   }
 
   function attachClient(binding, client) {
-    client.onLifecycle?.(lifecycle => reconcileBindingLoss(binding.id, lifecycle));
-    client.onNotification?.(message => recordNotification(binding, message));
+    const subscriptions = [
+      client.onLifecycle?.(lifecycle => reconcileBindingLoss(binding.id, lifecycle)),
+      client.onNotification?.(message => recordNotification(binding, message)),
+    ].filter(unsubscribe => typeof unsubscribe === 'function');
+    clientSubscriptions.set(binding.id, subscriptions);
   }
 
   function taskMayContinue(binding) {
@@ -327,8 +377,7 @@ function createAgentRuntimeSessionRunner({
       const closed = updateBinding(store, { bindingId: current.id, expectedRevision: current.revision, state: 'closed', terminalReason: 'closed' });
       const session = clients.get(binding.id);
       try { await session?.client?.closeSession?.(current.opaqueSessionRef); } catch (error) { log('debug', 'automatic-outcome.remote-close-failed', { bindingId: binding.id, message: error?.message || String(error) }); }
-      session?.client?.close?.();
-      clients.delete(binding.id);
+      releaseClient(binding.id);
       const closedBinding = closed?.ok ? closed.binding : bindingFor(binding.id) || current;
       syncTaskExecution(closedBinding, executionState, { reason: moved.ok ? 'automatic-outcome-finalized' : 'automatic-outcome-unreconciled' });
     }
@@ -354,7 +403,7 @@ function createAgentRuntimeSessionRunner({
       return;
     }
     automaticContinuationInFlight.add(bindingId);
-    setTimeout(async () => {
+    scheduleBindingTimer(bindingId, async () => {
       try {
         const latest = bindingFor(bindingId);
         if (!latest || latest.state !== 'ready' || ACTIVE_TURN_STATES.has(latest.turn?.state) || !taskMayContinue(latest)) return;
@@ -476,6 +525,7 @@ function createAgentRuntimeSessionRunner({
   }
 
   async function start(payload = {}) {
+    if (disposed) return shuttingDown();
     log('info', 'start.requested', { taskId: payload.taskId || null, hasWorkspace: Boolean(payload.workspacePath), executionProfileId: payload.executionProfileId || null });
     if (payload.confirmed !== true) {
       log('warn', 'start.rejected', { taskId: payload.taskId || null, error: 'ACP_START_CONFIRMATION_REQUIRED' });
@@ -587,11 +637,14 @@ function createAgentRuntimeSessionRunner({
     let client;
     try {
       client = createClient(profile, clientOptions(profile, payload.workspacePath, mcpReadiness, binding.scope));
+      clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profile.id });
+      attachClient(binding, client);
       log('info', 'runtime.initializing', { bindingId: binding.id, runtimeProfileId: profile.id });
       const negotiated = await client.initialize();
+      if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
       log('info', 'runtime.initialized', { bindingId: binding.id, authentication: negotiated.authentication || 'unknown', capabilities: Object.keys(negotiated.capabilities || {}).filter(key => negotiated.capabilities[key] === true) });
-      attachClient(binding, client);
       const session = await client.startSession();
+      if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
       log('info', 'session.created', { bindingId: binding.id });
       const ready = updateBinding(store, {
         bindingId: binding.id,
@@ -602,7 +655,6 @@ function createAgentRuntimeSessionRunner({
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The runtime session could not be marked ready.'), { code: ready.error });
       syncTaskExecution(ready.binding, 'ready', { reason: 'session-ready' });
-      clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profile.id });
       {
         const promptText = contextPack.text || 'Begin working on the assigned task. Re-read its current state before making changes.';
         log('info', 'context.prompting', { bindingId: binding.id, contextEntryCount: confirmed.contractSnapshot.contextEntryIds?.length || 0 });
@@ -615,7 +667,7 @@ function createAgentRuntimeSessionRunner({
       const current = bindingFor(binding.id) || ready.binding;
       return { ok: true, state: current.state, binding: current, attempt, task: started.task, preflight: confirmed };
     } catch (error) {
-      client?.close?.();
+      releaseClient(binding.id);
       syncTurnState(binding.id, 'failed', { reason: error.code || 'protocol-error' });
       const current = bindingFor(binding.id) || binding;
       updateBinding(store, { bindingId: binding.id, expectedRevision: current.revision, state: 'failed', terminalReason: 'protocol-error' });
@@ -626,6 +678,7 @@ function createAgentRuntimeSessionRunner({
   }
 
   async function startGoalNode(payload = {}) {
+    if (disposed) return shuttingDown();
     if (payload.confirmed !== true) return failure('ACP_START_CONFIRMATION_REQUIRED', 'Explicit confirmation is required before starting Goal-node work.');
     const required = ['goalId', 'goalElementId', 'goalExecutionId', 'workspacePath'];
     if (required.some(field => typeof payload[field] !== 'string' || !payload[field].trim())) return failure('ACP_GOAL_SCOPE_REQUIRED', 'A Goal, agent-node, execution, and repository folder are required.');
@@ -653,9 +706,12 @@ function createAgentRuntimeSessionRunner({
     let client;
     try {
       client = createClient(profileResolution.profile, clientOptions(profileResolution.profile, payload.workspacePath, mcpReadiness, binding.scope));
-      const negotiated = await client.initialize();
+      clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profileResolution.profile.id });
       attachClient(binding, client);
+      const negotiated = await client.initialize();
+      if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
       const session = await client.startSession();
+      if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
       const ready = updateBinding(store, {
         bindingId: binding.id,
         expectedRevision: binding.revision,
@@ -664,16 +720,16 @@ function createAgentRuntimeSessionRunner({
         capabilities: Object.entries(negotiated.capabilities || {}).filter(([, supported]) => supported === true).map(([id]) => ({ id, support: 'supported' })),
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The Goal runtime session could not be marked ready.'), { code: ready.error });
-      clients.set(binding.id, { client, workspacePath: payload.workspacePath, profileId: profileResolution.profile.id });
       return { ok: true, state: 'ready', binding: ready.binding };
     } catch (error) {
-      client?.close?.();
+      releaseClient(binding.id);
       updateBinding(store, { bindingId: binding.id, expectedRevision: binding.revision, state: 'failed', terminalReason: 'protocol-error' });
       return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The Goal runtime session could not be started.', { binding });
     }
   }
 
   async function invoke(bindingId, method, text) {
+    if (disposed) return shuttingDown();
     let current = bindingFor(bindingId);
     const session = clients.get(bindingId);
     if (!current || !session) return inactiveSession();
@@ -695,7 +751,7 @@ function createAgentRuntimeSessionRunner({
         if (result?.acknowledged === true && latest?.turn?.state === 'cancelling') {
           syncTurnState(bindingId, 'interrupted', { reason: 'cancelled' });
         } else if (latest?.turn?.state === 'cancelling') {
-          setTimeout(() => {
+          scheduleBindingTimer(bindingId, () => {
             const pending = bindingFor(bindingId);
             if (pending?.turn?.state === 'cancelling') syncTurnState(bindingId, 'interrupted', { reason: 'cancelled' });
           }, CANCEL_SETTLE_TIMEOUT_MS);
@@ -712,6 +768,7 @@ function createAgentRuntimeSessionRunner({
   }
 
   async function continueTask(bindingId, { automatic = false } = {}) {
+    if (disposed) return shuttingDown();
     const current = bindingFor(bindingId);
     const session = clients.get(bindingId);
     if (!current || !session) return inactiveSession();
@@ -735,6 +792,7 @@ function createAgentRuntimeSessionRunner({
   }
 
   async function respond(bindingId, requestId, result, error) {
+    if (disposed) return shuttingDown();
     const current = bindingFor(bindingId);
     const session = clients.get(bindingId);
     if (!current || !session) return inactiveSession();
@@ -750,6 +808,7 @@ function createAgentRuntimeSessionRunner({
   }
 
   async function resume(bindingId, payload = {}) {
+    if (disposed) return shuttingDown();
     const current = bindingFor(bindingId);
     if (!current || !current.opaqueSessionRef) return failure('ACP_SESSION_RESUME_UNSUPPORTED', 'This session has no resumable runtime reference.');
     if (!['interrupted', 'starting'].includes(current.state)) return failure('ACP_SESSION_NOT_RESUMABLE', `Session is ${current.state}.`);
@@ -769,9 +828,12 @@ function createAgentRuntimeSessionRunner({
     let client;
     try {
       client = createClient(profileResolution.profile, clientOptions(profileResolution.profile, workspacePath, mcpReadiness, current.scope));
-      const negotiated = await client.initialize();
+      clients.set(bindingId, { client, workspacePath, profileId: current.runtimeProfileId });
       attachClient(starting.binding, client);
+      const negotiated = await client.initialize();
+      if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
       const session = await client.resumeSession(current.opaqueSessionRef);
+      if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
       const ready = updateBinding(store, {
         bindingId,
         expectedRevision: starting.binding.revision,
@@ -781,7 +843,6 @@ function createAgentRuntimeSessionRunner({
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The session could not be resumed.'), { code: ready.error });
       syncTaskExecution(ready.binding, 'ready', { reason: 'session-resumed' });
-      clients.set(bindingId, { client, workspacePath, profileId: current.runtimeProfileId });
       const contextPack = buildCurrentTaskContext(ready.binding);
       if (!contextPack.ok) throw Object.assign(new Error(contextPack.message), { code: contextPack.error });
       {
@@ -792,7 +853,7 @@ function createAgentRuntimeSessionRunner({
       }
       return { ...ready, binding: bindingFor(bindingId) || ready.binding };
     } catch (error) {
-      client?.close?.();
+      releaseClient(bindingId);
       if (ACTIVE_TURN_STATES.has(bindingFor(bindingId)?.turn?.state)) syncTurnState(bindingId, 'failed', { reason: error.code || 'protocol-error' });
       const latest = bindingFor(bindingId) || starting.binding;
       updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'failed', terminalReason: 'protocol-error' });
@@ -820,9 +881,7 @@ function createAgentRuntimeSessionRunner({
       const result = updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'closed', terminalReason: 'closed' });
       if (!result.ok) return result;
       syncTaskExecution(result.binding, 'stopped', { reason: 'closed' });
-      session?.client.close?.();
-      clients.delete(bindingId);
-      for (const key of pendingRequests.keys()) if (key.startsWith(`${bindingId}:`)) pendingRequests.delete(key);
+      releaseClient(bindingId);
       return result;
     } catch (error) {
       return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The runtime session could not be closed.');
@@ -846,7 +905,21 @@ function createAgentRuntimeSessionRunner({
     return changed ? listSessions(store, { limit: 100, includeEvents: false }) : projection;
   }
 
-  return { close, continueTask, hasLiveSessions: () => clients.size > 0, invoke, listRequests, reconcile, respond, resume, start, startGoalNode };
+  function dispose() {
+    if (disposed) return { ok: true, idempotent: true, closedClientCount: 0 };
+    disposed = true;
+    const bindingIds = [...clients.keys()];
+    for (const bindingId of bindingIds) {
+      releaseClient(bindingId);
+      reconcileBindingLoss(bindingId, { code: 'ACP_APP_SHUTDOWN', kind: 'shutdown' });
+    }
+    for (const bindingId of [...timersByBinding.keys()]) clearBindingTimers(bindingId);
+    pendingRequests.clear();
+    clientSubscriptions.clear();
+    return { ok: true, idempotent: false, closedClientCount: bindingIds.length };
+  }
+
+  return { close, continueTask, dispose, hasLiveSessions: () => clients.size > 0, invoke, listRequests, reconcile, respond, resume, start, startGoalNode };
 }
 
 module.exports = { createAgentRuntimeSessionRunner };

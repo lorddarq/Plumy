@@ -337,6 +337,32 @@ test('transport rejects malformed runtime messages and bounds pending requests',
   await Promise.all(pending);
 });
 
+test('transport close kills the child and detaches stream and lifecycle listeners exactly once', () => {
+  const child = createChild(() => {});
+  const transport = new JsonLineTransport('/usr/bin/fixture', [], {
+    workspacePath: '/tmp/workspace', spawnProcess: () => child, timeoutMs: 100,
+  });
+  let lifecycleCalls = 0;
+  transport.onLifecycle(() => { lifecycleCalls += 1; });
+  transport.onNotification(() => {});
+
+  assert.equal(child.stdout.listenerCount('data'), 1);
+  assert.equal(child.stderr.listenerCount('data'), 1);
+  assert.equal(child.listenerCount('error'), 1);
+  assert.equal(child.listenerCount('exit'), 1);
+  transport.close();
+  transport.close();
+
+  assert.equal(child.killed, true);
+  assert.equal(child.stdout.listenerCount('data'), 0);
+  assert.equal(child.stderr.listenerCount('data'), 0);
+  assert.equal(child.listenerCount('error'), 0);
+  assert.equal(child.listenerCount('exit'), 0);
+  assert.equal(transport.listeners.size, 0);
+  assert.equal(transport.lifecycleListeners.size, 0);
+  assert.equal(lifecycleCalls, 0, 'explicit close is not reported as an unexpected connection loss');
+});
+
 test('transport reports an idle provider exit even with no pending request', async () => {
   const child = createChild(() => {});
   const lifecycle = [];

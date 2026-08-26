@@ -7,7 +7,11 @@ const { createPersonContextService } = require('../domain/person-context-service
 const { createTaskService } = require('../domain/task-service.cjs');
 const { createTaskCollaborationService, COLLABORATION_SCHEMA_VERSION } = require('../domain/task-collaboration-service.cjs');
 const { createTaskCollaborationLifecycleService } = require('../domain/task-collaboration-lifecycle-service.cjs');
-const { createTaskContextLedgerService, TASK_CONTEXT_SCHEMA_VERSION } = require('../domain/task-context-ledger-service.cjs');
+const {
+  TASK_CONTEXT_ENTRIES_KEY,
+  TASK_CONTEXT_SCHEMA_VERSION,
+  createTaskContextLedgerService,
+} = require('../domain/task-context-ledger-service.cjs');
 const { createAgentExecutionPreflightService } = require('../domain/agent-execution-preflight-service.cjs');
 const { createAgentRuntimeContextPack } = require('../domain/agent-runtime-context-pack.cjs');
 const {
@@ -25,7 +29,6 @@ const PREFERENCES_KEY = 'omvra.preferences.v1';
 const TASKS_KEY = 'omvra.tasks.v1';
 const TASK_CONTRIBUTION_ATTEMPTS_KEY = 'omvra.taskContributionAttempts.v1';
 const TASK_COLLABORATION_EVENTS_KEY = 'omvra.taskCollaborationEvents.v1';
-const TASK_CONTEXT_ENTRIES_KEY = 'omvra.taskContextEntries.v1';
 const ACTIVE_RUNTIME_TURN_STATES = new Set(['queued', 'starting', 'active', 'waiting-input', 'cancelling']);
 const OWNED_RUNTIME_SESSION_STATES = new Set(['starting', 'ready', 'active', 'needs-input', 'cancelling']);
 const MILESTONES_KEY = 'omvra.milestones.v1';
@@ -1977,31 +1980,12 @@ const {
 } = milestoneService;
 
 module.exports = {
-  PREFERENCES_KEY,
   TASK_CONTRIBUTION_ATTEMPTS_KEY,
-  TASK_COLLABORATION_EVENTS_KEY,
-  TASK_CONTEXT_ENTRIES_KEY,
-  TASK_CONTEXT_SCHEMA_VERSION,
   SESSION_BINDINGS_KEY,
   SESSION_EVENTS_KEY,
-  SESSION_SCHEMA_VERSION,
-  COLLABORATION_SCHEMA_VERSION,
-  MILESTONES_KEY,
-  MCP_PROTOCOL_VERSION,
-  MCP_SERVER_NAME,
-  DEFAULT_MCP_HOST,
-  DEFAULT_MCP_PORT,
-  DEFAULT_MCP_PATH,
-  DEFAULT_MCP_CAPABILITY_PROFILE,
-  MCP_CAPABILITY_PROFILES,
-  MCP_AUDIT_LOG_KEY,
-  GOAL_MUTATION_COMMANDS_KEY,
-  GOAL_ARTIFACT_AUDIT_KEY,
-  GOAL_PROJECT_BINDING_AUDIT_KEY,
   isMcpAgentAccessEnabled,
   getMcpServerConfig,
   isMcpAccessTokenExpired,
-  getMcpAccessTokenStatus,
   buildMcpListenerStatus,
   getMcpCapabilityProfile,
   buildMcpCapabilitySnapshot,
@@ -2013,7 +1997,6 @@ module.exports = {
   MCP_TASK_REV_FIELD,
   getWorkspaceSnapshot,
   listGoals,
-  resolveGoalAgentDispatch,
   getGoalById,
   updateGoal,
   updateGoalProjectBindings,
@@ -2072,5 +2055,4 @@ module.exports = {
   deleteMilestone,
   deleteTask,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
-  REQUIRES_HUMAN_REVIEW_STATUS_TITLE,
 };

@@ -9,13 +9,11 @@ const { createRequestDispatcher } = require('./mcp-http-server.cjs');
 const {
   MCP_TASK_REV_FIELD,
   getMcpServerConfig,
-  getMcpAccessTokenStatus,
   isMcpAccessTokenExpired,
   buildMcpListenerStatus,
   appendMcpAuditLog,
   getWorkspaceSnapshot,
   listGoals,
-  resolveGoalAgentDispatch,
   listMilestones,
   getMilestoneById,
   listTasks,
@@ -212,10 +210,6 @@ test('kanban and timeline card projections include board and swimlane descriptio
 test('listener status reflects runtime state and token expiry details', () => {
   const store = makeStoreFromFixture('workspace-mcp-security');
   const serverConfig = getMcpServerConfig(store);
-  const tokenStatus = getMcpAccessTokenStatus(serverConfig, Date.parse('2026-03-26T09:59:00.000Z'));
-
-  assert.equal(tokenStatus.configured, true);
-  assert.equal(tokenStatus.status, 'active');
   assert.equal(isMcpAccessTokenExpired(serverConfig, Date.parse('2026-03-26T09:59:00.000Z')), false);
 
   const listenerStatus = buildMcpListenerStatus(store, {
@@ -1126,11 +1120,11 @@ test('Goal agent dispatch read model preserves canonical, ephemeral, and unavail
     { id: 'missing', type: 'agent', title: 'Missing', x: 0, y: 0, agentConfiguration: { mode: 'existing', assigneeId: 'gone', instructions: 'Do not reassign', spawnIfUnavailable: true } },
   ] }]);
 
-  assert.deepEqual(resolveGoalAgentDispatch(store, store.get('omvra.goals.v1')[0].elements[0]), {
+  const agents = listGoals(store)[0].agents;
+  assert.deepEqual(agents[0].agentDispatch, {
     status: 'resolved', mode: 'existing', assigneeId: 'canonical-1', profileSource: 'canonical',
     personaInstructions: 'Persona', operationalInstructions: 'Method', instructions: 'Node task',
   });
-  const agents = listGoals(store)[0].agents;
   assert.equal(agents[1].agentDispatch.status, 'recruitment-requested');
   assert.equal(agents[1].agentDispatch.autoGenerateName, true);
   assert.equal(agents[1].agentDispatch.profileSource, 'none');

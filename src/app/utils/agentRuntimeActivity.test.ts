@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
+import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, projectAgentRuntimeSession, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
 
 test('agent message delta joining preserves normal boundaries and repairs compact legacy chunks', () => {
   assert.equal(joinAgentMessageDeltas(['Current ', 'implementation ', 'passes.']), 'Current implementation passes.');
@@ -106,4 +106,21 @@ test('closed sessions and finished batches explain that more work may remain', (
   assert.equal(describeAgentRuntimeSession('closed', []).label, 'No agent is working');
   assert.match(describeAgentRuntimeSession('closed', []).detail, /closed session/i);
   assert.equal(describeAgentRuntimeSession('ready', [{ id: '1', type: 'turn-state', nativeEventType: 'turn/completed' }]).label, 'Batch finished');
+});
+
+test('one session projection drives both supervision summaries and dock states', () => {
+  const working = projectAgentRuntimeSession({ state: 'ready', turn: { id: 'turn-1', state: 'active' } });
+  assert.equal(working.turnState, 'active');
+  assert.equal(working.summary?.label, 'Agent is working');
+  assert.equal(working.dockState, 'hidden-active');
+  assert.equal(projectAgentRuntimeSession(
+    { state: 'ready', turn: { id: 'turn-1', state: 'active' } },
+    [],
+    { supervisionVisible: true },
+  ).dockState, 'working');
+
+  const waiting = projectAgentRuntimeSession({ state: 'ready', turn: { id: 'turn-2', state: 'waiting-input' } });
+  assert.equal(waiting.summary?.label, 'Agent is waiting for you');
+  assert.equal(waiting.dockState, 'needs-input');
+  assert.equal(projectAgentRuntimeSession(undefined, [], { blocked: true }).dockState, 'blocked');
 });

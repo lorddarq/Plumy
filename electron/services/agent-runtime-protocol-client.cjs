@@ -85,19 +85,23 @@ class JsonLineTransport {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
-    this.child.stdout?.on('data', chunk => this.#receive(chunk));
-    this.child.stderr?.on('data', chunk => { this.stderr = `${this.stderr}${chunk}`.slice(-2048); });
-    this.child.once('error', error => {
+    this.handleStdoutData = chunk => this.#receive(chunk);
+    this.handleStderrData = chunk => { this.stderr = `${this.stderr}${chunk}`.slice(-2048); };
+    this.handleChildError = error => {
       this.logger?.error?.('[agent-runtime:transport] process.error', { code: error.code || null, message: error.message || String(error) });
       this.#fail(runtimeError(error.code === 'ENOENT' ? 'ACP_RUNTIME_MISSING' : 'ACP_RUNTIME_UNAVAILABLE', error.message), { kind: 'error', processCode: error.code || null });
-    });
-    this.child.once('exit', code => {
+    };
+    this.handleChildExit = code => {
       if (!this.closed) {
         const detail = this.stderr.trim();
         this.logger?.error?.('[agent-runtime:transport] process.exited', { code: code ?? null, stderr: detail || null });
         this.#fail(runtimeError('ACP_SESSION_INTERRUPTED', `Runtime exited unexpectedly (${code ?? 'unknown'}).${detail ? ` ${detail}` : ''}`), { kind: 'exit', processCode: code ?? null });
       }
-    });
+    };
+    this.child.stdout?.on('data', this.handleStdoutData);
+    this.child.stderr?.on('data', this.handleStderrData);
+    this.child.once('error', this.handleChildError);
+    this.child.once('exit', this.handleChildExit);
   }
 
   onNotification(listener) {
@@ -155,8 +159,11 @@ class JsonLineTransport {
   close() {
     if (this.closed) return;
     this.closed = true;
+    this.#detachListeners();
     if (this.child && !this.child.killed) this.child.kill();
     this.#rejectPending(runtimeError('ACP_SESSION_INTERRUPTED', 'Runtime connection closed.'));
+    this.listeners.clear();
+    this.lifecycleListeners.clear();
   }
 
   #write(message) {
@@ -212,8 +219,18 @@ class JsonLineTransport {
     if (this.closed) return;
     this.closed = true;
     for (const listener of this.lifecycleListeners) listener({ state: 'lost', code: error.code || 'ACP_RUNTIME_UNAVAILABLE', ...details });
+    this.#detachListeners();
     if (this.child && !this.child.killed) this.child.kill();
     this.#rejectPending(error);
+    this.listeners.clear();
+    this.lifecycleListeners.clear();
+  }
+
+  #detachListeners() {
+    this.child?.stdout?.removeListener('data', this.handleStdoutData);
+    this.child?.stderr?.removeListener('data', this.handleStderrData);
+    this.child?.removeListener('error', this.handleChildError);
+    this.child?.removeListener('exit', this.handleChildExit);
   }
 }
 

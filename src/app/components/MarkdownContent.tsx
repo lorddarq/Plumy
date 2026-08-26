@@ -2,7 +2,7 @@ import ReactMarkdown, { Components } from 'react-markdown';
 import { Children, isValidElement } from 'react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import remarkGfm from 'remark-gfm';
-import { useWorkspaceStore } from '../store/workspaceStore.tsx';
+import { useWorkspaceSelector } from '../store/workspaceStore.tsx';
 import { getMarkdownAppearanceCssVariables } from '../utils/markdownAppearance.ts';
 import { TaskCheckboxIndicator } from './TaskCheckboxControl';
 
@@ -155,12 +155,12 @@ export const markdownComponents: Components = {
 };
 
 export function MarkdownContent({ content }: MarkdownContentProps) {
-  const { preferences } = useWorkspaceStore();
+  const markdownAppearance = useWorkspaceSelector(state => state.preferences.markdownAppearance);
 
   return (
     <div
       className="omvra-markdown-content min-w-0 max-w-full overflow-hidden"
-      style={getMarkdownAppearanceCssVariables(preferences.markdownAppearance)}
+      style={getMarkdownAppearanceCssVariables(markdownAppearance)}
     >
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {content}

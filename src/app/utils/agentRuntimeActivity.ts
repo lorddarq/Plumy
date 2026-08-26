@@ -27,6 +27,16 @@ export interface AgentRuntimeTurnProjection {
   requestId?: string;
 }
 
+export type AgentRuntimeDockState = 'none' | 'starting' | 'working' | 'hidden-active' | 'ready' | 'needs-input' | 'interrupted' | 'failed' | 'history' | 'blocked';
+
+export interface AgentRuntimeSessionProjection {
+  turnState?: string;
+  isTurnInFlight: boolean;
+  lastBatchCompleted: boolean;
+  summary?: ReturnType<typeof describeAgentRuntimeSession>;
+  dockState: AgentRuntimeDockState;
+}
+
 export const IN_FLIGHT_AGENT_RUNTIME_TURN_STATES = new Set(['queued', 'starting', 'active', 'waiting-input', 'cancelling']);
 const TERMINAL_AGENT_RUNTIME_SESSION_STATES = new Set(['interrupted', 'closed', 'failed', 'complete', 'completed']);
 
@@ -152,4 +162,31 @@ export function describeAgentRuntimeSession(bindingState: string, events: AgentR
   const latestTurn = [...events].reverse().find(event => event.nativeEventType === 'turn/started' || event.nativeEventType === 'turn/completed');
   if (latestTurn?.nativeEventType === 'turn/completed') return { label: 'Batch finished', detail: 'The latest work batch ended. The task is not complete unless its task status or handoff says so.', tone: 'warning' as const, isTurnActive: false };
   return { label: 'Session connected, no run active', detail: 'The agent is connected but is not currently doing work. Continue work to start another batch.', tone: 'warning' as const, isTurnActive: false };
+}
+
+export function projectAgentRuntimeSession(
+  binding?: { state?: string; turn?: AgentRuntimeTurnProjection; taskExecution?: { state?: string } },
+  events: AgentRuntimeActivityEvent[] = [],
+  options: { blocked?: boolean; supervisionVisible?: boolean } = {},
+): AgentRuntimeSessionProjection {
+  const turnState = agentRuntimeTurnState(binding);
+  const isTurnInFlight = IN_FLIGHT_AGENT_RUNTIME_TURN_STATES.has(turnState || '');
+  const executionState = binding?.taskExecution?.state;
+  const lastBatchCompleted = executionState === 'batch-finished' || events.some(event =>
+    event.nativeEventType === 'turn/completed' && !['failed', 'interrupted'].includes(event.state || '')
+  );
+  const summary = binding?.state
+    ? describeAgentRuntimeSession(binding.state, events, lastBatchCompleted ? (executionState || 'batch-finished') : executionState, turnState)
+    : undefined;
+  const dockState: AgentRuntimeDockState = options.blocked ? 'blocked'
+    : isTurnInFlight
+      ? ['queued', 'starting'].includes(turnState || '') ? 'starting'
+        : turnState === 'waiting-input' ? 'needs-input'
+          : options.supervisionVisible ? 'working' : 'hidden-active'
+      : binding?.state === 'ready' ? 'ready'
+        : binding?.state === 'interrupted' ? 'interrupted'
+          : binding?.state === 'failed' ? 'failed'
+            : binding ? 'history' : 'none';
+
+  return { turnState, isTurnInFlight, lastBatchCompleted, summary, dockState };
 }

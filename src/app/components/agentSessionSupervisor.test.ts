@@ -120,3 +120,14 @@ test('task supervision prefers an in-flight turn or reusable ready session over 
   assert.match(execution, /const refreshSequence = useRef\(0\)/);
   assert.match(execution, /if \(sequence !== refreshSequence\.current\) return null/);
 });
+
+test('dock and task supervision consume one shared session status projection', () => {
+  const supervisor = readComponent('AgentSessionSupervisor.tsx');
+  const execution = readComponent('TaskExecutionAction.tsx');
+
+  assert.match(supervisor, /projectAgentRuntimeSession\(activeBinding/);
+  assert.match(execution, /projectAgentRuntimeSession\(binding \|\| undefined, events\)/);
+  assert.match(supervisor, /setBindings\(current =>/);
+  assert.match(supervisor, /refreshPendingRequest\(nextBinding\)/);
+  assert.doesNotMatch(supervisor, /notifyCompletedRuns\(\[payload\.event as RuntimeEvent\][\s\S]{0,200}void refresh\(\)/);
+});

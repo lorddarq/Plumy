@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createTaskContextLedgerService } = require('./task-context-ledger-service.cjs');
+const { TASK_CONTEXT_ENTRIES_KEY, createTaskContextLedgerService } = require('./task-context-ledger-service.cjs');
 
 class MemoryStore {
   constructor(seed = {}) {
@@ -265,7 +265,6 @@ test('exact retrieval reports resolved and missing task-scoped sources explicitl
 
 test('workspace facade persists entries under the versioned ledger key', () => {
   const {
-    TASK_CONTEXT_ENTRIES_KEY,
     appendTaskContextEntry,
     listTaskContextEntries,
   } = require('../services/workspace-service.cjs');

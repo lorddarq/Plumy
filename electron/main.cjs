@@ -585,6 +585,7 @@ app.on('before-quit', () => {
     clearInterval(agentRuntimeReconciliationTimer);
     agentRuntimeReconciliationTimer = null;
   }
+  agentRuntimeSessionRunner.dispose();
   if (mcpHttpServer) {
     mcpHttpServer.close();
     mcpHttpServer = null;

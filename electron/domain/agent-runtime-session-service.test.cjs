@@ -310,6 +310,29 @@ test('binding and event reads are bounded and unknown stored fields survive upda
   assert.equal(read.hasMore, true);
 });
 
+test('sustained runtime event storage retains only the latest 2000 events', () => {
+  const seedBinding = {
+    schemaVersion: 1, id: 'binding-retention', idempotencyKey: 'retention-binding', revision: 0, runtimeProfileId: 'runtime-1', scope,
+    state: 'ready', capabilities: [], createdAt: '2026-07-30T09:00:00.000Z', updatedAt: '2026-07-30T09:00:00.000Z', lastObservedAt: '2026-07-30T09:00:00.000Z',
+  };
+  const { service, state } = harness({ bindings: [seedBinding] });
+
+  for (let index = 0; index < 2_005; index += 1) {
+    const result = service.appendEvent(null, {
+      bindingId: seedBinding.id,
+      runtimeProfileId: 'runtime-1',
+      kind: 'turn',
+      state: 'working',
+      idempotencyKey: `retained-event-${index}`,
+    });
+    assert.equal(result.ok, true);
+  }
+
+  assert.equal(state.events.length, 2_000);
+  assert.equal(state.events[0].idempotencyKey, 'retained-event-5');
+  assert.equal(state.events.at(-1).idempotencyKey, 'retained-event-2004');
+});
+
 test('durable runtime outcomes use the task ledger boundary and cannot claim human provenance', () => {
   const { service, state } = harness();
   const binding = service.createBinding(null, { runtimeProfileId: 'runtime-1', scope, idempotencyKey: 'binding-1' }).binding;
