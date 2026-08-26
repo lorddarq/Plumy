@@ -1159,8 +1159,8 @@ function updateGoalArtifactReferences(store, {
 }
 
 function getWorkspaceSnapshot(store) {
-  // TODO(next-phase): unify storage source of truth. The renderer currently persists
-  // most workspace state in localStorage; MCP should read from a canonical backend store.
+  // Electron-store is the canonical shared source in the desktop runtime. The renderer
+  // keeps localStorage only as the documented browser/failure fallback mirror.
   //
   // store.get(key) already resolves dot-notation keys correctly (electron-store
   // nests 'omvra.tasks.v1' as store.store.omvra.tasks.v1). A prior version of
