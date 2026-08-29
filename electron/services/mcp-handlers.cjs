@@ -154,7 +154,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
       const tasks = listTasks(store, args);
       const hasFilters = ['status', 'assigneeId', 'projectId', 'search'].some(key => typeof args[key] === 'string' && args[key].trim());
       return {
-        result: makeToolResult(tasks, {
+        result: makeToolResult({ tasks }, {
           resultText: tasks.length > 0 || !hasFilters
             ? undefined
             : 'Not found: no tasks matched the supplied filters.',
@@ -163,7 +163,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
     }
 
     case 'goals.list':
-      return { result: makeToolResult(listGoals(store)) };
+      return { result: makeToolResult({ goals: listGoals(store) }) };
 
     case 'diagnostics.audit_summary':
       return { result: makeToolResult(buildMcpAuditSummary(store, args)) };
@@ -233,14 +233,14 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
         assigneeId: args.assigneeId,
         search: args.search,
       };
-      return { result: makeToolResult(listKanbanCards(store, filters)) };
+      return { result: makeToolResult({ cards: listKanbanCards(store, filters) }) };
     }
 
     case 'cards.timeline.list':
-      return { result: makeToolResult(listTimelineCards(store, args)) };
+      return { result: makeToolResult({ cards: listTimelineCards(store, args) }) };
 
     case 'milestones.list':
-      return { result: makeToolResult(listMilestones(store)) };
+      return { result: makeToolResult({ milestones: listMilestones(store) }) };
 
     case 'milestones.get': {
       const milestoneId = parseMilestoneId(args);
@@ -343,7 +343,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
     }
 
     case 'skills.list':
-      return { result: makeToolResult(listAvailableSkills({ skillsRoot, userDataPath: userSkillsRoot })) };
+      return { result: makeToolResult({ skills: listAvailableSkills({ skillsRoot, userDataPath: userSkillsRoot }) }) };
 
     case 'skills.get': {
       const skillId = typeof args.skillId === 'string' ? args.skillId.trim() : '';

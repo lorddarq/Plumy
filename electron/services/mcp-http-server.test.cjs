@@ -237,7 +237,7 @@ test('sensitive headers, tokens, and payloads stay out of events and summaries',
     },
   }, req);
 
-  assert.equal(Array.isArray(response.result.structuredContent), true);
+  assert.equal(Array.isArray(response.result.structuredContent.tasks), true);
   const audit = store.get('omvra.mcp.audit.v1').at(-1);
   const serializedAudit = JSON.stringify(audit);
   assert.equal(Object.prototype.hasOwnProperty.call(audit, 'arguments'), false);
@@ -507,7 +507,7 @@ test('goals expose the complete graph through tools, resources, and workspace sn
     params: { name, arguments: args },
   }, makeReq());
 
-  const list = call('goals.list').result.structuredContent;
+  const list = call('goals.list').result.structuredContent.goals;
   assert.equal(list[0].subgoals.length, 1);
   assert.equal(list[0].agents[0].assigneeId, 'agent-1');
   assert.equal(list[0].instructions[0].body, 'Return evidence');
@@ -998,8 +998,8 @@ test('underscore tool aliases dispatch to the canonical handlers', () => {
 
   assert.equal(response.jsonrpc, '2.0');
   assert.equal(response.id, 'alias-list-1');
-  assert.ok(Array.isArray(response.result.structuredContent));
-  assert.ok(response.result.structuredContent.some(task => task.id === 'task-1'));
+  assert.ok(Array.isArray(response.result.structuredContent.tasks));
+  assert.ok(response.result.structuredContent.tasks.some(task => task.id === 'task-1'));
 
   const summaryResponse = dispatch({
     jsonrpc: '2.0',
@@ -1016,6 +1016,29 @@ test('underscore tool aliases dispatch to the canonical handlers', () => {
   assert.equal(summaryResponse.result.structuredContent.schemaVersion, 1);
 });
 
+test('list tools return record-shaped structured content', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const call = name => dispatch({
+    jsonrpc: '2.0',
+    id: name,
+    method: 'tools/call',
+    params: { name, arguments: {} },
+  }, makeReq()).result.structuredContent;
+
+  for (const [name, field] of [
+    ['tasks_list', 'tasks'],
+    ['goals_list', 'goals'],
+    ['cards_kanban_list', 'cards'],
+    ['cards_timeline_list', 'cards'],
+    ['milestones_list', 'milestones'],
+    ['skills_list', 'skills'],
+  ]) {
+    const structuredContent = call(name);
+    assert.equal(Array.isArray(structuredContent), false, `${name} must return a record`);
+    assert.ok(Array.isArray(structuredContent[field]), `${name} must return ${field}`);
+  }
+});
+
 test('tasks.list returns a successful Not found result for an empty filtered result set', () => {
   const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
   const response = dispatch({
@@ -1030,7 +1053,7 @@ test('tasks.list returns a successful Not found result for an empty filtered res
 
   assert.equal(response.jsonrpc, '2.0');
   assert.equal(response.result.isError, false);
-  assert.deepEqual(response.result.structuredContent, []);
+  assert.deepEqual(response.result.structuredContent, { tasks: [] });
   assert.equal(response.result.content[0].text, 'Not found: no tasks matched the supplied filters.');
 });
 
@@ -1186,7 +1209,7 @@ test('MCP logs approximate task time and creates linked milestones', () => {
     },
   }, makeReq({}, 'stdio'));
 
-  assert.ok(listResponse.result.structuredContent.some(item => item.id === milestone.id));
+  assert.ok(listResponse.result.structuredContent.milestones.some(item => item.id === milestone.id));
 });
 
 test('MCP updates milestone linked tasks and clears removed task milestone links', () => {
@@ -1456,7 +1479,7 @@ test('tasks.delete removes a task through MCP and workspace snapshots stay in sy
       arguments: {},
     },
   }, req);
-  assert.ok(!listResponse.result.structuredContent.some(task => task.id === 'task-2'));
+  assert.ok(!listResponse.result.structuredContent.tasks.some(task => task.id === 'task-2'));
 
   const snapshotResponse = dispatch({
     jsonrpc: '2.0',

@@ -34,9 +34,9 @@ async function readMcpGoals(endpoint) {
   const response = await fetch(endpoint, { method: 'POST', headers: sessionHeaders, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'goals.list', arguments: {} } }) });
   const payload = await response.json();
   const content = payload?.result?.content?.find(item => item?.type === 'text')?.text;
-  let goals = payload?.result?.structuredContent;
+  let goals = payload?.result?.structuredContent?.goals;
   if (!Array.isArray(goals) && content) {
-    try { goals = JSON.parse(content); } catch { goals = []; }
+    try { goals = JSON.parse(content)?.goals; } catch { goals = []; }
   }
   return { endpoint, status: response.status, goals: Array.isArray(goals) ? goals.map(goal => ({ id: goal?.id, title: goal?.title, revision: goal?.revision ?? goal?.__mcpRevision ?? 0, execution: goal?.execution?.state || null })) : [], error: payload?.error?.message || null };
 }
