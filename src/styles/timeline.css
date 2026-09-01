@@ -392,6 +392,11 @@
   flex-shrink: 0;
 }
 
+.timeline-vertical-spacer {
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
 .timeline-right-column {
   flex: 1;
   overflow: auto;

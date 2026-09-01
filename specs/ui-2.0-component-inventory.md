@@ -355,13 +355,11 @@ Kanban has a reasonable split:
 ## Timeline Inventory
 
 Primary sources:
-- `src/app/components/TimelineView.tsx`
-- `src/app/components/TimelineHeader.tsx`
+- `src/app/components/views/TimelineView.tsx`
+- `src/app/components/headers/TimelineHeader.tsx`
 - `src/app/components/DraggableSwimlaneRow.tsx`
 - `src/app/components/DraggableTimelineTask.tsx`
 - `src/app/components/DraggableSwimlaneLabel.tsx`
-- `src/app/components/SwimlaneRowsView.tsx`
-- `src/app/components/MonthsScrollerFixed.tsx`
 
 ### Current Componentization
 
@@ -384,7 +382,7 @@ Timeline is the most modular primary view, but the container is still large. `Ti
 | `TimelineToolbar` | component | Extract during visual refresh | Mode toggle, weekend toggle, add project/person controls if applicable. |
 | `TimelineLayoutProvider` | hook/provider | Later | Owns left column width, month widths, scroll state. |
 | `TimelineGridFrame` | component | Later | Header/rows/scroll container wiring. |
-| `TimelineRowList` | existing | Reuse | `SwimlaneRowsView` and row components are already useful. |
+| `TimelineRowList` | existing | Reuse | `DraggableSwimlaneRow` remains the single active row renderer. |
 | `TimelineTaskBar` | existing | Reuse | `DraggableTimelineTask` is the correct behavior boundary. |
 | `TimelineSwimlaneNav` | existing | Reuse | `DraggableSwimlaneLabel` should keep reorder behavior. |
 

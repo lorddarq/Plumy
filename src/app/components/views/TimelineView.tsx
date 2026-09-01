@@ -4,11 +4,8 @@
  * Main timeline/calendar view for task scheduling.
  * Renders swimlanes as rows with draggable tasks positioned on a date grid.
  *
- * Modular architecture:
- * - TimelineHeader: month/day headers
- * - SwimlaneRowsView: swimlane rows container
- * - DraggableSwimlaneRow: individual swimlane with tasks
- * - Track allocation: dynamic height calculation for overlapping tasks
+ * The Timeline viewport owns month/day geometry; the header and interactive rows
+ * consume the same visible-month and pixel-offset result.
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
@@ -30,30 +27,41 @@ import {
   type SwimlaneRowDropIndicator,
 } from '../DraggableSwimlaneLabel';
 import { DraggableSwimlaneRow } from '../DraggableSwimlaneRow';
-import { allocateTasksToTracks, calculateSwimlaneHeight } from '../../utils/trackAllocation';
+import {
+  buildTimelineRowWindow,
+  buildTimelineTrackPlan,
+  getTimelineCompensatedScrollTop,
+} from '../../utils/trackAllocation';
 import { getStatusVisual } from '../../utils/roadmap';
 import { getReadableOutlineColorFor } from '../../utils/contrast';
-import { parseISODateLocal, toLocalISODate } from '../../utils/date';
+import {
+  parseISODateLocal,
+  toLocalISODate,
+  updateTimelineDateRangeByKeyboard,
+  type TimelineKeyboardDateAction,
+} from '../../utils/date';
 import {
   createInitialTimelineWindow,
+  buildTimelineViewport,
+  buildTimelineViewportGeometry,
+  createTimelineMonthWidths,
   extendTimelineWindow,
   extendTimelineWindowToDate,
+  findTimelineDateIndex,
   getTimelineWindowDates,
   getTimelineWindowScrollCompensation,
+  getTimelineViewportMarker,
 } from '../../utils/timelineWindow';
 import { applyTimelineTaskDrop } from '../../utils/timelineTaskDrop';
 import { resolveReorderDropIndex } from '../../utils/swimlaneReorder';
-import {
-  findNearestVisibleDateIndex,
-  getCenteredScrollLeftForMarker,
-  getVariableDaySurfaceMarker,
-} from '../../utils/timeSurface';
+import { getCenteredScrollLeftForMarker } from '../../utils/timeSurface';
 import type { TimelineLayoutState } from '../../services/uiState';
 import { persistTimelineLayoutState } from '../../services/uiState';
 import { isPointerReleased } from '../../utils/pointerInteraction';
 import { HorizontalScrollbar } from '../HorizontalScrollbar';
 
 const DEFAULT_ROW_HEIGHT = 48;
+const TIMELINE_TRACK_HEIGHT = 40;
 const HEADER_HEIGHT = 89;
 const DEFAULT_DAY_WIDTH = 60;
 const DEFAULT_LEFT_COL_WIDTH = 282;
@@ -62,6 +70,9 @@ const MAX_LEFT_COL_WIDTH = 420;
 const HORIZONTAL_RENDER_BUFFER_PX = 1200;
 const WINDOW_EXTENSION_BUFFER_PX = 1200;
 const HORIZONTAL_METRICS_STEP_PX = 64;
+// Roughly one viewport on common laptop displays; enough headroom for wheel and
+// scrollbar jumps without retaining work proportional to the authored row count.
+const VERTICAL_ROW_OVERSCAN_PX = 640;
 
 function TimelineSwimlaneInsertionMarker({
   height,
@@ -215,12 +226,20 @@ export function TimelineView({
     viewportWidth: 0,
   });
   const horizontalMetricsRef = useRef(horizontalMetrics);
+  const [verticalMetrics, setVerticalMetrics] = useState({ scrollTop: 0, viewportHeight: 0 });
+  const verticalMetricsRef = useRef(verticalMetrics);
 
   useEffect(() => {
     horizontalMetricsRef.current = horizontalMetrics;
   }, [horizontalMetrics]);
+  useEffect(() => {
+    verticalMetricsRef.current = verticalMetrics;
+  }, [verticalMetrics]);
   const [swimlaneDropIndicator, setSwimlaneDropIndicator] = useState<SwimlaneRowDropIndicator | null>(null);
   const [draggingSwimlaneId, setDraggingSwimlaneId] = useState<string | null>(null);
+  const [selectingRowId, setSelectingRowId] = useState<string | null>(null);
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
+  const [draggingTaskRowId, setDraggingTaskRowId] = useState<string | null>(null);
   const visibleSwimlaneDropIndicator = draggingSwimlaneId ? swimlaneDropIndicator : null;
   
   // Display swimlanes based on mode
@@ -235,21 +254,25 @@ export function TimelineView({
     }
     return swimlanes;
   }, [mode, people, swimlanes]);
-  const timelineTasksBySwimlane = useMemo(() => {
-    const tasksBySwimlane = new Map<string, Task[]>();
-    timelineTasks.forEach(task => {
-      const swimlaneId = mode === 'people' ? task.assigneeId : task.swimlaneId;
-      if (!swimlaneId) return;
-      const laneTasks = tasksBySwimlane.get(swimlaneId);
-      if (laneTasks) laneTasks.push(task);
-      else tasksBySwimlane.set(swimlaneId, [task]);
-    });
-    return tasksBySwimlane;
-  }, [mode, timelineTasks]);
-  const visibleTaskCount = useMemo(
-    () => displaySwimlanes.reduce((count, swimlane) => count + (timelineTasksBySwimlane.get(swimlane.id)?.length ?? 0), 0),
-    [displaySwimlanes, timelineTasksBySwimlane]
+  const displaySwimlaneIds = useMemo(
+    () => displaySwimlanes.map(swimlane => swimlane.id),
+    [displaySwimlanes]
   );
+  const timelineTrackPlan = useMemo(
+    () => buildTimelineTrackPlan(
+      timelineTasks,
+      displaySwimlaneIds,
+      mode,
+      TIMELINE_TRACK_HEIGHT,
+      DEFAULT_ROW_HEIGHT
+    ),
+    [displaySwimlaneIds, mode, timelineTasks]
+  );
+  const displaySwimlanesById = useMemo(
+    () => new Map(displaySwimlanes.map(swimlane => [swimlane.id, swimlane])),
+    [displaySwimlanes]
+  );
+  const visibleTaskCount = timelineTrackPlan.taskCount;
   const lastDisplaySwimlaneId = displaySwimlanes[displaySwimlanes.length - 1]?.id;
 
   // Refs
@@ -271,8 +294,10 @@ export function TimelineView({
   const scrubStartScrollLeftRef = useRef<number>(0);
   const startupScrollTimersRef = useRef<number[]>([]);
   const startupScrollRafRef = useRef<number | null>(null);
+  const previousTrackPlanRef = useRef<typeof timelineTrackPlan | null>(null);
   const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
   const [needsStartupTodayScroll, setNeedsStartupTodayScroll] = useState(false);
+  const [timelineAnnouncement, setTimelineAnnouncement] = useState('');
 
   // State for task resizing
   const [resizingTask, setResizingTask] = useState<{
@@ -288,6 +313,30 @@ export function TimelineView({
     width: number;
   } | null>(null);
 
+  const resizingRowId = resizingTask
+    ? timelineTrackPlan.taskRowIdByTaskId.get(resizingTask.taskId) ?? null
+    : null;
+  const pinnedRowIds = useMemo(
+    () => new Set([
+      draggingSwimlaneId,
+      draggingTaskRowId,
+      resizingRowId,
+      selectingRowId,
+      focusedRowId,
+    ].filter((rowId): rowId is string => Boolean(rowId))),
+    [draggingSwimlaneId, draggingTaskRowId, focusedRowId, resizingRowId, selectingRowId]
+  );
+  const timelineRowWindow = useMemo(
+    () => buildTimelineRowWindow(
+      timelineTrackPlan,
+      verticalMetrics.scrollTop,
+      verticalMetrics.viewportHeight,
+      VERTICAL_ROW_OVERSCAN_PX,
+      pinnedRowIds
+    ),
+    [pinnedRowIds, timelineTrackPlan, verticalMetrics]
+  );
+
   // Ref for synchronously suppressing slot-add interactions around resize pointer cycles.
   const ignoreAddTaskUntilRef = useRef<number>(0);
 
@@ -299,58 +348,38 @@ export function TimelineView({
     [timelineWindow, showWeekends]
   );
 
-  // Group dates by month
-  const allDatesByMonth = useMemo(() => {
-    const m: Record<string, Date[]> = {};
-    allDates.forEach(date => {
-      const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-      if (!m[monthKey]) m[monthKey] = [];
-      m[monthKey].push(date);
-    });
-    return m;
-  }, [allDates]);
-
-  const orderedMonthKeys = useMemo(() => (
-    Object.keys(allDatesByMonth).sort((a, b) => {
-      const ta = allDatesByMonth[a]?.[0]?.getTime() ?? 0;
-      const tb = allDatesByMonth[b]?.[0]?.getTime() ?? 0;
-      return ta - tb;
-    })
-  ), [allDatesByMonth]);
-
   // Initialize month widths
-  const [monthWidths, setMonthWidths] = useState<Record<string, number>>(() => {
-    const defaults: Record<string, number> = {};
-    Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
-      defaults[k] = monthDates.length * DEFAULT_DAY_WIDTH;
-    });
-    return initialLayoutState?.monthWidths ? { ...defaults, ...initialLayoutState.monthWidths } : defaults;
-  });
+  const [monthWidths, setMonthWidths] = useState<Record<string, number>>(() => (
+    createTimelineMonthWidths(allDates, DEFAULT_DAY_WIDTH, initialLayoutState?.monthWidths)
+  ));
 
-  // Derive day widths
-  const [allDayWidths, setAllDayWidths] = useState<number[]>(() => {
-    const arr: number[] = [];
-    Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
-      const perDay = monthWidths[k] ? monthWidths[k] / monthDates.length : DEFAULT_DAY_WIDTH;
-      monthDates.forEach(() => arr.push(perDay));
-    });
-    return arr;
-  });
+  const viewportGeometry = useMemo(() => buildTimelineViewportGeometry({
+    dates: allDates,
+    monthWidths,
+    defaultDayWidth: DEFAULT_DAY_WIDTH,
+  }), [allDates, monthWidths]);
 
-  // Update dayWidths when monthWidths changes
+  const viewport = useMemo(() => buildTimelineViewport({
+    geometry: viewportGeometry,
+    scrollMetrics: horizontalMetrics,
+    renderBufferPx: HORIZONTAL_RENDER_BUFFER_PX,
+  }), [horizontalMetrics, viewportGeometry]);
+
+  // Persist concrete widths for months added by window extension.
   useEffect(() => {
+    const defaults = createTimelineMonthWidths(allDates, DEFAULT_DAY_WIDTH);
     setMonthWidths(prev => {
       const next = { ...prev };
       let changed = false;
-      Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
-        if (!next[k]) {
-          next[k] = monthDates.length * DEFAULT_DAY_WIDTH;
+      Object.entries(defaults).forEach(([monthKey, width]) => {
+        if (!next[monthKey]) {
+          next[monthKey] = width;
           changed = true;
         }
       });
       return changed ? next : prev;
     });
-  }, [allDatesByMonth]);
+  }, [allDates]);
 
   useEffect(() => {
     const nextLayoutState = {
@@ -362,98 +391,13 @@ export function TimelineView({
     onLayoutStateChange?.(nextLayoutState);
   }, [leftColWidth, monthWidths, onLayoutStateChange, showCompleted]);
 
-  useEffect(() => {
-    const arr: number[] = [];
-    Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
-      const perDay = monthWidths[k] ? monthWidths[k] / monthDates.length : DEFAULT_DAY_WIDTH;
-      monthDates.forEach(() => arr.push(perDay));
-    });
-    setAllDayWidths(arr);
-  }, [monthWidths, allDatesByMonth]);
-
-  const monthMeta = useMemo(() => {
-    const entries = orderedMonthKeys.map(monthKey => ({
-      monthKey,
-      width: monthWidths[monthKey] ?? (allDatesByMonth[monthKey]?.length || 0) * DEFAULT_DAY_WIDTH,
-      dayCount: allDatesByMonth[monthKey]?.length || 0,
-    }));
-
-    let runningPx = 0;
-    let runningDayIndex = 0;
-    return entries.map(entry => {
-      const meta = {
-        ...entry,
-        startPx: runningPx,
-        endPx: runningPx + entry.width,
-        startDayIndex: runningDayIndex,
-      };
-      runningPx += entry.width;
-      runningDayIndex += entry.dayCount;
-      return meta;
-    });
-  }, [orderedMonthKeys, monthWidths, allDatesByMonth]);
-
-  const visibleMonthKeys = useMemo(() => {
-    if (monthMeta.length === 0) return orderedMonthKeys;
-    const viewportWidth = horizontalMetrics.viewportWidth || 0;
-    const left = Math.max(0, horizontalMetrics.scrollLeft - HORIZONTAL_RENDER_BUFFER_PX);
-    const right = horizontalMetrics.scrollLeft + viewportWidth + HORIZONTAL_RENDER_BUFFER_PX;
-    const keys = monthMeta
-      .filter(m => m.endPx >= left && m.startPx <= right)
-      .map(m => m.monthKey);
-    return keys.length > 0 ? keys : orderedMonthKeys;
-  }, [monthMeta, horizontalMetrics, orderedMonthKeys]);
-
-  const datesByMonth = useMemo(() => {
-    const subset: Record<string, Date[]> = {};
-    visibleMonthKeys.forEach(monthKey => {
-      subset[monthKey] = allDatesByMonth[monthKey] || [];
-    });
-    return subset;
-  }, [visibleMonthKeys, allDatesByMonth]);
-
-  const monthStartIndices = useMemo(() => {
-    const map: Record<string, number> = {};
-    monthMeta.forEach(m => {
-      map[m.monthKey] = m.startDayIndex;
-    });
-    return map;
-  }, [monthMeta]);
-
-  const leadingSpacerWidth = useMemo(() => {
-    if (visibleMonthKeys.length === 0 || monthMeta.length === 0) return 0;
-    const firstKey = visibleMonthKeys[0];
-    const first = monthMeta.find(m => m.monthKey === firstKey);
-    return first?.startPx ?? 0;
-  }, [visibleMonthKeys, monthMeta]);
-
-  const trailingSpacerWidth = useMemo(() => {
-    if (visibleMonthKeys.length === 0 || monthMeta.length === 0) return 0;
-    const lastKey = visibleMonthKeys[visibleMonthKeys.length - 1];
-    const last = monthMeta.find(m => m.monthKey === lastKey);
-    const totalWidth = monthMeta[monthMeta.length - 1].endPx;
-    return Math.max(0, totalWidth - (last?.endPx ?? totalWidth));
-  }, [visibleMonthKeys, monthMeta]);
-
-  const dates = allDates;
-  const dayWidths = allDayWidths;
-
-  // Compute dynamic heights for swimlanes
-  const swimlaneHeights = useMemo(() => {
-    const heights: Record<string, number> = {};
-    displaySwimlanes.forEach(swimlane => {
-      const swimlaneTasks = timelineTasksBySwimlane.get(swimlane.id) ?? [];
-      // Each track is 40px (task render height 32px + gap 8px), with at least DEFAULT_ROW_HEIGHT
-      const TRACK_HEIGHT = 40;
-      const trackAssignments = allocateTasksToTracks(swimlaneTasks);
-      const trackCount = swimlaneTasks.length > 0 ? Math.max(...Object.values(trackAssignments)) + 1 : 1;
-      heights[swimlane.id] = Math.max(DEFAULT_ROW_HEIGHT, trackCount * TRACK_HEIGHT);
-    });
-    return heights;
-  }, [displaySwimlanes, timelineTasksBySwimlane]);
+  const visibleMonths = viewport.visibleMonths;
+  const leadingSpacerWidth = viewport.horizontalSpacers.leadingWidth;
+  const trailingSpacerWidth = viewport.horizontalSpacers.trailingWidth;
+  const { dates, dayWidths, dayOffsets, totalWidth: totalTimelineWidth } = viewport.dateGeometry;
 
   const draggedSwimlaneHeight = draggingSwimlaneId
-    ? swimlaneHeights[draggingSwimlaneId] || DEFAULT_ROW_HEIGHT
+    ? timelineTrackPlan.rowsById.get(draggingSwimlaneId)?.height ?? DEFAULT_ROW_HEIGHT
     : DEFAULT_ROW_HEIGHT;
 
   // Sync left column header height with timeline header actual height
@@ -480,40 +424,20 @@ export function TimelineView({
 
   const todayIndex = useMemo(() => {
     // In 5-day mode, weekend "today" may be filtered out; use nearest visible day.
-    return findNearestVisibleDateIndex(allDates, today);
-  }, [allDates, today]);
+    return findTimelineDateIndex(dates, today, 'start');
+  }, [dates, today]);
 
   const todayMarker = useMemo(
-    () => getVariableDaySurfaceMarker(dayWidths, todayIndex, DEFAULT_DAY_WIDTH),
-    [dayWidths, todayIndex]
+    () => getTimelineViewportMarker(viewport.dateGeometry, todayIndex, DEFAULT_DAY_WIDTH),
+    [todayIndex, viewport.dateGeometry]
   );
 
   const todayCenterOffset = todayMarker?.center ?? null;
 
-  // Calculate total timeline width
-  const totalTimelineWidth = useMemo(() => {
-    return dayWidths.reduce((a, b) => a + b, 0);
-  }, [dayWidths]);
-
   const endPadding = 24;
 
   const getVisibleIndexForDate = useCallback(
-    (date: Date, mode: 'start' | 'end'): number => {
-      if (dates.length === 0) return -1;
-      const target = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-
-      if (mode === 'start') {
-        for (let i = 0; i < dates.length; i++) {
-          if (dates[i].getTime() >= target) return i;
-        }
-        return dates.length - 1;
-      }
-
-      for (let i = dates.length - 1; i >= 0; i--) {
-        if (dates[i].getTime() <= target) return i;
-      }
-      return 0;
-    },
+    (date: Date, mode: 'start' | 'end') => findTimelineDateIndex(dates, date, mode),
     [dates]
   );
 
@@ -623,8 +547,7 @@ export function TimelineView({
 
       if (startIdx < 0) return;
 
-      const prefix: number[] = [0];
-      for (let i = 0; i < dayWidths.length; i++) prefix.push(prefix[i] + (dayWidths[i] ?? DEFAULT_DAY_WIDTH));
+      const prefix = dayOffsets;
 
       // Use rowsContainerRef for accurate scroll position (not headerRef)
       const scrollEl = rowsContainerRef.current;
@@ -716,15 +639,24 @@ export function TimelineView({
     const handleMouseUp = (e: MouseEvent) => {
       finishResize(e.clientX);
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      pendingResizePreviewRef.current = null;
+      setTaskResizePreview(null);
+      setResizingTask(null);
+      suppressAddTaskInteractions();
+    };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [resizingTask, tasks, dates, dayWidths, onUpdateTaskDates, getVisibleIndexForDate, queueTaskResizePreview, suppressAddTaskInteractions]);
+  }, [resizingTask, tasks, dates, dayWidths, dayOffsets, onUpdateTaskDates, getVisibleIndexForDate, queueTaskResizePreview, suppressAddTaskInteractions]);
 
   // Scroll to today
   const scrollToToday = useCallback((opts?: { smooth?: boolean }) => {
@@ -735,9 +667,9 @@ export function TimelineView({
       : getCenteredScrollLeftForMarker(todayCenterOffset, rowsContainerRef.current.clientWidth);
 
     if (targetLeft === null) {
-      const fallbackMarker = getVariableDaySurfaceMarker(
-        dayWidths,
-        findNearestVisibleDateIndex(allDates, new Date()),
+      const fallbackMarker = getTimelineViewportMarker(
+        viewport.dateGeometry,
+        findTimelineDateIndex(dates, new Date(), 'start'),
         DEFAULT_DAY_WIDTH
       );
       if (fallbackMarker) {
@@ -760,7 +692,7 @@ export function TimelineView({
       viewportWidth: rowsContainerRef.current.clientWidth,
     });
     return targetLeft;
-  }, [todayCenterOffset, allDates, dayWidths, totalTimelineWidth]);
+  }, [todayCenterOffset, dates, totalTimelineWidth, viewport.dateGeometry]);
 
   // Scroll handlers
   const handleScrollLeft = useCallback(() => {
@@ -973,6 +905,25 @@ export function TimelineView({
           // can trigger a second layout/scroll update during wheel dispatch.
           leftListContent.style.transform = `translate3d(0, -${scrollTop}px, 0)`;
 
+          const activeElement = document.activeElement;
+          const activeRowId = activeElement instanceof HTMLElement
+            ? activeElement.closest<HTMLElement>('[data-timeline-row-id]')?.dataset.timelineRowId
+            : undefined;
+          if (activeRowId) setFocusedRowId(current => current === activeRowId ? current : activeRowId);
+
+          const nextVerticalMetrics = {
+            scrollTop,
+            viewportHeight: Math.max(0, rowsContainer.clientHeight - HEADER_HEIGHT),
+          };
+          const publishedVerticalMetrics = verticalMetricsRef.current;
+          if (
+            nextVerticalMetrics.scrollTop !== publishedVerticalMetrics.scrollTop
+            || nextVerticalMetrics.viewportHeight !== publishedVerticalMetrics.viewportHeight
+          ) {
+            verticalMetricsRef.current = nextVerticalMetrics;
+            setVerticalMetrics(nextVerticalMetrics);
+          }
+
           if (lastHorizontalScrollLeftRef.current !== scrollLeft) {
             lastHorizontalScrollLeftRef.current = scrollLeft;
             const scrollWidth = rowsContainer.scrollWidth;
@@ -1026,6 +977,31 @@ export function TimelineView({
     windowExtensionPendingRef.current = false;
   }, [timelineWindow]);
 
+  useLayoutEffect(() => {
+    const previousPlan = previousTrackPlanRef.current;
+    const rowsContainer = rowsContainerRef.current;
+    if (previousPlan && rowsContainer) {
+      const targetScrollTop = getTimelineCompensatedScrollTop(
+        previousPlan,
+        timelineTrackPlan,
+        verticalMetricsRef.current.scrollTop
+      );
+      if (Math.abs(rowsContainer.scrollTop - targetScrollTop) > 0.5) {
+        rowsContainer.scrollTop = targetScrollTop;
+        if (leftListContentRef.current) {
+          leftListContentRef.current.style.transform = `translate3d(0, -${targetScrollTop}px, 0)`;
+        }
+        const nextMetrics = {
+          scrollTop: targetScrollTop,
+          viewportHeight: Math.max(0, rowsContainer.clientHeight - HEADER_HEIGHT),
+        };
+        verticalMetricsRef.current = nextMetrics;
+        setVerticalMetrics(nextMetrics);
+      }
+    }
+    previousTrackPlanRef.current = timelineTrackPlan;
+  }, [timelineTrackPlan]);
+
   // Attach vertical scroll listener
   useEffect(() => {
     const rowsEl = rowsContainerRef.current;
@@ -1042,11 +1018,26 @@ export function TimelineView({
   }, [handleRowsVerticalScroll]);
 
   useEffect(() => {
-    if (!rowsContainerRef.current) return;
-    setHorizontalMetrics({
-      scrollLeft: rowsContainerRef.current.scrollLeft,
-      viewportWidth: rowsContainerRef.current.clientWidth,
-    });
+    const rowsContainer = rowsContainerRef.current;
+    if (!rowsContainer) return;
+    const syncMetrics = () => {
+      const nextHorizontalMetrics = {
+        scrollLeft: rowsContainer.scrollLeft,
+        viewportWidth: rowsContainer.clientWidth,
+      };
+      horizontalMetricsRef.current = nextHorizontalMetrics;
+      setHorizontalMetrics(nextHorizontalMetrics);
+      const nextVerticalMetrics = {
+        scrollTop: rowsContainer.scrollTop,
+        viewportHeight: Math.max(0, rowsContainer.clientHeight - HEADER_HEIGHT),
+      };
+      verticalMetricsRef.current = nextVerticalMetrics;
+      setVerticalMetrics(nextVerticalMetrics);
+    };
+    syncMetrics();
+    const resizeObserver = new ResizeObserver(syncMetrics);
+    resizeObserver.observe(rowsContainer);
+    return () => resizeObserver.disconnect();
   }, [dayWidths.length, leftColWidth, showWeekends]);
 
   useEffect(() => {
@@ -1062,7 +1053,7 @@ export function TimelineView({
     const idx = getVisibleIndexForDate(revealDate, 'start');
     if (idx < 0) return;
 
-    const marker = getVariableDaySurfaceMarker(dayWidths, idx, DEFAULT_DAY_WIDTH);
+    const marker = getTimelineViewportMarker(viewport.dateGeometry, idx, DEFAULT_DAY_WIDTH);
     if (!marker) return;
 
     const left = marker.left;
@@ -1074,7 +1065,7 @@ export function TimelineView({
     }
 
     pendingRevealDateRef.current = null;
-  }, [dates, dayWidths, getVisibleIndexForDate]);
+  }, [dates, dayWidths, getVisibleIndexForDate, viewport.dateGeometry]);
 
   const getTaskColor = useCallback(
     (status: string): { className?: string; style?: React.CSSProperties; textClass?: string; bulletOutlineColor?: string } => {
@@ -1098,9 +1089,45 @@ export function TimelineView({
     [statusColumns]
   );
 
+  const getTaskStatusLabel = useCallback(
+    (status: string) => statusColumns?.find(column => column.id === status)?.title || status,
+    [statusColumns],
+  );
+
+  const handleKeyboardTaskDateChange = useCallback((
+    task: Task,
+    action: TimelineKeyboardDateAction,
+    direction: -1 | 1,
+  ) => {
+    const update = updateTimelineDateRangeByKeyboard(
+      task.startDate,
+      task.endDate,
+      action,
+      direction,
+      showWeekends,
+    );
+    if (!update) {
+      setTimelineAnnouncement(`${task.title} cannot be resized further.`);
+      return;
+    }
+    onUpdateTaskDates(task.id, update.startDate, update.endDate);
+    const nextStart = parseISODateLocal(update.startDate);
+    const nextEnd = parseISODateLocal(update.endDate);
+    if (nextStart && nextEnd) {
+      setTimelineWindow(window => extendTimelineWindowToDate(
+        extendTimelineWindowToDate(window, nextStart),
+        nextEnd,
+      ));
+    }
+    setTimelineAnnouncement(`${task.title} ${action === 'move' ? 'moved' : 'resized'}: ${update.startDate} to ${update.endDate}.`);
+  }, [onUpdateTaskDates, showWeekends]);
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div ref={timelineContainerRef} className="timeline-container">
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {timelineAnnouncement}
+        </div>
         <TimelineToolbar
           mode={mode}
           showWeekends={showWeekends}
@@ -1165,12 +1192,19 @@ export function TimelineView({
 
             <div className="timeline-left-list" ref={leftListRef}>
               <div ref={leftListContentRef} className="timeline-left-list-content">
-              {displaySwimlanes.map((swimlane, index) => {
-                const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
+              <div
+                className="timeline-vertical-spacer"
+                style={{ height: `${timelineRowWindow.leadingSpacerHeight}px` }}
+                aria-hidden
+              />
+              {timelineRowWindow.rows.map(rowPlan => {
+                const swimlane = displaySwimlanesById.get(rowPlan.rowId);
+                if (!swimlane) return null;
+                const height = rowPlan.height;
                 const isDraggedRowCollapsed = Boolean(
                   visibleSwimlaneDropIndicator && draggingSwimlaneId === swimlane.id
                 );
-                const taskCount = timelineTasksBySwimlane.get(swimlane.id)?.length ?? 0;
+                const taskCount = rowPlan.tasks.length;
                 
                 return (
                   <React.Fragment key={swimlane.id}>
@@ -1185,6 +1219,11 @@ export function TimelineView({
                     )}
                     <div
                       className="timeline-swimlane-label-container"
+                      data-timeline-row-id={swimlane.id}
+                      onFocusCapture={() => setFocusedRowId(swimlane.id)}
+                      onBlurCapture={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedRowId(null);
+                      }}
                       style={{
                         height: isDraggedRowCollapsed ? '0px' : `${height}px`,
                         minHeight: isDraggedRowCollapsed ? '0px' : `${height}px`,
@@ -1193,7 +1232,7 @@ export function TimelineView({
                     >
                       <DraggableSwimlaneLabel
                         swimlane={swimlane}
-                        index={index}
+                        index={rowPlan.index}
                         leftColWidth={leftColWidth}
                         rowHeight={height}
                         onEditSwimlane={mode === 'projects' ? onEditSwimlane : () => {}}
@@ -1219,6 +1258,11 @@ export function TimelineView({
                   </React.Fragment>
                 );
               })}
+              <div
+                className="timeline-vertical-spacer"
+                style={{ height: `${timelineRowWindow.trailingSpacerHeight}px` }}
+                aria-hidden
+              />
               <TimelineSwimlaneEndDropZone
                 width={`${leftColWidth}px`}
                 lastSwimlaneId={lastDisplaySwimlaneId}
@@ -1252,10 +1296,7 @@ export function TimelineView({
                 }}
               >
               <TimelineHeader
-                datesByMonth={datesByMonth}
-                monthKeys={visibleMonthKeys}
-                monthStartIndices={monthStartIndices}
-                monthWidths={monthWidths}
+                months={visibleMonths}
                 dayWidths={dayWidths}
                 defaultDayWidth={DEFAULT_DAY_WIDTH}
                 totalTimelineWidth={totalTimelineWidth}
@@ -1275,7 +1316,7 @@ export function TimelineView({
                   };
                 }}
                 onMonthReset={(monthKey) => {
-                  const monthDates = datesByMonth[monthKey] || [];
+                  const monthDates = visibleMonths.find(month => month.monthKey === monthKey)?.dates ?? [];
                   setMonthWidths(prev => ({
                     ...prev,
                     [monthKey]: monthDates.length * DEFAULT_DAY_WIDTH,
@@ -1309,10 +1350,23 @@ export function TimelineView({
                 </div>
               </div>
             )}
-            <div className="timeline-rows-container">
-              {displaySwimlanes.map((swimlane, idx) => {
-                const swimlaneTasks = timelineTasksBySwimlane.get(swimlane.id) ?? [];
-                const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
+            <div
+              className="timeline-rows-container"
+              data-timeline-authored-rows={displaySwimlanes.length}
+              data-timeline-window-start={timelineRowWindow.startIndex}
+              data-timeline-window-end={timelineRowWindow.endIndex}
+              data-timeline-pinned-rows={[...pinnedRowIds].join(',')}
+            >
+              <div
+                className="timeline-vertical-spacer"
+                style={{ height: `${timelineRowWindow.leadingSpacerHeight}px` }}
+                aria-hidden
+              />
+              {timelineRowWindow.rows.map(rowPlan => {
+                const swimlane = displaySwimlanesById.get(rowPlan.rowId);
+                if (!swimlane) return null;
+                const swimlaneTasks = rowPlan.tasks;
+                const height = rowPlan.height;
                 const isDraggedRowCollapsed = Boolean(
                   visibleSwimlaneDropIndicator && draggingSwimlaneId === swimlane.id
                 );
@@ -1330,6 +1384,7 @@ export function TimelineView({
                     )}
                     <div
                       className="swimlane-row relative"
+                      data-timeline-row-id={swimlane.id}
                       style={{
                         height: isDraggedRowCollapsed ? '0px' : `${height}px`,
                         minHeight: isDraggedRowCollapsed ? '0px' : `${height}px`,
@@ -1339,14 +1394,15 @@ export function TimelineView({
                     >
                       <DraggableSwimlaneRow
                         swimlane={swimlane}
-                        index={idx}
+                        index={rowPlan.index}
                         mode={mode}
                         tasks={swimlaneTasks}
+                        trackAssignments={rowPlan.trackAssignments}
+                        trackHeight={rowPlan.trackHeight}
                         dates={dates}
                         dateWidths={dayWidths}
-                        monthKeys={visibleMonthKeys}
-                        monthWidths={monthWidths}
-                        datesByMonth={datesByMonth}
+                        dateOffsets={dayOffsets}
+                        months={visibleMonths}
                         leadingSpacerWidth={leadingSpacerWidth}
                         trailingSpacerWidth={trailingSpacerWidth + endPadding}
                         totalTimelineWidth={totalTimelineWidth}
@@ -1384,6 +1440,7 @@ export function TimelineView({
                           pendingRevealDateRef.current = dateISO;
                         }}
                         getTaskColor={getTaskColor}
+                        getTaskStatusLabel={getTaskStatusLabel}
                         handleResizeStart={(e, task, edge) => {
                           suppressAddTaskInteractions();
                           setResizingTask({
@@ -1396,6 +1453,10 @@ export function TimelineView({
                         }}
                         resizingTaskId={resizingTask?.taskId ?? null}
                         taskResizePreview={taskResizePreview}
+                        onSelectionRowChange={setSelectingRowId}
+                        onFocusedRowChange={setFocusedRowId}
+                        onTaskDragRowChange={setDraggingTaskRowId}
+                        onKeyboardDateChange={handleKeyboardTaskDateChange}
                         shouldIgnoreAddTask={shouldIgnoreAddTask}
                         scrollContainerRef={rowsContainerRef}
                       />
@@ -1412,6 +1473,11 @@ export function TimelineView({
                   </React.Fragment>
                 );
               })}
+              <div
+                className="timeline-vertical-spacer"
+                style={{ height: `${timelineRowWindow.trailingSpacerHeight}px` }}
+                aria-hidden
+              />
               <TimelineSwimlaneEndDropZone
                 width={`${totalTimelineWidth + endPadding}px`}
                 lastSwimlaneId={lastDisplaySwimlaneId}

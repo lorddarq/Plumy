@@ -10,6 +10,37 @@
 
 import type { Task } from '../types.ts';
 
+export type TimelineTrackPlanMode = 'projects' | 'people';
+
+export interface TimelineRowTrackPlan {
+  index: number;
+  rowId: string;
+  tasks: Task[];
+  trackAssignments: Record<string, number>;
+  trackCount: number;
+  trackHeight: number;
+  height: number;
+  topOffset: number;
+}
+
+export interface TimelineTrackPlan {
+  tasksByRow: Map<string, Task[]>;
+  rows: TimelineRowTrackPlan[];
+  rowsById: Map<string, TimelineRowTrackPlan>;
+  taskRowIdByTaskId: Map<string, string>;
+  taskCount: number;
+  totalHeight: number;
+}
+
+export interface TimelineRowWindow {
+  rows: TimelineRowTrackPlan[];
+  startIndex: number;
+  endIndex: number;
+  leadingSpacerHeight: number;
+  trailingSpacerHeight: number;
+  totalHeight: number;
+}
+
 /**
  * Represents a task assignment to a track.
  */
@@ -133,6 +164,150 @@ export function allocateTasksToTracks(
   }
 
   return assignments;
+}
+
+/**
+ * Build the authored-row task index and its vertical track geometry together.
+ * The plan intentionally has no viewport input, so horizontal mounting and width
+ * changes cannot alter track placement or row height.
+ */
+export function buildTimelineTrackPlan(
+  tasks: Task[],
+  rowIds: string[],
+  mode: TimelineTrackPlanMode,
+  trackHeight: number,
+  minimumRowHeight: number
+): TimelineTrackPlan {
+  const tasksByRow = new Map<string, Task[]>(rowIds.map(rowId => [rowId, []]));
+
+  tasks.forEach(task => {
+    const rowId = mode === 'people' ? task.assigneeId : task.swimlaneId;
+    if (!rowId) return;
+    tasksByRow.get(rowId)?.push(task);
+  });
+
+  const rows: TimelineRowTrackPlan[] = [];
+  const rowsById = new Map<string, TimelineRowTrackPlan>();
+  const taskRowIdByTaskId = new Map<string, string>();
+  let topOffset = 0;
+  let taskCount = 0;
+
+  rowIds.forEach((rowId, index) => {
+    const rowTasks = tasksByRow.get(rowId) ?? [];
+    const trackAssignments = allocateTasksToTracks(rowTasks);
+    const trackCount = rowTasks.length > 0
+      ? Math.max(...Object.values(trackAssignments)) + 1
+      : 1;
+    const height = Math.max(minimumRowHeight, trackCount * trackHeight);
+
+    const row = {
+      index,
+      rowId,
+      tasks: rowTasks,
+      trackAssignments,
+      trackCount,
+      trackHeight,
+      height,
+      topOffset,
+    };
+    rows.push(row);
+    rowsById.set(rowId, row);
+    rowTasks.forEach(task => taskRowIdByTaskId.set(task.id, rowId));
+    topOffset += height;
+    taskCount += rowTasks.length;
+  });
+
+  return { tasksByRow, rows, rowsById, taskRowIdByTaskId, taskCount, totalHeight: topOffset };
+}
+
+function findFirstRowEndingAfter(rows: TimelineRowTrackPlan[], offset: number): number {
+  let low = 0;
+  let high = rows.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (rows[middle].topOffset + rows[middle].height > offset) high = middle;
+    else low = middle + 1;
+  }
+  return Math.min(low, Math.max(0, rows.length - 1));
+}
+
+function findLastRowStartingBefore(rows: TimelineRowTrackPlan[], offset: number): number {
+  let low = 0;
+  let high = rows.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (rows[middle].topOffset < offset) low = middle + 1;
+    else high = middle;
+  }
+  return Math.max(0, Math.min(rows.length - 1, low - 1));
+}
+
+export function buildTimelineRowWindow(
+  plan: TimelineTrackPlan,
+  scrollTop: number,
+  viewportHeight: number,
+  overscanPx: number,
+  pinnedRowIds: Iterable<string> = []
+): TimelineRowWindow {
+  if (plan.rows.length === 0) {
+    return {
+      rows: [],
+      startIndex: 0,
+      endIndex: -1,
+      leadingSpacerHeight: 0,
+      trailingSpacerHeight: 0,
+      totalHeight: 0,
+    };
+  }
+
+  const safeScrollTop = Math.max(0, scrollTop);
+  const safeOverscan = Math.max(0, overscanPx);
+  const startOffset = Math.max(0, safeScrollTop - safeOverscan);
+  const endOffset = Math.min(
+    plan.totalHeight,
+    safeScrollTop + Math.max(0, viewportHeight) + safeOverscan
+  );
+  let startIndex = findFirstRowEndingAfter(plan.rows, startOffset);
+  let endIndex = findLastRowStartingBefore(plan.rows, Math.max(endOffset, startOffset + 1));
+
+  for (const rowId of pinnedRowIds) {
+    const pinnedIndex = plan.rowsById.get(rowId)?.index;
+    if (pinnedIndex === undefined) continue;
+    startIndex = Math.min(startIndex, pinnedIndex);
+    endIndex = Math.max(endIndex, pinnedIndex);
+  }
+
+  const firstRow = plan.rows[startIndex];
+  const lastRow = plan.rows[endIndex];
+  return {
+    rows: plan.rows.slice(startIndex, endIndex + 1),
+    startIndex,
+    endIndex,
+    leadingSpacerHeight: firstRow.topOffset,
+    trailingSpacerHeight: Math.max(0, plan.totalHeight - lastRow.topOffset - lastRow.height),
+    totalHeight: plan.totalHeight,
+  };
+}
+
+export function getTimelineCompensatedScrollTop(
+  previousPlan: TimelineTrackPlan,
+  nextPlan: TimelineTrackPlan,
+  scrollTop: number
+): number {
+  if (previousPlan.rows.length === 0 || nextPlan.rows.length === 0) return 0;
+  if (previousPlan.rows.length !== nextPlan.rows.length) return scrollTop;
+  if (previousPlan.rows.some((row, index) => row.rowId !== nextPlan.rows[index]?.rowId)) return scrollTop;
+
+  const anchorIndex = findFirstRowEndingAfter(previousPlan.rows, Math.max(0, scrollTop));
+  const previousAnchor = previousPlan.rows[anchorIndex];
+  const nextAnchor = nextPlan.rowsById.get(previousAnchor.rowId);
+  if (!nextAnchor) return scrollTop;
+
+  const offsetWithinRow = Math.max(0, scrollTop - previousAnchor.topOffset);
+  return Math.max(
+    0,
+    Math.min(nextPlan.totalHeight, nextAnchor.topOffset + Math.min(offsetWithinRow, nextAnchor.height))
+  );
 }
 
 /**

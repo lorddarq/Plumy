@@ -105,6 +105,24 @@ export function HorizontalScrollbar({ scrollContainerRef, ariaLabel, enabled = t
     if (node) dragRef.current = { startClientX: event.clientX, startScrollLeft: node.scrollLeft };
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const node = scrollContainerRef.current;
+    if (!node || maxScrollLeft <= 0) return;
+    const step = Math.max(40, node.clientWidth * 0.1);
+    const page = Math.max(40, node.clientWidth * 0.8);
+    const next = event.key === 'Home' ? 0
+      : event.key === 'End' ? maxScrollLeft
+        : event.key === 'ArrowLeft' ? node.scrollLeft - step
+          : event.key === 'ArrowRight' ? node.scrollLeft + step
+            : event.key === 'PageUp' ? node.scrollLeft - page
+              : event.key === 'PageDown' ? node.scrollLeft + page
+                : null;
+    if (next === null) return;
+    event.preventDefault();
+    node.scrollLeft = Math.min(maxScrollLeft, Math.max(0, next));
+    syncMetrics();
+  };
+
   if (!enabled || (hideWhenNoOverflow && metrics.scrollWidth > 0 && maxScrollLeft <= 0)) return null;
 
   return (
@@ -112,10 +130,12 @@ export function HorizontalScrollbar({ scrollContainerRef, ariaLabel, enabled = t
       <div
         ref={trackRef}
         role="scrollbar"
+        tabIndex={0}
         aria-label={ariaLabel}
         aria-valuemin={0}
         aria-valuemax={Math.round(maxScrollLeft)}
         aria-valuenow={Math.round(metrics.scrollLeft)}
+        onKeyDown={handleKeyDown}
         onMouseDown={handleTrackMouseDown}
         className="persistent-horizontal-scrollbar-track"
       >

@@ -4,10 +4,10 @@ import { GripVertical } from 'lucide-react';
 import { Task, TimelineSwimlane } from '../types';
 import { Button } from '../components/ui/button';
 import { DraggableTimelineTask, TIMELINE_TASK_TYPE } from '../components/DraggableTimelineTask';
-import { allocateTasksToTracks } from '../utils/trackAllocation';
-import { parseISODateLocal, toLocalISODate } from '../utils/date';
+import { parseISODateLocal, toLocalISODate, type TimelineKeyboardDateAction } from '../utils/date';
 import { canDropTimelineTaskInRow } from '../utils/timelineTaskDrop';
 import { isPointerReleased } from '../utils/pointerInteraction';
+import { findTimelineDateIndex, type TimelineViewportMonth } from '../utils/timelineWindow';
 
 const ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -16,11 +16,12 @@ interface DraggableSwimlaneRowProps {
   index: number;
   mode?: 'projects' | 'people';
   tasks: Task[];
+  trackAssignments: Record<string, number>;
+  trackHeight: number;
   dates: Date[];
-  dateWidths?: number[]; // per-date widths computed by TimelineView
-  monthKeys?: string[];
-  monthWidths?: Record<string, number>;
-  datesByMonth?: Record<string, Date[]>;
+  dateWidths: number[];
+  dateOffsets: number[];
+  months: TimelineViewportMonth[];
   leadingSpacerWidth?: number;
   trailingSpacerWidth?: number;
   totalTimelineWidth?: number;
@@ -37,9 +38,14 @@ interface DraggableSwimlaneRowProps {
   onMoveTaskToSwimlane: (taskId: string, swimlaneId: string, newStartDate?: string, newEndDate?: string) => void;
   onRevealDate?: (dateISO: string) => void;
   getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties; textClass?: string; bulletOutlineColor?: string };
+  getTaskStatusLabel: (status: string) => string;
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   resizingTaskId: string | null;
   taskResizePreview?: TaskResizePreview | null;
+  onSelectionRowChange?: (rowId: string | null) => void;
+  onFocusedRowChange?: (rowId: string | null) => void;
+  onTaskDragRowChange?: (rowId: string | null) => void;
+  onKeyboardDateChange?: (task: Task, action: TimelineKeyboardDateAction, direction: -1 | 1) => void;
 } 
 
 interface TaskResizePreview {
@@ -71,11 +77,12 @@ export function DraggableSwimlaneRow({
   index,
   mode = 'projects',
   tasks,
+  trackAssignments,
+  trackHeight,
   dates,
   dateWidths,
-  monthKeys,
-  monthWidths,
-  datesByMonth,
+  dateOffsets,
+  months,
   leadingSpacerWidth = 0,
   trailingSpacerWidth = 0,
   totalTimelineWidth,
@@ -89,12 +96,17 @@ export function DraggableSwimlaneRow({
   onMoveTaskToSwimlane,
   onRevealDate,
   getTaskColor,
+  getTaskStatusLabel,
   handleResizeStart,
   resizingTaskId,
   taskResizePreview,
   rowHeight,
   shouldIgnoreAddTask,
   scrollContainerRef,
+  onSelectionRowChange,
+  onFocusedRowChange,
+  onTaskDragRowChange,
+  onKeyboardDateChange,
 }: DraggableSwimlaneRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -108,12 +120,8 @@ export function DraggableSwimlaneRow({
     start: null,
     end: null,
   });
+  const wasTaskDragSourceRef = useRef(false);
 
-  // Compute track assignments for tasks in this swimlane (memoized)
-  const trackAssignments = useMemo(
-    () => allocateTasksToTracks(tasks),
-    [tasks]
-  );
   const includesWeekends = useMemo(
     () => dates.some(d => d.getDay() === 0 || d.getDay() === 6),
     [dates]
@@ -151,35 +159,8 @@ export function DraggableSwimlaneRow({
     return addTimelineDays(new Date(dates[dates.length - 1]), steps);
   }, [dates, addTimelineDays]);
 
-  const getVisibleIndexForDate = useCallback(
-    (date: Date, mode: 'start' | 'end'): number => {
-      if (dates.length === 0) return -1;
-      const target = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-
-      if (mode === 'start') {
-        for (let i = 0; i < dates.length; i++) {
-          if (dates[i].getTime() >= target) return i;
-        }
-        return dates.length - 1;
-      }
-
-      for (let i = dates.length - 1; i >= 0; i--) {
-        if (dates[i].getTime() <= target) return i;
-      }
-      return 0;
-    },
-    [dates]
-  );
-
-  const rowDayWidths = useMemo(
-    () => (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60),
-    [dateWidths, dates]
-  );
-  const rowDayPrefix = useMemo(() => {
-    const prefix: number[] = [0];
-    rowDayWidths.forEach(width => prefix.push(prefix[prefix.length - 1] + width));
-    return prefix;
-  }, [rowDayWidths]);
+  const rowDayWidths = dateWidths;
+  const rowDayPrefix = dateOffsets;
 
   const getTaskDurationDays = useCallback((task: Task): number => {
     const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -253,13 +234,12 @@ export function DraggableSwimlaneRow({
     }
 
     const TASK_RENDER_HEIGHT = 32;
-    const TRACK_HEIGHT = 40;
     const trackIndex = trackAssignments[task.id] || 0;
 
     return {
       left,
       width: Math.max(8, previewWidth - 8),
-      top: `calc(${trackIndex * TRACK_HEIGHT}px + (${TRACK_HEIGHT}px - ${TASK_RENDER_HEIGHT}px) / 2)`,
+      top: `calc(${trackIndex * trackHeight}px + (${trackHeight}px - ${TASK_RENDER_HEIGHT}px) / 2)`,
     };
   };
 
@@ -269,7 +249,8 @@ export function DraggableSwimlaneRow({
     setIsSelecting(true);
     setSelectionStart(dayIdx);
     setSelectionEnd(dayIdx);
-  }, []);
+    onSelectionRowChange?.(swimlane.id);
+  }, [onSelectionRowChange, swimlane.id]);
 
   const handleSelectionMove = useCallback((dayIdx: number) => {
     if (selectionRef.current.active && selectionRef.current.start !== null) {
@@ -286,6 +267,7 @@ export function DraggableSwimlaneRow({
       setIsSelecting(false);
       setSelectionStart(null);
       setSelectionEnd(null);
+      onSelectionRowChange?.(null);
       return;
     }
 
@@ -302,7 +284,8 @@ export function DraggableSwimlaneRow({
     setIsSelecting(false);
     setSelectionStart(null);
     setSelectionEnd(null);
-  }, [dates, swimlane.id, onAddTask, mode, shouldIgnoreAddTask]);
+    onSelectionRowChange?.(null);
+  }, [dates, swimlane.id, onAddTask, mode, shouldIgnoreAddTask, onSelectionRowChange]);
 
   // Global mouse up listener to end selection
   useEffect(() => {
@@ -344,6 +327,19 @@ export function DraggableSwimlaneRow({
       isDraggingTimelineTask,
     };
   });
+
+  useEffect(() => {
+    const draggedTaskId = liveTimelineDrag.item?.task.id;
+    const isSourceRow = liveTimelineDrag.isDraggingTimelineTask
+      && Boolean(draggedTaskId && tasks.some(task => task.id === draggedTaskId));
+    if (isSourceRow && !wasTaskDragSourceRef.current) {
+      wasTaskDragSourceRef.current = true;
+      onTaskDragRowChange?.(swimlane.id);
+    } else if (!isSourceRow && wasTaskDragSourceRef.current) {
+      wasTaskDragSourceRef.current = false;
+      onTaskDragRowChange?.(null);
+    }
+  }, [liveTimelineDrag.isDraggingTimelineTask, liveTimelineDrag.item, onTaskDragRowChange, swimlane.id, tasks]);
 
   // Drop zone for timeline tasks — row handles task drops and repositioning
   const [{ isOver: isTaskOver, canDrop }, dropTask] = useDrop({
@@ -453,29 +449,23 @@ export function DraggableSwimlaneRow({
   const timelineTasks = tasks;
   const timelineTaskRanges = useMemo(() => timelineTasks.map(task => {
     const parsedStart = parseISODateLocal(task.startDate);
-    const startIndex = parsedStart ? getVisibleIndexForDate(parsedStart, 'start') : -1;
+    const startIndex = parsedStart ? findTimelineDateIndex(dates, parsedStart, 'start') : -1;
     const parsedEnd = parseISODateLocal(task.endDate);
     const endIndex = task.endDate
-      ? (parsedEnd ? getVisibleIndexForDate(parsedEnd, 'end') : startIndex)
+      ? (parsedEnd ? findTimelineDateIndex(dates, parsedEnd, 'end') : startIndex)
       : startIndex;
     return { task, startIndex, endIndex };
-  }), [getVisibleIndexForDate, timelineTasks]);
-  const rowMonthStarts = useMemo(() => {
-    const monthStarts: Record<string, number> = {};
-    (monthKeys ?? []).forEach(monthKey => {
-      const monthDates = datesByMonth?.[monthKey];
-      if (monthDates?.length) {
-        const index = dates.findIndex(date => date.getTime() === monthDates[0].getTime());
-        monthStarts[monthKey] = index >= 0 ? index : 0;
-      }
-    });
-    return monthStarts;
-  }, [dates, datesByMonth, monthKeys]);
+  }), [dates, timelineTasks]);
 
   return (
     <div
       ref={ref}
       className="swimlane-row"
+      data-timeline-row-id={swimlane.id}
+      onFocusCapture={() => onFocusedRowChange?.(swimlane.id)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onFocusedRowChange?.(null);
+      }}
       style={{ 
         height: `${rowHeight || 48}px`
       }}
@@ -516,11 +506,9 @@ export function DraggableSwimlaneRow({
                     aria-hidden
                   />
                 )}
-                {(monthKeys ?? []).map((monthKey) => {
-              const startIdx = rowMonthStarts[monthKey] ?? 0;
-              const len = datesByMonth?.[monthKey]?.length ?? 0;
-              const monthLeft = rowDayPrefix[startIdx];
-              const monthWidth = rowDayPrefix[startIdx + len] - rowDayPrefix[startIdx];
+                {months.map(month => {
+              const { monthKey, startDayIndex: startIdx, dates: monthDates, startPx: monthLeft, width: monthWidth } = month;
+              const len = monthDates.length;
 
               return (
                 <div
@@ -531,7 +519,7 @@ export function DraggableSwimlaneRow({
                   <div className="h-full relative">
                     {/* Clickable day overlay: clicking a day cell creates a new task at that date in this swimlane */}
                     <div className="absolute inset-0 flex" aria-hidden>
-                      {(datesByMonth?.[monthKey] ?? []).map((d, di) => {
+                      {monthDates.map((d, di) => {
                         const globalIdx = startIdx + di;
                         const w = rowDayWidths[globalIdx] ?? 60;
                         
@@ -636,9 +624,8 @@ export function DraggableSwimlaneRow({
 
                       // Use track index for vertical positioning
                       const TASK_RENDER_HEIGHT = 32; // matches h-8 in tailwind (8 * 4px)
-                      const TRACK_HEIGHT = 40; // height per track (task height + gap)
                       const trackIndex = trackAssignments[task.id] || 0;
-                      const topCalc = `calc(${trackIndex * TRACK_HEIGHT}px + (${TRACK_HEIGHT}px - ${TASK_RENDER_HEIGHT}px) / 2)`;
+                      const topCalc = `calc(${trackIndex * trackHeight}px + (${trackHeight}px - ${TASK_RENDER_HEIGHT}px) / 2)`;
 
                       return (
                         <div
@@ -657,6 +644,8 @@ export function DraggableSwimlaneRow({
                             onTaskDuplicate={onTaskDuplicate}
                             repositoryFolder={swimlane.repositoryFolder}
                             resizingTaskId={resizingTaskId}
+                            statusLabel={getTaskStatusLabel(task.status)}
+                            onKeyboardDateChange={onKeyboardDateChange}
                           />
                         </div>
                       );

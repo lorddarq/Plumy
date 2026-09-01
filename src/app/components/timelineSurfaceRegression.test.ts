@@ -36,3 +36,21 @@ test('[Timeline] the swimlane label column cannot be resized narrower than its m
     'The column-resize handler must clamp between the min and max width constants on every drag frame, not just at drag start',
   );
 });
+
+test('[Timeline accessibility] dates, task state, keyboard date editing, and the custom scrollbar remain non-pointer-only', () => {
+  const taskSource = readComponent('DraggableTimelineTask.tsx');
+  const headerSource = readComponent('headers/TimelineHeader.tsx');
+  const scrollbarSource = readComponent('HorizontalScrollbar.tsx');
+  const timelineSource = readComponent('views/TimelineView.tsx');
+  assert.match(taskSource, /Status: \$\{statusLabel\}\. Dates:/, 'Task bars must announce status and date state, not only their color and position');
+  assert.match(taskSource, /e\.altKey[\s\S]*'resize-start'/, 'Alt plus Arrow must expose start-edge resizing from the focused task');
+  assert.match(taskSource, /e\.shiftKey[\s\S]*'resize-end'/, 'Shift plus Arrow must expose end-edge resizing from the focused task');
+  for (const action of ['Edit', 'Start work', 'Delete', 'Duplicate']) {
+    assert.match(taskSource, new RegExp(`>${action}<|\\n\\s*${action}\\n`), `The task context menu must preserve ${action}`);
+  }
+  assert.match(headerSource, /weekday: 'long'[\s\S]*year: 'numeric'[\s\S]*month: 'long'/, 'Day headers must announce a complete calendar date');
+  assert.match(scrollbarSource, /role="scrollbar"[\s\S]*tabIndex=\{0\}[\s\S]*onKeyDown=\{handleKeyDown\}/, 'The custom scrollbar must be focusable and keyboard operable');
+  assert.match(timelineSource, /if \(e\.key !== 'Escape'\) return;[\s\S]*setTaskResizePreview\(null\);[\s\S]*setResizingTask\(null\);/, 'Escape must cancel an active pointer resize without committing dates');
+  const timelineStyles = readFileSync(resolve(componentsDirectory, '../../styles/timeline.css'), 'utf8');
+  assert.match(timelineStyles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none;[\s\S]*transition: none;[\s\S]*scroll-behavior: auto;/, 'Timeline motion must honor reduced-motion preferences');
+});

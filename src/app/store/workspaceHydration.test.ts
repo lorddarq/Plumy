@@ -10,6 +10,7 @@ import {
   SWIMLANES_KEY,
   TASKS_KEY,
 } from './workspacePersistence.ts';
+import { persistJSONBatchWithElectronMirror } from '../utils/storage.ts';
 
 function makeLocalStorage(entries: Record<string, string>) {
   const values = new Map(Object.entries(entries));
@@ -101,4 +102,27 @@ test('workspace persistence starts canonical writes without a shutdown-sensitive
   const source = readFileSync(new URL('./workspacePersistence.ts', import.meta.url), 'utf8');
   assert.match(source, /Promise\.resolve\(\)\.then\(async \(\) =>/);
   assert.doesNotMatch(source, /window\.setTimeout/);
+});
+
+test('workspace persistence falls back to the portable mirror when the Electron batch write fails', async () => {
+  const originalWindow = globalThis.window;
+  const localStorage = makeLocalStorage({});
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      electron: {
+        storeSetMany: async () => { throw new Error('forced workspace write failure'); },
+      },
+      localStorage,
+    },
+  });
+
+  try {
+    const tasks = [{ id: 'task-1', title: 'Moved task', status: 'open' }];
+    await persistJSONBatchWithElectronMirror({ [TASKS_KEY]: tasks });
+    assert.deepEqual(JSON.parse(localStorage.getItem(TASKS_KEY) || 'null'), tasks);
+  } finally {
+    if (originalWindow === undefined) Reflect.deleteProperty(globalThis, 'window');
+    else Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow });
+  }
 });

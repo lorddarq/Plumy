@@ -10,12 +10,10 @@
  */
 
 import React from 'react';
+import type { TimelineViewportMonth } from '../../utils/timelineWindow';
 
 interface TimelineHeaderProps {
-  datesByMonth: Record<string, Date[]>;
-  monthKeys?: string[];
-  monthStartIndices?: Record<string, number>;
-  monthWidths: Record<string, number>;
+  months: TimelineViewportMonth[];
   dayWidths: number[];
   defaultDayWidth: number;
   totalTimelineWidth: number;
@@ -47,10 +45,7 @@ function isSameDate(a: Date, b: Date): boolean {
 }
 
 export function TimelineHeader({
-  datesByMonth,
-  monthKeys,
-  monthStartIndices,
-  monthWidths,
+  months,
   dayWidths,
   defaultDayWidth,
   totalTimelineWidth,
@@ -64,26 +59,6 @@ export function TimelineHeader({
   onMonthResizeStart,
   onMonthReset,
 }: TimelineHeaderProps) {
-  // Ordered month keys (from parent windowing if provided)
-  const monthKeysOrdered = monthKeys && monthKeys.length > 0
-    ? monthKeys
-    : Object.keys(datesByMonth).sort((a, b) => {
-        const ta = datesByMonth[a]?.[0]?.getTime() ?? 0;
-        const tb = datesByMonth[b]?.[0]?.getTime() ?? 0;
-        return ta - tb;
-      });
-
-  // Compute month metadata with indices for day width lookup
-  const monthMeta: { key: string; dates: Date[]; width: number; startIndex: number }[] = [];
-  let runningIndex = 0;
-  monthKeysOrdered.forEach(k => {
-    const md = datesByMonth[k] ?? [];
-    const w = monthWidths[k] ?? md.length * defaultDayWidth;
-    const absoluteStart = monthStartIndices?.[k] ?? runningIndex;
-    monthMeta.push({ key: k, dates: md, width: w, startIndex: absoluteStart });
-    runningIndex += md.length;
-  });
-
   const timelineInnerStyle: React.CSSProperties = {
     minWidth: `${totalTimelineWidth + endPadding}px`,
     display: 'flex',
@@ -108,10 +83,10 @@ export function TimelineHeader({
                 aria-hidden
               />
             )}
-            {monthMeta.map(m => (
+            {months.map(month => (
               <div
-                key={m.key}
-                style={{ width: `${m.width}px` }}
+                key={month.monthKey}
+                style={{ width: `${month.width}px` }}
                 className="month-column"
               >
                 {/* Month header */}
@@ -120,14 +95,14 @@ export function TimelineHeader({
                   className="month-header relative"
                 >
                   <span className="month-header-text">
-                    {getMonthLabel(m.dates[0])}
+                    {getMonthLabel(month.dates[0])}
                   </span>
                   <div
                     role="separator"
                     aria-orientation="vertical"
                     className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-gray-300/40"
-                    onMouseDown={(e) => onMonthResizeStart?.(m.key, e)}
-                    onDoubleClick={() => onMonthReset?.(m.key)}
+                    onMouseDown={(e) => onMonthResizeStart?.(month.monthKey, e)}
+                    onDoubleClick={() => onMonthReset?.(month.monthKey)}
                     title="Drag to resize month. Double-click to reset."
                   />
                 </div>
@@ -138,8 +113,8 @@ export function TimelineHeader({
                   className="day-row timeline-day-scrub-handle"
                   style={{ height: `${rowHeight}px` }}
                 >
-                  {m.dates.map((d, i) => {
-                    const globalIdx = m.startIndex + i;
+                  {month.dates.map((d, i) => {
+                    const globalIdx = month.startDayIndex + i;
                     const w = dayWidths[globalIdx] ?? defaultDayWidth;
                     const today = new Date();
                     const todayNoTime = new Date(
@@ -153,6 +128,12 @@ export function TimelineHeader({
                     const dayOfWeek = d.getDay();
                     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                     const isWeekStart = dayOfWeek === 1; // Monday
+                    const dateLabel = d.toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    });
 
                     return (
                       <div
@@ -162,7 +143,7 @@ export function TimelineHeader({
                       >
                         <div
                           title={isToday ? 'Today' : isWeekend ? 'Weekend' : undefined}
-                          aria-label={isToday ? 'Today' : isWeekend ? 'Weekend' : undefined}
+                          aria-label={`${dateLabel}${isToday ? ', Today' : ''}${isWeekend ? ', Weekend' : ''}`}
                           className={`day-label ${
                             isToday ? 'today' : ''
                           } ${

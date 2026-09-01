@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useDrag } from 'react-dnd';
 import { Play, Trash2 } from 'lucide-react';
 import { Task } from '../types';
+import type { TimelineKeyboardDateAction } from '../utils/date';
 import { PenWritingIcon } from './icons/PenWritingIcon';
 import { FilesCopyIcon } from './icons/FilesCopyIcon';
 import { useAgentSessionLauncher } from './AgentSessionSupervisor';
@@ -31,6 +32,8 @@ interface DraggableTimelineTaskProps {
   onTaskDuplicate: (task: Task) => void;
   repositoryFolder?: string;
   resizingTaskId: string | null;
+  statusLabel: string;
+  onKeyboardDateChange?: (task: Task, action: TimelineKeyboardDateAction, direction: -1 | 1) => void;
 }
 
 export function DraggableTimelineTask({
@@ -44,6 +47,8 @@ export function DraggableTimelineTask({
   onTaskDuplicate,
   repositoryFolder,
   resizingTaskId,
+  statusLabel,
+  onKeyboardDateChange,
 }: DraggableTimelineTaskProps) {
   const ref = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -95,12 +100,25 @@ export function DraggableTimelineTask({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onTaskClick(task);
+      return;
+    }
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
-    onTaskClick(task);
+    const action: TimelineKeyboardDateAction = e.altKey
+      ? 'resize-start'
+      : e.shiftKey
+        ? 'resize-end'
+        : 'move';
+    onKeyboardDateChange?.(task, action, e.key === 'ArrowLeft' ? -1 : 1);
   }
 
   const isResizing = resizingTaskId === task.id;
+  const startDateLabel = task.startDate || 'unscheduled';
+  const endDateLabel = task.endDate || task.startDate || 'unscheduled';
+  const accessibleLabel = `${task.title}. Status: ${statusLabel}. Dates: ${startDateLabel} to ${endDateLabel}. Priority: ${task.priority || 'normal'}. Arrow keys move; Alt plus Arrow resizes the start; Shift plus Arrow resizes the end.`;
 
   function handleEditFromContextMenu() {
     setContextMenuOpen(false);
@@ -115,7 +133,7 @@ export function DraggableTimelineTask({
           ref={ref}
           role="button"
           tabIndex={0}
-          aria-label={`Open task ${task.title}`}
+          aria-label={accessibleLabel}
           className={`timeline-task-bar absolute h-8 rounded-md px-3 flex items-center gap-2 cursor-pointer pointer-events-auto group/task ${backgroundClass} ${textClass} text-xs font-medium ${
             isResizing ? 'is-resizing shadow-lg z-10' : ''
           } ${isDragging ? 'is-dragging opacity-0' : ''}`}
@@ -130,6 +148,7 @@ export function DraggableTimelineTask({
         >
       {/* Left resize handle */}
       <div
+        aria-hidden="true"
         className="timeline-task-resize-grip left-0 absolute top-0 bottom-0 w-2 cursor-ew-resize flex items-center justify-center opacity-0 group-hover/task:opacity-100"
         onMouseDown={(e) => {
           e.preventDefault();
@@ -152,6 +171,7 @@ export function DraggableTimelineTask({
 
       {/* Right resize handle */}
       <div
+        aria-hidden="true"
         className="timeline-task-resize-grip right-0 absolute top-0 bottom-0 w-2 cursor-ew-resize flex items-center justify-center opacity-0 group-hover/task:opacity-100"
         onMouseDown={(e) => {
           e.preventDefault();
