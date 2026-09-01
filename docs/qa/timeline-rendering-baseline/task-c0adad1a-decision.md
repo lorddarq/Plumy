@@ -2,9 +2,15 @@
 
 Task: `task-c0adad1a-ae4a-478f-8e6f-7283569d1198`
 
+## Final human decision — merge approved
+
+On 2026-09-01, the human reviewer accepted the experiment as a large net positive and approved merging it to `main`. The reviewer considered the one-item-at-a-time interaction model and accepted the measured vertical-jump result as a bounded tradeoff relative to the archive-scale readiness, DOM, scripting, memory, horizontal-scroll, and resize gains.
+
+The implementation, harness, and evidence were prepared as the ordered commit range beginning at `89622cb` and merged by fast-forward. The experiment branch is retained separately. The trusted React DnD and retained-node investigations remain useful follow-up validation, but they are not merge blockers under the approved decision.
+
 ## Recommendation
 
-**Revise. Do not merge or discard the experiment yet.**
+The evidence review initially recommended **revise** pending additional validation. That recommendation is retained below as the pre-approval record and is superseded by the final human decision above.
 
 The candidate materially improves the archive-scale cases that motivated the experiment, but the milestone is not ready for release acceptance. Two existing predecessor tasks still lack trusted React DnD evidence, and the controlled comparison found a repeatable vertical-scroll regression plus scale-sensitive retained-node/listener telemetry that has not been attributed.
 
