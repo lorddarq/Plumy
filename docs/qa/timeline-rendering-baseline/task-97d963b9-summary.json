@@ -1,0 +1,2143 @@
+{
+  "schemaVersion": 1,
+  "candidateLabel": "task-97d963b9",
+  "generatedAt": "2026-09-01T12:35:14.264Z",
+  "samples": {
+    "control": [
+      "control-814a336-sample-01.json",
+      "control-814a336-sample-02.json",
+      "control-814a336-sample-03.json",
+      "control-814a336-sample-04.json",
+      "control-814a336-sample-05.json"
+    ],
+    "candidate": [
+      "candidate-task-97d963b9-1f5ee1b9-sample-01.json",
+      "candidate-task-97d963b9-1f5ee1b9-sample-02.json",
+      "candidate-task-97d963b9-1f5ee1b9-sample-03.json",
+      "candidate-task-97d963b9-1f5ee1b9-sample-04.json",
+      "candidate-task-97d963b9-1f5ee1b9-sample-05.json"
+    ]
+  },
+  "environment": {
+    "fixture": {
+      "seed": 1330468434,
+      "profiles": [
+        {
+          "swimlanes": 100,
+          "tasks": 1000
+        },
+        {
+          "swimlanes": 500,
+          "tasks": 5000
+        },
+        {
+          "swimlanes": 1000,
+          "tasks": 10000
+        }
+      ],
+      "dateSpan": [
+        "2019-01-07",
+        "2033-12-15"
+      ]
+    },
+    "runtime": {
+      "platform": "darwin",
+      "architecture": "arm64",
+      "hostNode": "v22.23.1",
+      "npm": "12.0.1",
+      "electron": "43.3.0",
+      "chromium": "150.0.7871.212",
+      "embeddedNode": "24.18.1",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "zoomFactor": 1
+      }
+    },
+    "isolation": {
+      "standaloneEntry": "timeline-benchmark.html",
+      "workspaceHydrationMounted": false,
+      "electronPreloadMounted": false,
+      "temporaryUserDataDirectory": true,
+      "temporaryBuildDirectory": true
+    },
+    "build": {
+      "mode": "Vite production build",
+      "config": "vite.config.ts",
+      "entry": "timeline-benchmark.html"
+    }
+  },
+  "validation": {
+    "samplesPerSide": 5,
+    "scenariosPerSample": 12,
+    "phasesPerScenario": 2,
+    "measuredScenarioPhasesPerSide": 120,
+    "environmentEquivalent": true,
+    "controlFullMount": true,
+    "candidateWindowed": true,
+    "candidateBlankFrames": 0,
+    "candidateAlignmentFailures": 0,
+    "resizePreviewMeasured": true,
+    "trustedDragMeasured": false
+  },
+  "comparison": {
+    "1000": {
+      "cold": {
+        "initialRenderMs": {
+          "control": {
+            "count": 20,
+            "median": 104.80000007152557,
+            "p95": 133.5,
+            "min": 101.20000004768372,
+            "max": 151.70000004768372
+          },
+          "candidate": {
+            "count": 20,
+            "median": 56.10000002384186,
+            "p95": 93.79999995231628,
+            "min": 53.60000014305115,
+            "max": 127.60000014305115
+          },
+          "medianChangePercent": -46.469465662639465
+        },
+        "readyMs": {
+          "control": {
+            "count": 20,
+            "median": 182.35000002384186,
+            "p95": 251.5,
+            "min": 101.20000004768372,
+            "max": 260.59999990463257
+          },
+          "candidate": {
+            "count": 20,
+            "median": 94.89999997615814,
+            "p95": 106.70000004768372,
+            "min": 53.60000014305115,
+            "max": 127.60000014305115
+          },
+          "medianChangePercent": -47.95722513641339
+        },
+        "firstContentfulPaintMs": {
+          "control": {
+            "count": 20,
+            "median": 284,
+            "p95": 424,
+            "min": 244,
+            "max": 424
+          },
+          "candidate": {
+            "count": 20,
+            "median": 200,
+            "p95": 364,
+            "min": 184,
+            "max": 428
+          },
+          "medianChangePercent": -29.5774647887324
+        },
+        "domElements": {
+          "control": {
+            "count": 20,
+            "median": 11600,
+            "p95": 12926,
+            "min": 10274,
+            "max": 12926
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1498,
+            "p95": 1723,
+            "min": 1274,
+            "max": 1723
+          },
+          "medianChangePercent": -87.08620689655172
+        },
+        "chromiumNodes": {
+          "control": {
+            "count": 20,
+            "median": 37031.5,
+            "p95": 89419,
+            "min": 11660,
+            "max": 89568
+          },
+          "candidate": {
+            "count": 20,
+            "median": 25743,
+            "p95": 57660,
+            "min": 1853,
+            "max": 59500
+          },
+          "medianChangePercent": -30.483507284339005
+        },
+        "eventListeners": {
+          "control": {
+            "count": 20,
+            "median": 39437,
+            "p95": 87560,
+            "min": 13631,
+            "max": 88493
+          },
+          "candidate": {
+            "count": 20,
+            "median": 25501,
+            "p95": 43976,
+            "min": 1363,
+            "max": 45431
+          },
+          "medianChangePercent": -35.337373532469506
+        },
+        "layoutCount": {
+          "control": {
+            "count": 20,
+            "median": 132,
+            "p95": 132,
+            "min": 131,
+            "max": 132
+          },
+          "candidate": {
+            "count": 20,
+            "median": 201.5,
+            "p95": 202,
+            "min": 200,
+            "max": 202
+          },
+          "medianChangePercent": 52.65151515151516
+        },
+        "styleRecalcCount": {
+          "control": {
+            "count": 20,
+            "median": 139.5,
+            "p95": 144,
+            "min": 137,
+            "max": 144
+          },
+          "candidate": {
+            "count": 20,
+            "median": 280,
+            "p95": 282,
+            "min": 278,
+            "max": 282
+          },
+          "medianChangePercent": 100.71684587813618
+        },
+        "scriptMs": {
+          "control": {
+            "count": 20,
+            "median": 2476.535,
+            "p95": 2831.234,
+            "min": 2094.274,
+            "max": 2988.916
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1045.629,
+            "p95": 1145.4260000000002,
+            "min": 914.895,
+            "max": 1192.101
+          },
+          "medianChangePercent": -57.77854946528114
+        },
+        "layoutMs": {
+          "control": {
+            "count": 20,
+            "median": 123.13550000000001,
+            "p95": 138.569,
+            "min": 106.049,
+            "max": 140.099
+          },
+          "candidate": {
+            "count": 20,
+            "median": 103.23249999999999,
+            "p95": 112.326,
+            "min": 91.179,
+            "max": 121.578
+          },
+          "medianChangePercent": -16.163494686747537
+        },
+        "styleMs": {
+          "control": {
+            "count": 20,
+            "median": 283.695,
+            "p95": 323.106,
+            "min": 250.05300000000003,
+            "max": 338.31899999999996
+          },
+          "candidate": {
+            "count": 20,
+            "median": 246.016,
+            "p95": 265.571,
+            "min": 224.103,
+            "max": 277.055
+          },
+          "medianChangePercent": -13.281517122261588
+        },
+        "taskMs": {
+          "control": {
+            "count": 20,
+            "median": 3228.3755,
+            "p95": 3649.5389999999998,
+            "min": 2775.226,
+            "max": 3833.522
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1704.9185,
+            "p95": 1834.558,
+            "min": 1504.021,
+            "max": 1928.986
+          },
+          "medianChangePercent": -47.18958497857514
+        },
+        "heapMiB": {
+          "control": {
+            "count": 20,
+            "median": 100.20198631286621,
+            "p95": 138.2991485595703,
+            "min": 59.59473419189453,
+            "max": 140.42789459228516
+          },
+          "candidate": {
+            "count": 20,
+            "median": 19.1390380859375,
+            "p95": 33.34775161743164,
+            "min": 10.364673614501953,
+            "max": 37.61383819580078
+          },
+          "medianChangePercent": -80.89954222446387
+        },
+        "longTaskCount": {
+          "control": {
+            "count": 20,
+            "median": 6.5,
+            "p95": 15,
+            "min": 2,
+            "max": 17
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1,
+            "p95": 1,
+            "min": 1,
+            "max": 1
+          },
+          "medianChangePercent": -84.61538461538461
+        },
+        "longTaskTotalMs": {
+          "control": {
+            "count": 20,
+            "median": 438,
+            "p95": 946,
+            "min": 162,
+            "max": 1037
+          },
+          "candidate": {
+            "count": 20,
+            "median": 54,
+            "p95": 81,
+            "min": 51,
+            "max": 122
+          },
+          "medianChangePercent": -87.67123287671232
+        },
+        "longTaskMaxMs": {
+          "control": {
+            "count": 20,
+            "median": 102.5,
+            "p95": 122,
+            "min": 99,
+            "max": 148
+          },
+          "candidate": {
+            "count": 20,
+            "median": 54,
+            "p95": 81,
+            "min": 51,
+            "max": 122
+          },
+          "medianChangePercent": -47.3170731707317
+        },
+        "verticalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 13.400000000000091,
+            "p95": 14.199999999999932,
+            "min": 13.400000000000034,
+            "max": 14.199999999999932
+          },
+          "candidate": {
+            "count": 20,
+            "median": 13.400000000000091,
+            "p95": 14,
+            "min": 13.400000000000034,
+            "max": 14.100000000000023
+          },
+          "medianChangePercent": 0
+        },
+        "horizontalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 53.64999999999998,
+            "p95": 66.80000000000018,
+            "min": 53.29999999999973,
+            "max": 80
+          },
+          "candidate": {
+            "count": 20,
+            "median": 13.549999999999955,
+            "p95": 26.59999999999991,
+            "min": 13.400000000000091,
+            "max": 26.699999999999818
+          },
+          "medianChangePercent": -74.74370922646791
+        },
+        "horizontalFramesOver50": {
+          "control": {
+            "count": 20,
+            "median": 19,
+            "p95": 31,
+            "min": 5,
+            "max": 46
+          },
+          "candidate": {
+            "count": 20,
+            "median": 0,
+            "p95": 0,
+            "min": 0,
+            "max": 0
+          },
+          "medianChangePercent": -100
+        },
+        "resizePreviewMs": {
+          "control": {
+            "count": 20,
+            "median": 22.549999952316284,
+            "p95": 26.800000190734863,
+            "min": 19.5,
+            "max": 31.200000047683716
+          },
+          "candidate": {
+            "count": 20,
+            "median": 27.350000023841858,
+            "p95": 28,
+            "min": 20.5,
+            "max": 28.40000009536743
+          },
+          "medianChangePercent": 21.286031404326145
+        }
+      },
+      "warm": {
+        "initialRenderMs": {
+          "control": {
+            "count": 20,
+            "median": 103.64999997615814,
+            "p95": 119.5,
+            "min": 100.89999985694885,
+            "max": 138.90000009536743
+          },
+          "candidate": {
+            "count": 20,
+            "median": 55.49999988079071,
+            "p95": 58.89999985694885,
+            "min": 53.59999990463257,
+            "max": 62.09999990463257
+          },
+          "medianChangePercent": -46.454413995603495
+        },
+        "readyMs": {
+          "control": {
+            "count": 20,
+            "median": 164.80000007152557,
+            "p95": 235.59999990463257,
+            "min": 100.89999985694885,
+            "max": 263.90000009536743
+          },
+          "candidate": {
+            "count": 20,
+            "median": 78.74999988079071,
+            "p95": 100.5,
+            "min": 53.59999990463257,
+            "max": 101.70000004768372
+          },
+          "medianChangePercent": -52.21480591831791
+        },
+        "firstContentfulPaintMs": {
+          "control": {
+            "count": 20,
+            "median": 270,
+            "p95": 308,
+            "min": 232,
+            "max": 328
+          },
+          "candidate": {
+            "count": 20,
+            "median": 190,
+            "p95": 204,
+            "min": 180,
+            "max": 216
+          },
+          "medianChangePercent": -29.629629629629626
+        },
+        "domElements": {
+          "control": {
+            "count": 20,
+            "median": 11600,
+            "p95": 12926,
+            "min": 10274,
+            "max": 12926
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1498,
+            "p95": 1723,
+            "min": 1274,
+            "max": 1723
+          },
+          "medianChangePercent": -87.08620689655172
+        },
+        "chromiumNodes": {
+          "control": {
+            "count": 20,
+            "median": 46202.5,
+            "p95": 94975,
+            "min": 11660,
+            "max": 103136
+          },
+          "candidate": {
+            "count": 20,
+            "median": 25743,
+            "p95": 48147,
+            "min": 1622,
+            "max": 58006
+          },
+          "medianChangePercent": -44.28223580975056
+        },
+        "eventListeners": {
+          "control": {
+            "count": 20,
+            "median": 46948.5,
+            "p95": 93390,
+            "min": 13631,
+            "max": 101627
+          },
+          "candidate": {
+            "count": 20,
+            "median": 25501,
+            "p95": 39334,
+            "min": 1363,
+            "max": 44455
+          },
+          "medianChangePercent": -45.68303566674121
+        },
+        "layoutCount": {
+          "control": {
+            "count": 20,
+            "median": 132,
+            "p95": 132,
+            "min": 131,
+            "max": 134
+          },
+          "candidate": {
+            "count": 20,
+            "median": 201.5,
+            "p95": 202,
+            "min": 200,
+            "max": 202
+          },
+          "medianChangePercent": 52.65151515151516
+        },
+        "styleRecalcCount": {
+          "control": {
+            "count": 20,
+            "median": 140,
+            "p95": 144,
+            "min": 136,
+            "max": 145
+          },
+          "candidate": {
+            "count": 20,
+            "median": 280,
+            "p95": 282,
+            "min": 278,
+            "max": 282
+          },
+          "medianChangePercent": 100
+        },
+        "scriptMs": {
+          "control": {
+            "count": 20,
+            "median": 2466.6890000000003,
+            "p95": 2864.546,
+            "min": 2098.6769999999997,
+            "max": 2919.0119999999997
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1026.634,
+            "p95": 1141.889,
+            "min": 906.833,
+            "max": 1252.664
+          },
+          "medianChangePercent": -58.38007953171236
+        },
+        "layoutMs": {
+          "control": {
+            "count": 20,
+            "median": 123.36,
+            "p95": 139.32500000000002,
+            "min": 105.37599999999999,
+            "max": 140.991
+          },
+          "candidate": {
+            "count": 20,
+            "median": 102.8115,
+            "p95": 112.089,
+            "min": 91.791,
+            "max": 123.557
+          },
+          "medianChangePercent": -16.657344357976655
+        },
+        "styleMs": {
+          "control": {
+            "count": 20,
+            "median": 280.633,
+            "p95": 337.12399999999997,
+            "min": 248.939,
+            "max": 338.642
+          },
+          "candidate": {
+            "count": 20,
+            "median": 240.73149999999998,
+            "p95": 264.70300000000003,
+            "min": 224.78,
+            "max": 279.579
+          },
+          "medianChangePercent": -14.218391992388636
+        },
+        "taskMs": {
+          "control": {
+            "count": 20,
+            "median": 3241.297,
+            "p95": 3736.1349999999998,
+            "min": 2760.1710000000003,
+            "max": 3760.891
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1669.308,
+            "p95": 1823.195,
+            "min": 1508.0800000000002,
+            "max": 1994.557
+          },
+          "medianChangePercent": -48.49876453777608
+        },
+        "heapMiB": {
+          "control": {
+            "count": 20,
+            "median": 107.73028564453125,
+            "p95": 135.48354721069336,
+            "min": 59.02268981933594,
+            "max": 145.2781982421875
+          },
+          "candidate": {
+            "count": 20,
+            "median": 23.279972076416016,
+            "p95": 33.12611770629883,
+            "min": 10.471355438232422,
+            "max": 33.71083450317383
+          },
+          "medianChangePercent": -78.39050371291967
+        },
+        "longTaskCount": {
+          "control": {
+            "count": 20,
+            "median": 7.5,
+            "p95": 13,
+            "min": 2,
+            "max": 18
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1,
+            "p95": 1,
+            "min": 1,
+            "max": 1
+          },
+          "medianChangePercent": -86.66666666666667
+        },
+        "longTaskTotalMs": {
+          "control": {
+            "count": 20,
+            "median": 472.5,
+            "p95": 801,
+            "min": 164,
+            "max": 1108
+          },
+          "candidate": {
+            "count": 20,
+            "median": 53,
+            "p95": 56,
+            "min": 51,
+            "max": 59
+          },
+          "medianChangePercent": -88.78306878306879
+        },
+        "longTaskMaxMs": {
+          "control": {
+            "count": 20,
+            "median": 102.5,
+            "p95": 118,
+            "min": 98,
+            "max": 137
+          },
+          "candidate": {
+            "count": 20,
+            "median": 53,
+            "p95": 56,
+            "min": 51,
+            "max": 59
+          },
+          "medianChangePercent": -48.292682926829265
+        },
+        "verticalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 13.5,
+            "p95": 14,
+            "min": 13.399999999999977,
+            "max": 14
+          },
+          "candidate": {
+            "count": 20,
+            "median": 13.5,
+            "p95": 14,
+            "min": 13.400000000000034,
+            "max": 14.100000000000023
+          },
+          "medianChangePercent": 0
+        },
+        "horizontalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 66.59999999999991,
+            "p95": 66.70000000000027,
+            "min": 53.09999999999991,
+            "max": 80
+          },
+          "candidate": {
+            "count": 20,
+            "median": 13.700000000000045,
+            "p95": 26.59999999999991,
+            "min": 13.400000000000091,
+            "max": 26.700000000000045
+          },
+          "medianChangePercent": -79.42942942942933
+        },
+        "horizontalFramesOver50": {
+          "control": {
+            "count": 20,
+            "median": 19,
+            "p95": 35,
+            "min": 4,
+            "max": 37
+          },
+          "candidate": {
+            "count": 20,
+            "median": 0,
+            "p95": 0,
+            "min": 0,
+            "max": 0
+          },
+          "medianChangePercent": -100
+        },
+        "resizePreviewMs": {
+          "control": {
+            "count": 20,
+            "median": 23.049999952316284,
+            "p95": 28.600000143051147,
+            "min": 19.40000009536743,
+            "max": 29.399999856948853
+          },
+          "candidate": {
+            "count": 20,
+            "median": 27.299999952316284,
+            "p95": 27.600000143051147,
+            "min": 22.5,
+            "max": 28
+          },
+          "medianChangePercent": 18.438177912329756
+        }
+      }
+    },
+    "5000": {
+      "cold": {
+        "initialRenderMs": {
+          "control": {
+            "count": 20,
+            "median": 325.39999997615814,
+            "p95": 359.5,
+            "min": 307.10000014305115,
+            "max": 386
+          },
+          "candidate": {
+            "count": 20,
+            "median": 74.09999990463257,
+            "p95": 81.09999990463257,
+            "min": 70.89999985694885,
+            "max": 83.40000009536743
+          },
+          "medianChangePercent": -77.22802707127786
+        },
+        "readyMs": {
+          "control": {
+            "count": 20,
+            "median": 529.8500001430511,
+            "p95": 918.6999998092651,
+            "min": 314.2999999523163,
+            "max": 922.7000000476837
+          },
+          "candidate": {
+            "count": 20,
+            "median": 94.55000007152557,
+            "p95": 131.20000004768372,
+            "min": 70.89999985694885,
+            "max": 149.79999995231628
+          },
+          "medianChangePercent": -82.15532697065234
+        },
+        "firstContentfulPaintMs": {
+          "control": {
+            "count": 20,
+            "median": 556,
+            "p95": 760,
+            "min": 460,
+            "max": 780
+          },
+          "candidate": {
+            "count": 20,
+            "median": 224,
+            "p95": 268,
+            "min": 200,
+            "max": 272
+          },
+          "medianChangePercent": -59.71223021582735
+        },
+        "domElements": {
+          "control": {
+            "count": 20,
+            "median": 56661,
+            "p95": 63187,
+            "min": 50135,
+            "max": 63187
+          },
+          "candidate": {
+            "count": 20,
+            "median": 3096,
+            "p95": 3278,
+            "min": 2914,
+            "max": 3278
+          },
+          "medianChangePercent": -94.53592418065337
+        },
+        "chromiumNodes": {
+          "control": {
+            "count": 20,
+            "median": 176475,
+            "p95": 407168,
+            "min": 57016,
+            "max": 445708
+          },
+          "candidate": {
+            "count": 20,
+            "median": 51785,
+            "p95": 187484,
+            "min": 3043,
+            "max": 187694
+          },
+          "medianChangePercent": -70.65590026915993
+        },
+        "eventListeners": {
+          "control": {
+            "count": 20,
+            "median": 193141.5,
+            "p95": 298622,
+            "min": 77568,
+            "max": 316206
+          },
+          "candidate": {
+            "count": 20,
+            "median": 93758.5,
+            "p95": 164821,
+            "min": 1360,
+            "max": 174842
+          },
+          "medianChangePercent": -51.45605682880168
+        },
+        "layoutCount": {
+          "control": {
+            "count": 20,
+            "median": 132,
+            "p95": 133,
+            "min": 131,
+            "max": 133
+          },
+          "candidate": {
+            "count": 20,
+            "median": 205.5,
+            "p95": 206,
+            "min": 204,
+            "max": 206
+          },
+          "medianChangePercent": 55.68181818181819
+        },
+        "styleRecalcCount": {
+          "control": {
+            "count": 20,
+            "median": 138,
+            "p95": 138,
+            "min": 137,
+            "max": 139
+          },
+          "candidate": {
+            "count": 20,
+            "median": 278.5,
+            "p95": 280,
+            "min": 276,
+            "max": 280
+          },
+          "medianChangePercent": 101.81159420289853
+        },
+        "scriptMs": {
+          "control": {
+            "count": 20,
+            "median": 13290.909,
+            "p95": 15348.131000000001,
+            "min": 11205.539999999999,
+            "max": 15807.81
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1933.909,
+            "p95": 2136.768,
+            "min": 1707.904,
+            "max": 2195.835
+          },
+          "medianChangePercent": -85.44938498939388
+        },
+        "layoutMs": {
+          "control": {
+            "count": 20,
+            "median": 193.397,
+            "p95": 224.488,
+            "min": 164.142,
+            "max": 229.025
+          },
+          "candidate": {
+            "count": 20,
+            "median": 158.4355,
+            "p95": 174.63,
+            "min": 139.83200000000002,
+            "max": 178.81900000000002
+          },
+          "medianChangePercent": -18.07758134821119
+        },
+        "styleMs": {
+          "control": {
+            "count": 20,
+            "median": 385.33500000000004,
+            "p95": 447.55699999999996,
+            "min": 334.432,
+            "max": 456.57
+          },
+          "candidate": {
+            "count": 20,
+            "median": 363.3215,
+            "p95": 405.734,
+            "min": 329.129,
+            "max": 418.676
+          },
+          "medianChangePercent": -5.71282131132651
+        },
+        "taskMs": {
+          "control": {
+            "count": 20,
+            "median": 14558.369999999999,
+            "p95": 16832.585000000003,
+            "min": 12309.973,
+            "max": 17200.185999999998
+          },
+          "candidate": {
+            "count": 20,
+            "median": 2796.2655,
+            "p95": 3089.5350000000003,
+            "min": 2493.819,
+            "max": 3137.388
+          },
+          "medianChangePercent": -80.79272954321122
+        },
+        "heapMiB": {
+          "control": {
+            "count": 20,
+            "median": 428.09902000427246,
+            "p95": 559.4216995239258,
+            "min": 205.23041152954102,
+            "max": 562.1204109191895
+          },
+          "candidate": {
+            "count": 20,
+            "median": 37.57107734680176,
+            "p95": 141.87117767333984,
+            "min": 12.926258087158203,
+            "max": 145.78408432006836
+          },
+          "medianChangePercent": -91.22374133292182
+        },
+        "longTaskCount": {
+          "control": {
+            "count": 20,
+            "median": 68.5,
+            "p95": 69,
+            "min": 68,
+            "max": 69
+          },
+          "candidate": {
+            "count": 20,
+            "median": 4.5,
+            "p95": 7,
+            "min": 4,
+            "max": 7
+          },
+          "medianChangePercent": -93.43065693430657
+        },
+        "longTaskTotalMs": {
+          "control": {
+            "count": 20,
+            "median": 13458.5,
+            "p95": 15432,
+            "min": 11434,
+            "max": 15845
+          },
+          "candidate": {
+            "count": 20,
+            "median": 621.5,
+            "p95": 832,
+            "min": 533,
+            "max": 879
+          },
+          "medianChangePercent": -95.38210053126276
+        },
+        "longTaskMaxMs": {
+          "control": {
+            "count": 20,
+            "median": 450.5,
+            "p95": 570,
+            "min": 416,
+            "max": 602
+          },
+          "candidate": {
+            "count": 20,
+            "median": 180,
+            "p95": 220,
+            "min": 156,
+            "max": 232
+          },
+          "medianChangePercent": -60.04439511653719
+        },
+        "verticalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 13.600000000000023,
+            "p95": 14.300000000000182,
+            "min": 13.400000000000091,
+            "max": 14.399999999999864
+          },
+          "candidate": {
+            "count": 20,
+            "median": 26.649999999999977,
+            "p95": 26.700000000000045,
+            "min": 13.400000000000034,
+            "max": 26.700000000000045
+          },
+          "medianChangePercent": 95.95588235294068
+        },
+        "horizontalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 253.400000000001,
+            "p95": 333.40000000000055,
+            "min": 213.39999999999964,
+            "max": 345.5999999999999
+          },
+          "candidate": {
+            "count": 20,
+            "median": 26.649999999999977,
+            "p95": 26.700000000000045,
+            "min": 13.400000000000091,
+            "max": 26.799999999999955
+          },
+          "medianChangePercent": -89.48303078137337
+        },
+        "horizontalFramesOver50": {
+          "control": {
+            "count": 20,
+            "median": 58,
+            "p95": 58,
+            "min": 58,
+            "max": 58
+          },
+          "candidate": {
+            "count": 20,
+            "median": 0,
+            "p95": 0,
+            "min": 0,
+            "max": 1
+          },
+          "medianChangePercent": -100
+        },
+        "resizePreviewMs": {
+          "control": {
+            "count": 20,
+            "median": 86.25,
+            "p95": 102.69999980926514,
+            "min": 74.10000014305115,
+            "max": 122.19999980926514
+          },
+          "candidate": {
+            "count": 20,
+            "median": 25.899999976158142,
+            "p95": 29.09999990463257,
+            "min": 21.700000047683716,
+            "max": 29.800000190734863
+          },
+          "medianChangePercent": -69.97101452039635
+        }
+      },
+      "warm": {
+        "initialRenderMs": {
+          "control": {
+            "count": 20,
+            "median": 328.6999999284744,
+            "p95": 386.80000019073486,
+            "min": 313.90000009536743,
+            "max": 449
+          },
+          "candidate": {
+            "count": 20,
+            "median": 74.05000007152557,
+            "p95": 77.20000004768372,
+            "min": 70.79999995231628,
+            "max": 78.20000004768372
+          },
+          "medianChangePercent": -77.47185881118376
+        },
+        "readyMs": {
+          "control": {
+            "count": 20,
+            "median": 607.8500000238419,
+            "p95": 910.3000001907349,
+            "min": 316.5,
+            "max": 916.2999999523163
+          },
+          "candidate": {
+            "count": 20,
+            "median": 95.10000002384186,
+            "p95": 128.19999980926514,
+            "min": 71.79999995231628,
+            "max": 133.60000014305115
+          },
+          "medianChangePercent": -84.35469276628909
+        },
+        "firstContentfulPaintMs": {
+          "control": {
+            "count": 20,
+            "median": 614,
+            "p95": 656,
+            "min": 472,
+            "max": 676
+          },
+          "candidate": {
+            "count": 20,
+            "median": 224,
+            "p95": 276,
+            "min": 204,
+            "max": 280
+          },
+          "medianChangePercent": -63.51791530944626
+        },
+        "domElements": {
+          "control": {
+            "count": 20,
+            "median": 56661,
+            "p95": 63187,
+            "min": 50135,
+            "max": 63187
+          },
+          "candidate": {
+            "count": 20,
+            "median": 3096,
+            "p95": 3278,
+            "min": 2914,
+            "max": 3278
+          },
+          "medianChangePercent": -94.53592418065337
+        },
+        "chromiumNodes": {
+          "control": {
+            "count": 20,
+            "median": 217177.5,
+            "p95": 391824,
+            "min": 57040,
+            "max": 421835
+          },
+          "candidate": {
+            "count": 20,
+            "median": 51893.5,
+            "p95": 187694,
+            "min": 9256,
+            "max": 187762
+          },
+          "medianChangePercent": -76.10548974916831
+        },
+        "eventListeners": {
+          "control": {
+            "count": 20,
+            "median": 194107.5,
+            "p95": 350998,
+            "min": 77589,
+            "max": 396095
+          },
+          "candidate": {
+            "count": 20,
+            "median": 84127.5,
+            "p95": 175054,
+            "min": 24889,
+            "max": 175236
+          },
+          "medianChangePercent": -56.65932537382636
+        },
+        "layoutCount": {
+          "control": {
+            "count": 20,
+            "median": 132,
+            "p95": 133,
+            "min": 131,
+            "max": 133
+          },
+          "candidate": {
+            "count": 20,
+            "median": 205.5,
+            "p95": 206,
+            "min": 204,
+            "max": 206
+          },
+          "medianChangePercent": 55.68181818181819
+        },
+        "styleRecalcCount": {
+          "control": {
+            "count": 20,
+            "median": 138,
+            "p95": 138,
+            "min": 137,
+            "max": 139
+          },
+          "candidate": {
+            "count": 20,
+            "median": 278.5,
+            "p95": 280,
+            "min": 276,
+            "max": 280
+          },
+          "medianChangePercent": 101.81159420289853
+        },
+        "scriptMs": {
+          "control": {
+            "count": 20,
+            "median": 13301.246,
+            "p95": 15619.604000000001,
+            "min": 11265.655,
+            "max": 15637.643
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1987.3935000000001,
+            "p95": 2144.401,
+            "min": 1695.398,
+            "max": 2166.742
+          },
+          "medianChangePercent": -85.05859150338246
+        },
+        "layoutMs": {
+          "control": {
+            "count": 20,
+            "median": 192.041,
+            "p95": 232.49800000000002,
+            "min": 163.828,
+            "max": 233.61
+          },
+          "candidate": {
+            "count": 20,
+            "median": 161.18,
+            "p95": 177.08499999999998,
+            "min": 139.064,
+            "max": 177.33499999999998
+          },
+          "medianChangePercent": -16.070005884160143
+        },
+        "styleMs": {
+          "control": {
+            "count": 20,
+            "median": 393.6275,
+            "p95": 448.95,
+            "min": 338.99600000000004,
+            "max": 493.349
+          },
+          "candidate": {
+            "count": 20,
+            "median": 377.11699999999996,
+            "p95": 412.213,
+            "min": 329.503,
+            "max": 426.027
+          },
+          "medianChangePercent": -4.1944477964573235
+        },
+        "taskMs": {
+          "control": {
+            "count": 20,
+            "median": 14578.539,
+            "p95": 17062.109,
+            "min": 12381.201000000001,
+            "max": 17150.876
+          },
+          "candidate": {
+            "count": 20,
+            "median": 2863.5665,
+            "p95": 3101.833,
+            "min": 2477.5930000000003,
+            "max": 3153.795
+          },
+          "medianChangePercent": -80.35765792443263
+        },
+        "heapMiB": {
+          "control": {
+            "count": 20,
+            "median": 442.96630477905273,
+            "p95": 549.7895011901855,
+            "min": 199.44123458862305,
+            "max": 580.5349922180176
+          },
+          "candidate": {
+            "count": 20,
+            "median": 48.40999794006348,
+            "p95": 141.57682037353516,
+            "min": 13.013267517089844,
+            "max": 145.7498321533203
+          },
+          "medianChangePercent": -89.07140398315174
+        },
+        "longTaskCount": {
+          "control": {
+            "count": 20,
+            "median": 69,
+            "p95": 69,
+            "min": 68,
+            "max": 70
+          },
+          "candidate": {
+            "count": 20,
+            "median": 5,
+            "p95": 6,
+            "min": 4,
+            "max": 8
+          },
+          "medianChangePercent": -92.7536231884058
+        },
+        "longTaskTotalMs": {
+          "control": {
+            "count": 20,
+            "median": 13485.5,
+            "p95": 15707,
+            "min": 11501,
+            "max": 15788
+          },
+          "candidate": {
+            "count": 20,
+            "median": 641.5,
+            "p95": 813,
+            "min": 532,
+            "max": 877
+          },
+          "medianChangePercent": -95.24303881947277
+        },
+        "longTaskMaxMs": {
+          "control": {
+            "count": 20,
+            "median": 463,
+            "p95": 537,
+            "min": 404,
+            "max": 761
+          },
+          "candidate": {
+            "count": 20,
+            "median": 182.5,
+            "p95": 220,
+            "min": 155,
+            "max": 223
+          },
+          "medianChangePercent": -60.583153347732186
+        },
+        "verticalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 13.699999999999932,
+            "p95": 14.299999999999955,
+            "min": 13.400000000000091,
+            "max": 26.299999999999955
+          },
+          "candidate": {
+            "count": 20,
+            "median": 26.69999999999999,
+            "p95": 26.800000000000068,
+            "min": 13.5,
+            "max": 26.800000000000068
+          },
+          "medianChangePercent": 94.890510948906
+        },
+        "horizontalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 273.35000000000036,
+            "p95": 360.10000000000036,
+            "min": 213.10000000000036,
+            "max": 466.7000000000007
+          },
+          "candidate": {
+            "count": 20,
+            "median": 26.699999999999932,
+            "p95": 26.799999999999727,
+            "min": 13.5,
+            "max": 26.799999999999955
+          },
+          "medianChangePercent": -90.23230290835929
+        },
+        "horizontalFramesOver50": {
+          "control": {
+            "count": 20,
+            "median": 58,
+            "p95": 58,
+            "min": 58,
+            "max": 58
+          },
+          "candidate": {
+            "count": 20,
+            "median": 0,
+            "p95": 0,
+            "min": 0,
+            "max": 0
+          },
+          "medianChangePercent": -100
+        },
+        "resizePreviewMs": {
+          "control": {
+            "count": 20,
+            "median": 89.75000011920929,
+            "p95": 108.79999995231628,
+            "min": 77.39999985694885,
+            "max": 175.39999985694885
+          },
+          "candidate": {
+            "count": 20,
+            "median": 27.049999952316284,
+            "p95": 28.40000009536743,
+            "min": 20.59999990463257,
+            "max": 29.600000143051147
+          },
+          "medianChangePercent": -69.86072432714488
+        }
+      }
+    },
+    "10000": {
+      "cold": {
+        "initialRenderMs": {
+          "control": {
+            "count": 20,
+            "median": 608.3000000715256,
+            "p95": 638.7000000476837,
+            "min": 591.1999998092651,
+            "max": 743.4000000953674
+          },
+          "candidate": {
+            "count": 20,
+            "median": 97.89999997615814,
+            "p95": 109.40000009536743,
+            "min": 92.5,
+            "max": 110.79999995231628
+          },
+          "medianChangePercent": -83.90596745608305
+        },
+        "readyMs": {
+          "control": {
+            "count": 20,
+            "median": 1045.1499999761581,
+            "p95": 1773.1000001430511,
+            "min": 596.2999999523163,
+            "max": 1779.2000000476837
+          },
+          "candidate": {
+            "count": 20,
+            "median": 126,
+            "p95": 157,
+            "min": 92.79999995231628,
+            "max": 166.39999985694885
+          },
+          "medianChangePercent": -87.9443142129958
+        },
+        "firstContentfulPaintMs": {
+          "control": {
+            "count": 20,
+            "median": 950,
+            "p95": 1148,
+            "min": 788,
+            "max": 1236
+          },
+          "candidate": {
+            "count": 20,
+            "median": 260,
+            "p95": 324,
+            "min": 232,
+            "max": 324
+          },
+          "medianChangePercent": -72.63157894736842
+        },
+        "domElements": {
+          "control": {
+            "count": 20,
+            "median": 113363,
+            "p95": 126389,
+            "min": 100337,
+            "max": 126389
+          },
+          "candidate": {
+            "count": 20,
+            "median": 3195,
+            "p95": 3307,
+            "min": 3083,
+            "max": 3307
+          },
+          "medianChangePercent": -97.18162010532538
+        },
+        "chromiumNodes": {
+          "control": {
+            "count": 20,
+            "median": 856460,
+            "p95": 1346300,
+            "min": 347122,
+            "max": 1403404
+          },
+          "candidate": {
+            "count": 20,
+            "median": 226069,
+            "p95": 273733,
+            "min": 8019,
+            "max": 274830
+          },
+          "medianChangePercent": -73.60425472292927
+        },
+        "eventListeners": {
+          "control": {
+            "count": 20,
+            "median": 470589.5,
+            "p95": 593770,
+            "min": 184093,
+            "max": 599172
+          },
+          "candidate": {
+            "count": 20,
+            "median": 227718,
+            "p95": 260248,
+            "min": 71586,
+            "max": 260248
+          },
+          "medianChangePercent": -51.61005504797706
+        },
+        "layoutCount": {
+          "control": {
+            "count": 20,
+            "median": 132,
+            "p95": 132,
+            "min": 131,
+            "max": 132
+          },
+          "candidate": {
+            "count": 20,
+            "median": 205,
+            "p95": 206,
+            "min": 204,
+            "max": 206
+          },
+          "medianChangePercent": 55.3030303030303
+        },
+        "styleRecalcCount": {
+          "control": {
+            "count": 20,
+            "median": 137,
+            "p95": 137,
+            "min": 137,
+            "max": 137
+          },
+          "candidate": {
+            "count": 20,
+            "median": 277.5,
+            "p95": 280,
+            "min": 276,
+            "max": 280
+          },
+          "medianChangePercent": 102.55474452554742
+        },
+        "scriptMs": {
+          "control": {
+            "count": 20,
+            "median": 29066.144500000002,
+            "p95": 34626.664,
+            "min": 23752.075,
+            "max": 37094.528
+          },
+          "candidate": {
+            "count": 20,
+            "median": 3018.4809999999998,
+            "p95": 3188.6960000000004,
+            "min": 2717.211,
+            "max": 3208.388
+          },
+          "medianChangePercent": -89.61513110209715
+        },
+        "layoutMs": {
+          "control": {
+            "count": 20,
+            "median": 278.345,
+            "p95": 352.31600000000003,
+            "min": 226.739,
+            "max": 364.79699999999997
+          },
+          "candidate": {
+            "count": 20,
+            "median": 187.8755,
+            "p95": 197.138,
+            "min": 163.885,
+            "max": 199.36200000000002
+          },
+          "medianChangePercent": -32.502649589538166
+        },
+        "styleMs": {
+          "control": {
+            "count": 20,
+            "median": 484.837,
+            "p95": 625.2220000000001,
+            "min": 421.44,
+            "max": 692.75
+          },
+          "candidate": {
+            "count": 20,
+            "median": 417.1495,
+            "p95": 440.65700000000004,
+            "min": 374.577,
+            "max": 456.964
+          },
+          "medianChangePercent": -13.960877573287522
+        },
+        "taskMs": {
+          "control": {
+            "count": 20,
+            "median": 30808.148,
+            "p95": 36609.923,
+            "min": 25364.432,
+            "max": 39318.007000000005
+          },
+          "candidate": {
+            "count": 20,
+            "median": 3935.293,
+            "p95": 4156.503,
+            "min": 3529.832,
+            "max": 4184.498
+          },
+          "medianChangePercent": -87.22645385889474
+        },
+        "heapMiB": {
+          "control": {
+            "count": 20,
+            "median": 817.1818771362305,
+            "p95": 1008.6543045043945,
+            "min": 302.6664390563965,
+            "max": 1065.213466644287
+          },
+          "candidate": {
+            "count": 20,
+            "median": 200.6450252532959,
+            "p95": 227.9618797302246,
+            "min": 15.210098266601562,
+            "max": 235.23067092895508
+          },
+          "medianChangePercent": -75.44671132986386
+        },
+        "longTaskCount": {
+          "control": {
+            "count": 20,
+            "median": 71,
+            "p95": 71,
+            "min": 69,
+            "max": 71
+          },
+          "candidate": {
+            "count": 20,
+            "median": 10,
+            "p95": 10,
+            "min": 10,
+            "max": 10
+          },
+          "medianChangePercent": -85.91549295774648
+        },
+        "longTaskTotalMs": {
+          "control": {
+            "count": 20,
+            "median": 29323,
+            "p95": 34713,
+            "min": 24232,
+            "max": 37321
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1676,
+            "p95": 1781,
+            "min": 1566,
+            "max": 1845
+          },
+          "medianChangePercent": -94.28435016880947
+        },
+        "longTaskMaxMs": {
+          "control": {
+            "count": 20,
+            "median": 1225,
+            "p95": 1523,
+            "min": 1068,
+            "max": 1614
+          },
+          "candidate": {
+            "count": 20,
+            "median": 341,
+            "p95": 386,
+            "min": 314,
+            "max": 399
+          },
+          "medianChangePercent": -72.16326530612245
+        },
+        "verticalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 20.450000000000045,
+            "p95": 26.700000000000273,
+            "min": 13.400000000000091,
+            "max": 26.700000000000273
+          },
+          "candidate": {
+            "count": 20,
+            "median": 26.700000000000045,
+            "p95": 26.799999999999955,
+            "min": 26.600000000000023,
+            "max": 26.800000000000068
+          },
+          "medianChangePercent": 30.562347188263985
+        },
+        "horizontalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 673.6000000000004,
+            "p95": 920,
+            "min": 453.39999999999964,
+            "max": 920.0999999999985
+          },
+          "candidate": {
+            "count": 20,
+            "median": 26.700000000000273,
+            "p95": 27.299999999999955,
+            "min": 26.700000000000045,
+            "max": 27.600000000000136
+          },
+          "medianChangePercent": -96.0362232779097
+        },
+        "horizontalFramesOver50": {
+          "control": {
+            "count": 20,
+            "median": 58,
+            "p95": 58,
+            "min": 58,
+            "max": 58
+          },
+          "candidate": {
+            "count": 20,
+            "median": 0,
+            "p95": 0,
+            "min": 0,
+            "max": 0
+          },
+          "medianChangePercent": -100
+        },
+        "resizePreviewMs": {
+          "control": {
+            "count": 20,
+            "median": 164.04999995231628,
+            "p95": 202.19999980926514,
+            "min": 139.59999990463257,
+            "max": 220.20000004768372
+          },
+          "candidate": {
+            "count": 20,
+            "median": 25.199999928474426,
+            "p95": 28.299999952316284,
+            "min": 16.399999856948853,
+            "max": 28.300000190734863
+          },
+          "medianChangePercent": -84.63882966424919
+        }
+      },
+      "warm": {
+        "initialRenderMs": {
+          "control": {
+            "count": 20,
+            "median": 614.1499999761581,
+            "p95": 681.4000000953674,
+            "min": 588.3999998569489,
+            "max": 690.6000001430511
+          },
+          "candidate": {
+            "count": 20,
+            "median": 96.04999995231628,
+            "p95": 117.80000019073486,
+            "min": 92.39999985694885,
+            "max": 127.90000009536743
+          },
+          "medianChangePercent": -84.36049825677033
+        },
+        "readyMs": {
+          "control": {
+            "count": 20,
+            "median": 1070,
+            "p95": 1793.7000000476837,
+            "min": 601.5,
+            "max": 1823.0999999046326
+          },
+          "candidate": {
+            "count": 20,
+            "median": 129.5000001192093,
+            "p95": 161.90000009536743,
+            "min": 92.39999985694885,
+            "max": 187.90000009536743
+          },
+          "medianChangePercent": -87.89719625054119
+        },
+        "firstContentfulPaintMs": {
+          "control": {
+            "count": 20,
+            "median": 1010,
+            "p95": 1160,
+            "min": 788,
+            "max": 1200
+          },
+          "candidate": {
+            "count": 20,
+            "median": 260,
+            "p95": 352,
+            "min": 236,
+            "max": 356
+          },
+          "medianChangePercent": -74.25742574257426
+        },
+        "domElements": {
+          "control": {
+            "count": 20,
+            "median": 113363,
+            "p95": 126389,
+            "min": 100337,
+            "max": 126389
+          },
+          "candidate": {
+            "count": 20,
+            "median": 3195,
+            "p95": 3307,
+            "min": 3083,
+            "max": 3307
+          },
+          "medianChangePercent": -97.18162010532538
+        },
+        "chromiumNodes": {
+          "control": {
+            "count": 20,
+            "median": 771503,
+            "p95": 1286392,
+            "min": 427437,
+            "max": 1391937
+          },
+          "candidate": {
+            "count": 20,
+            "median": 228215,
+            "p95": 274833,
+            "min": 9279,
+            "max": 274833
+          },
+          "medianChangePercent": -70.41942805147873
+        },
+        "eventListeners": {
+          "control": {
+            "count": 20,
+            "median": 476770,
+            "p95": 642597,
+            "min": 203713,
+            "max": 690678
+          },
+          "candidate": {
+            "count": 20,
+            "median": 213031.5,
+            "p95": 260248,
+            "min": 71206,
+            "max": 260248
+          },
+          "medianChangePercent": -55.31776328208571
+        },
+        "layoutCount": {
+          "control": {
+            "count": 20,
+            "median": 132,
+            "p95": 132,
+            "min": 131,
+            "max": 132
+          },
+          "candidate": {
+            "count": 20,
+            "median": 205,
+            "p95": 206,
+            "min": 202,
+            "max": 206
+          },
+          "medianChangePercent": 55.3030303030303
+        },
+        "styleRecalcCount": {
+          "control": {
+            "count": 20,
+            "median": 137,
+            "p95": 137,
+            "min": 137,
+            "max": 137
+          },
+          "candidate": {
+            "count": 20,
+            "median": 277,
+            "p95": 280,
+            "min": 275,
+            "max": 281
+          },
+          "medianChangePercent": 102.18978102189782
+        },
+        "scriptMs": {
+          "control": {
+            "count": 20,
+            "median": 29022.388,
+            "p95": 34550.156,
+            "min": 24532.101000000002,
+            "max": 34985.799999999996
+          },
+          "candidate": {
+            "count": 20,
+            "median": 3018.809,
+            "p95": 3420.6310000000003,
+            "min": 2722.057,
+            "max": 3467.1400000000003
+          },
+          "medianChangePercent": -89.59834387163454
+        },
+        "layoutMs": {
+          "control": {
+            "count": 20,
+            "median": 282.539,
+            "p95": 321.045,
+            "min": 230.263,
+            "max": 330.712
+          },
+          "candidate": {
+            "count": 20,
+            "median": 185.80849999999998,
+            "p95": 210.548,
+            "min": 165.446,
+            "max": 217.17600000000002
+          },
+          "medianChangePercent": -34.23615854802347
+        },
+        "styleMs": {
+          "control": {
+            "count": 20,
+            "median": 499.98350000000005,
+            "p95": 579.899,
+            "min": 418.6,
+            "max": 603.0360000000001
+          },
+          "candidate": {
+            "count": 20,
+            "median": 412.964,
+            "p95": 471.329,
+            "min": 371.726,
+            "max": 482.908
+          },
+          "medianChangePercent": -17.404474347653476
+        },
+        "taskMs": {
+          "control": {
+            "count": 20,
+            "median": 30832.424,
+            "p95": 36525.658,
+            "min": 26097.749,
+            "max": 36931.879
+          },
+          "candidate": {
+            "count": 20,
+            "median": 3958.5225,
+            "p95": 4487.804999999999,
+            "min": 3537.515,
+            "max": 4546.129
+          },
+          "medianChangePercent": -87.16117000726248
+        },
+        "heapMiB": {
+          "control": {
+            "count": 20,
+            "median": 870.2149772644043,
+            "p95": 1040.156135559082,
+            "min": 335.61864852905273,
+            "max": 1070.9086799621582
+          },
+          "candidate": {
+            "count": 20,
+            "median": 198.69121742248535,
+            "p95": 238.94795608520508,
+            "min": 15.108715057373047,
+            "max": 239.88062286376953
+          },
+          "medianChangePercent": -77.16757093205999
+        },
+        "longTaskCount": {
+          "control": {
+            "count": 20,
+            "median": 70.5,
+            "p95": 71,
+            "min": 70,
+            "max": 71
+          },
+          "candidate": {
+            "count": 20,
+            "median": 10,
+            "p95": 10,
+            "min": 10,
+            "max": 10
+          },
+          "medianChangePercent": -85.81560283687944
+        },
+        "longTaskTotalMs": {
+          "control": {
+            "count": 20,
+            "median": 29389,
+            "p95": 34693,
+            "min": 25040,
+            "max": 35088
+          },
+          "candidate": {
+            "count": 20,
+            "median": 1681,
+            "p95": 1911,
+            "min": 1568,
+            "max": 1940
+          },
+          "medianChangePercent": -94.28017285378884
+        },
+        "longTaskMaxMs": {
+          "control": {
+            "count": 20,
+            "median": 1152.5,
+            "p95": 1535,
+            "min": 1072,
+            "max": 1549
+          },
+          "candidate": {
+            "count": 20,
+            "median": 344,
+            "p95": 412,
+            "min": 315,
+            "max": 412
+          },
+          "medianChangePercent": -70.15184381778742
+        },
+        "verticalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 20.450000000000045,
+            "p95": 27.59999999999991,
+            "min": 13.400000000000091,
+            "max": 27.59999999999991
+          },
+          "candidate": {
+            "count": 20,
+            "median": 26.700000000000045,
+            "p95": 26.700000000000045,
+            "min": 26.699999999999932,
+            "max": 26.700000000000045
+          },
+          "medianChangePercent": 30.562347188263985
+        },
+        "horizontalP95Ms": {
+          "control": {
+            "count": 20,
+            "median": 633.0500000000011,
+            "p95": 826.5999999999985,
+            "min": 520,
+            "max": 919.2000000000007
+          },
+          "candidate": {
+            "count": 20,
+            "median": 26.700000000000045,
+            "p95": 27.59999999999991,
+            "min": 26.600000000000136,
+            "max": 27.699999999999818
+          },
+          "medianChangePercent": -95.78232367111602
+        },
+        "horizontalFramesOver50": {
+          "control": {
+            "count": 20,
+            "median": 58,
+            "p95": 58,
+            "min": 58,
+            "max": 58
+          },
+          "candidate": {
+            "count": 20,
+            "median": 0,
+            "p95": 0,
+            "min": 0,
+            "max": 0
+          },
+          "medianChangePercent": -100
+        },
+        "resizePreviewMs": {
+          "control": {
+            "count": 20,
+            "median": 165.64999997615814,
+            "p95": 199.79999995231628,
+            "min": 139.5,
+            "max": 217.39999985694885
+          },
+          "candidate": {
+            "count": 20,
+            "median": 25.399999976158142,
+            "p95": 27.300000190734863,
+            "min": 17.800000190734863,
+            "max": 27.399999856948853
+          },
+          "medianChangePercent": -84.66646545136496
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "capturedAt": "2026-09-01T11:55:28.819Z",
+  "repository": "omvra",
+  "branch": "",
+  "captureKind": "unchanged-control",
+  "sample": 1,
+  "phases": {
+    "cold": "first load in a new BrowserWindow",
+    "warm": "second load in a fresh BrowserWindow sharing the same Electron session and resource cache"
+  },
+  "control": {
+    "mainCommit": "814a33659374171ae4f5d149e60f08aab80e6002",
+    "branchCommit": "814a33659374171ae4f5d149e60f08aab80e6002",
+    "mergeBase": "814a33659374171ae4f5d149e60f08aab80e6002",
+    "timelineViewBlob": "e516d2b5b657a1d9b44dcc283acdc90f1db0dfc6",
+    "rendererSourceDiffersFromMain": false
+  },
+  "fixture": {
+    "seed": 1330468434,
+    "profiles": [
+      {
+        "swimlanes": 100,
+        "tasks": 1000
+      },
+      {
+        "swimlanes": 500,
+        "tasks": 5000
+      },
+      {
+        "swimlanes": 1000,
+        "tasks": 10000
+      }
+    ],
+    "dateSpan": [
+      "2019-01-07",
+      "2033-12-15"
+    ]
+  },
+  "runtime": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "hostNode": "v22.23.1",
+    "npm": "12.0.1",
+    "electron": "43.3.0",
+    "chromium": "150.0.7871.212",
+    "embeddedNode": "24.18.1",
+    "viewport": {
+      "width": 1440,
+      "height": 900,
+      "zoomFactor": 1
+    }
+  },
+  "isolation": {
+    "standaloneEntry": "timeline-benchmark.html",
+    "workspaceHydrationMounted": false,
+    "electronPreloadMounted": false,
+    "temporaryUserDataDirectory": true,
+    "temporaryBuildDirectory": true
+  },
+  "build": {
+    "mode": "Vite production build",
+    "config": "vite.config.ts",
+    "entry": "timeline-benchmark.html"
+  }
+}

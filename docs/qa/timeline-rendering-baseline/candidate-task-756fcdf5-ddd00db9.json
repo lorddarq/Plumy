@@ -1,0 +1,1394 @@
+{
+  "schemaVersion": 1,
+  "environmentFile": "candidate-task-756fcdf5-ddd00db9-environment.json",
+  "scenarios": [
+    {
+      "swimlanes": 100,
+      "tasks": 1000,
+      "weekends": "visible",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 100,
+          "taskCount": 1000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 88.59999990463257,
+        "scenarioReadyMs": 122.29999995231628,
+        "dom": {
+          "totalNodes": 1496,
+          "authoredSwimlaneRows": 100,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 4
+        },
+        "longTasks": {
+          "count": 1,
+          "totalDurationMs": 74,
+          "maxDurationMs": 74,
+          "samples": [
+            {
+              "startTime": 159.20000004768372,
+              "duration": 74
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 33100000,
+          "totalJSHeapSize": 72200000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 817.8999999761581,
+            "frameCount": 60,
+            "p95FrameMs": 14.300000000000068,
+            "maxFrameMs": 39.900000000000034,
+            "framesOver16_7ms": 1,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 11,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 848.7000000476837,
+            "frameCount": 60,
+            "p95FrameMs": 14.300000000000182,
+            "maxFrameMs": 26.700000000000045,
+            "framesOver16_7ms": 3,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 27.09999990463257
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 33147,
+        "Nodes": 37704,
+        "LayoutCount": 201,
+        "RecalcStyleCount": 279,
+        "LayoutDuration": 0.124706,
+        "RecalcStyleDuration": 0.301281,
+        "ScriptDuration": 0.776229,
+        "TaskDuration": 1.474824,
+        "JSHeapUsedSize": 32338156,
+        "JSHeapTotalSize": 68943872
+      }
+    },
+    {
+      "swimlanes": 100,
+      "tasks": 1000,
+      "weekends": "visible",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 100,
+          "taskCount": 1000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 58.39999997615814,
+        "scenarioReadyMs": 83,
+        "dom": {
+          "totalNodes": 1496,
+          "authoredSwimlaneRows": 100,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 4
+        },
+        "longTasks": {
+          "count": 1,
+          "totalDurationMs": 56,
+          "maxDurationMs": 56,
+          "samples": [
+            {
+              "startTime": 95.10000002384186,
+              "duration": 56
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 35100000,
+          "totalJSHeapSize": 72200000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 796.2999999523163,
+            "frameCount": 60,
+            "p95FrameMs": 14.299999999999955,
+            "maxFrameMs": 14.300000000000011,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 11,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 820.3999999761581,
+            "frameCount": 60,
+            "p95FrameMs": 14.099999999999909,
+            "maxFrameMs": 27,
+            "framesOver16_7ms": 1,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 28
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 33115,
+        "Nodes": 37683,
+        "LayoutCount": 201,
+        "RecalcStyleCount": 279,
+        "LayoutDuration": 0.126605,
+        "RecalcStyleDuration": 0.314127,
+        "ScriptDuration": 0.776837,
+        "TaskDuration": 1.4903,
+        "JSHeapUsedSize": 33505336,
+        "JSHeapTotalSize": 71303168
+      }
+    },
+    {
+      "swimlanes": 100,
+      "tasks": 1000,
+      "weekends": "hidden",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 100,
+          "taskCount": 1000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 55.700000047683716,
+        "scenarioReadyMs": 94.79999995231628,
+        "dom": {
+          "totalNodes": 1721,
+          "authoredSwimlaneRows": 100,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 4
+        },
+        "longTasks": {
+          "count": 1,
+          "totalDurationMs": 53,
+          "maxDurationMs": 53,
+          "samples": [
+            {
+              "startTime": 108.70000004768372,
+              "duration": 53
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 11900000,
+          "totalJSHeapSize": 86400000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 799.6000000238419,
+            "frameCount": 60,
+            "p95FrameMs": 14.200000000000045,
+            "maxFrameMs": 14.399999999999977,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 11,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 845.2999999523163,
+            "frameCount": 60,
+            "p95FrameMs": 14.400000000000091,
+            "maxFrameMs": 27.5,
+            "framesOver16_7ms": 3,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 28
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 1361,
+        "Nodes": 1851,
+        "LayoutCount": 202,
+        "RecalcStyleCount": 281,
+        "LayoutDuration": 0.112229,
+        "RecalcStyleDuration": 0.263367,
+        "ScriptDuration": 0.773378,
+        "TaskDuration": 1.430585,
+        "JSHeapUsedSize": 10729272,
+        "JSHeapTotalSize": 81002496
+      }
+    },
+    {
+      "swimlanes": 100,
+      "tasks": 1000,
+      "weekends": "hidden",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 100,
+          "taskCount": 1000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 55.299999952316284,
+        "scenarioReadyMs": 96.70000004768372,
+        "dom": {
+          "totalNodes": 1721,
+          "authoredSwimlaneRows": 100,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 4
+        },
+        "longTasks": {
+          "count": 1,
+          "totalDurationMs": 53,
+          "maxDurationMs": 53,
+          "samples": [
+            {
+              "startTime": 97.5,
+              "duration": 53
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 12700000,
+          "totalJSHeapSize": 81400000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 798.7999999523163,
+            "frameCount": 60,
+            "p95FrameMs": 14.299999999999955,
+            "maxFrameMs": 14.399999999999977,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 11,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 805.1000000238419,
+            "frameCount": 60,
+            "p95FrameMs": 13.400000000000091,
+            "maxFrameMs": 14.100000000000136,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 27.200000047683716
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 1421,
+        "Nodes": 1851,
+        "LayoutCount": 202,
+        "RecalcStyleCount": 282,
+        "LayoutDuration": 0.096732,
+        "RecalcStyleDuration": 0.251546,
+        "ScriptDuration": 0.706288,
+        "TaskDuration": 1.324924,
+        "JSHeapUsedSize": 11654828,
+        "JSHeapTotalSize": 78643200
+      }
+    },
+    {
+      "swimlanes": 500,
+      "tasks": 5000,
+      "weekends": "visible",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 500,
+          "taskCount": 5000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 70,
+        "scenarioReadyMs": 94.19999992847443,
+        "dom": {
+          "totalNodes": 3276,
+          "authoredSwimlaneRows": 500,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 3
+        },
+        "longTasks": {
+          "count": 6,
+          "totalDurationMs": 700,
+          "maxDurationMs": 181,
+          "samples": [
+            {
+              "startTime": 93.60000002384186,
+              "duration": 68
+            },
+            {
+              "startTime": 1860.7999999523163,
+              "duration": 174
+            },
+            {
+              "startTime": 2153.7999999523163,
+              "duration": 170
+            },
+            {
+              "startTime": 2364.1999999284744,
+              "duration": 57
+            },
+            {
+              "startTime": 2449.399999976158,
+              "duration": 181
+            },
+            {
+              "startTime": 2670,
+              "duration": 50
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 97400000,
+          "totalJSHeapSize": 157000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 787.1999999284744,
+            "frameCount": 60,
+            "p95FrameMs": 13.400000000000091,
+            "maxFrameMs": 13.400000000000091,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 11,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 819.7000000476837,
+            "frameCount": 60,
+            "p95FrameMs": 13.400000000000091,
+            "maxFrameMs": 14.299999999999955,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 27.100000023841858
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 109940,
+        "Nodes": 126271,
+        "LayoutCount": 205,
+        "RecalcStyleCount": 277,
+        "LayoutDuration": 0.161721,
+        "RecalcStyleDuration": 0.372991,
+        "ScriptDuration": 1.560321,
+        "TaskDuration": 2.397278,
+        "JSHeapUsedSize": 95391992,
+        "JSHeapTotalSize": 152567808
+      }
+    },
+    {
+      "swimlanes": 500,
+      "tasks": 5000,
+      "weekends": "visible",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 500,
+          "taskCount": 5000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 73.30000007152557,
+        "scenarioReadyMs": 101.70000004768372,
+        "dom": {
+          "totalNodes": 3276,
+          "authoredSwimlaneRows": 500,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 3
+        },
+        "longTasks": {
+          "count": 5,
+          "totalDurationMs": 849,
+          "maxDurationMs": 259,
+          "samples": [
+            {
+              "startTime": 107.70000004768372,
+              "duration": 71
+            },
+            {
+              "startTime": 1973.2000000476837,
+              "duration": 259
+            },
+            {
+              "startTime": 2290.8000000715256,
+              "duration": 95
+            },
+            {
+              "startTime": 2426.899999976158,
+              "duration": 212
+            },
+            {
+              "startTime": 2751.100000023842,
+              "duration": 212
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 64000000,
+          "totalJSHeapSize": 123000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 795.2999999523163,
+            "frameCount": 60,
+            "p95FrameMs": 13.400000000000034,
+            "maxFrameMs": 26.69999999999999,
+            "framesOver16_7ms": 1,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 11,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 865.7999999523163,
+            "frameCount": 60,
+            "p95FrameMs": 14.299999999999955,
+            "maxFrameMs": 26.700000000000045,
+            "framesOver16_7ms": 3,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 25.299999952316284
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 59586,
+        "Nodes": 64851,
+        "LayoutCount": 205,
+        "RecalcStyleCount": 277,
+        "LayoutDuration": 0.183184,
+        "RecalcStyleDuration": 0.442042,
+        "ScriptDuration": 1.914083,
+        "TaskDuration": 2.867699,
+        "JSHeapUsedSize": 61143192,
+        "JSHeapTotalSize": 117702656
+      }
+    },
+    {
+      "swimlanes": 500,
+      "tasks": 5000,
+      "weekends": "hidden",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 500,
+          "taskCount": 5000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 72.39999997615814,
+        "scenarioReadyMs": 115.19999992847443,
+        "dom": {
+          "totalNodes": 2912,
+          "authoredSwimlaneRows": 500,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 3
+        },
+        "longTasks": {
+          "count": 4,
+          "totalDurationMs": 555,
+          "maxDurationMs": 166,
+          "samples": [
+            {
+              "startTime": 110.29999995231628,
+              "duration": 70
+            },
+            {
+              "startTime": 1905.1000000238419,
+              "duration": 166
+            },
+            {
+              "startTime": 2190.2999999523163,
+              "duration": 159
+            },
+            {
+              "startTime": 2452.5,
+              "duration": 160
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 116000000,
+          "totalJSHeapSize": 177000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 799.1000000238419,
+            "frameCount": 60,
+            "p95FrameMs": 13.400000000000091,
+            "maxFrameMs": 14.299999999999955,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 11,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 804.7999999523163,
+            "frameCount": 60,
+            "p95FrameMs": 13.400000000000091,
+            "maxFrameMs": 14.299999999999955,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 27.199999928474426
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 136140,
+        "Nodes": 149274,
+        "LayoutCount": 206,
+        "RecalcStyleCount": 279,
+        "LayoutDuration": 0.143748,
+        "RecalcStyleDuration": 0.342978,
+        "ScriptDuration": 1.435453,
+        "TaskDuration": 2.207189,
+        "JSHeapUsedSize": 114886576,
+        "JSHeapTotalSize": 173015040
+      }
+    },
+    {
+      "swimlanes": 500,
+      "tasks": 5000,
+      "weekends": "hidden",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 500,
+          "taskCount": 5000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 71.29999995231628,
+        "scenarioReadyMs": 114.39999997615814,
+        "dom": {
+          "totalNodes": 2912,
+          "authoredSwimlaneRows": 500,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 3
+        },
+        "longTasks": {
+          "count": 6,
+          "totalDurationMs": 741,
+          "maxDurationMs": 214,
+          "samples": [
+            {
+              "startTime": 116.79999995231628,
+              "duration": 69
+            },
+            {
+              "startTime": 1910.7999999523163,
+              "duration": 170
+            },
+            {
+              "startTime": 2191.100000023842,
+              "duration": 214
+            },
+            {
+              "startTime": 2449.100000023842,
+              "duration": 54
+            },
+            {
+              "startTime": 2524.899999976158,
+              "duration": 167
+            },
+            {
+              "startTime": 2734.899999976158,
+              "duration": 67
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 139000000,
+          "totalJSHeapSize": 188000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 798.9000000953674,
+            "frameCount": 60,
+            "p95FrameMs": 14.099999999999909,
+            "maxFrameMs": 14.300000000000011,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 11,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 804.4000000953674,
+            "frameCount": 60,
+            "p95FrameMs": 14,
+            "maxFrameMs": 14.299999999999955,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 28
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 136794,
+        "Nodes": 149238,
+        "LayoutCount": 206,
+        "RecalcStyleCount": 280,
+        "LayoutDuration": 0.150839,
+        "RecalcStyleDuration": 0.37131,
+        "ScriptDuration": 1.63848,
+        "TaskDuration": 2.45532,
+        "JSHeapUsedSize": 133209300,
+        "JSHeapTotalSize": 179568640
+      }
+    },
+    {
+      "swimlanes": 1000,
+      "tasks": 10000,
+      "weekends": "visible",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 1000,
+          "taskCount": 10000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 94.5,
+        "scenarioReadyMs": 118.89999997615814,
+        "dom": {
+          "totalNodes": 3305,
+          "authoredSwimlaneRows": 1000,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 5
+        },
+        "longTasks": {
+          "count": 10,
+          "totalDurationMs": 1803,
+          "maxDurationMs": 408,
+          "samples": [
+            {
+              "startTime": 122.70000004768372,
+              "duration": 92
+            },
+            {
+              "startTime": 2190.7000000476837,
+              "duration": 346
+            },
+            {
+              "startTime": 2537.5,
+              "duration": 73
+            },
+            {
+              "startTime": 2624,
+              "duration": 144
+            },
+            {
+              "startTime": 2816.100000023842,
+              "duration": 345
+            },
+            {
+              "startTime": 3161.600000023842,
+              "duration": 71
+            },
+            {
+              "startTime": 3241.100000023842,
+              "duration": 131
+            },
+            {
+              "startTime": 3409.2000000476837,
+              "duration": 408
+            },
+            {
+              "startTime": 3817.600000023842,
+              "duration": 68
+            },
+            {
+              "startTime": 3899.2000000476837,
+              "duration": 125
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 97400000,
+          "totalJSHeapSize": 188000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 789.1000000238419,
+            "frameCount": 60,
+            "p95FrameMs": 13.699999999999932,
+            "maxFrameMs": 14.299999999999955,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 10,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 1094.1000000238419,
+            "frameCount": 60,
+            "p95FrameMs": 27,
+            "maxFrameMs": 40.09999999999991,
+            "framesOver16_7ms": 20,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 25.300000071525574
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 87704,
+        "Nodes": 93570,
+        "LayoutCount": 204,
+        "RecalcStyleCount": 276,
+        "LayoutDuration": 0.207092,
+        "RecalcStyleDuration": 0.444967,
+        "ScriptDuration": 2.811827,
+        "TaskDuration": 3.796695,
+        "JSHeapUsedSize": 91535656,
+        "JSHeapTotalSize": 185057280
+      }
+    },
+    {
+      "swimlanes": 1000,
+      "tasks": 10000,
+      "weekends": "visible",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 1000,
+          "taskCount": 10000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 91.5,
+        "scenarioReadyMs": 119.5,
+        "dom": {
+          "totalNodes": 3305,
+          "authoredSwimlaneRows": 1000,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 5
+        },
+        "longTasks": {
+          "count": 10,
+          "totalDurationMs": 1687,
+          "maxDurationMs": 365,
+          "samples": [
+            {
+              "startTime": 114.89999997615814,
+              "duration": 89
+            },
+            {
+              "startTime": 2143.399999976158,
+              "duration": 365
+            },
+            {
+              "startTime": 2508.5,
+              "duration": 69
+            },
+            {
+              "startTime": 2586.600000023842,
+              "duration": 127
+            },
+            {
+              "startTime": 2755.2000000476837,
+              "duration": 331
+            },
+            {
+              "startTime": 3086.600000023842,
+              "duration": 64
+            },
+            {
+              "startTime": 3159.399999976158,
+              "duration": 122
+            },
+            {
+              "startTime": 3317.7999999523163,
+              "duration": 333
+            },
+            {
+              "startTime": 3651.7000000476837,
+              "duration": 65
+            },
+            {
+              "startTime": 3725.399999976158,
+              "duration": 122
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 254000000,
+          "totalJSHeapSize": 304000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 875,
+            "frameCount": 60,
+            "p95FrameMs": 26.600000000000023,
+            "maxFrameMs": 26.700000000000045,
+            "framesOver16_7ms": 6,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 10,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 956.3999999761581,
+            "frameCount": 60,
+            "p95FrameMs": 26.700000000000045,
+            "maxFrameMs": 40.09999999999991,
+            "framesOver16_7ms": 9,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 27.299999952316284
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 260275,
+        "Nodes": 273765,
+        "LayoutCount": 205,
+        "RecalcStyleCount": 277,
+        "LayoutDuration": 0.194918,
+        "RecalcStyleDuration": 0.452412,
+        "ScriptDuration": 2.750898,
+        "TaskDuration": 3.661075,
+        "JSHeapUsedSize": 241056940,
+        "JSHeapTotalSize": 294633472
+      }
+    },
+    {
+      "swimlanes": 1000,
+      "tasks": 10000,
+      "weekends": "hidden",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 1000,
+          "taskCount": 10000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 95.69999992847443,
+        "scenarioReadyMs": 135.09999990463257,
+        "dom": {
+          "totalNodes": 3081,
+          "authoredSwimlaneRows": 1000,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 5
+        },
+        "longTasks": {
+          "count": 10,
+          "totalDurationMs": 1659,
+          "maxDurationMs": 351,
+          "samples": [
+            {
+              "startTime": 111.60000002384186,
+              "duration": 93
+            },
+            {
+              "startTime": 1951.1000000238419,
+              "duration": 322
+            },
+            {
+              "startTime": 2273.2999999523163,
+              "duration": 64
+            },
+            {
+              "startTime": 2348.2999999523163,
+              "duration": 122
+            },
+            {
+              "startTime": 2510.899999976158,
+              "duration": 313
+            },
+            {
+              "startTime": 2824.7999999523163,
+              "duration": 62
+            },
+            {
+              "startTime": 2895.100000023842,
+              "duration": 124
+            },
+            {
+              "startTime": 3056.7000000476837,
+              "duration": 351
+            },
+            {
+              "startTime": 3408.2000000476837,
+              "duration": 81
+            },
+            {
+              "startTime": 3508.2999999523163,
+              "duration": 127
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 86400000,
+          "totalJSHeapSize": 188000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 797.2999999523163,
+            "frameCount": 60,
+            "p95FrameMs": 13.400000000000091,
+            "maxFrameMs": 13.400000000000091,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 10,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 843.3999999761581,
+            "frameCount": 60,
+            "p95FrameMs": 13.400000000000091,
+            "maxFrameMs": 26.59999999999991,
+            "framesOver16_7ms": 2,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 26
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 71789,
+        "Nodes": 77670,
+        "LayoutCount": 206,
+        "RecalcStyleCount": 280,
+        "LayoutDuration": 0.168202,
+        "RecalcStyleDuration": 0.374264,
+        "ScriptDuration": 2.475078,
+        "TaskDuration": 3.301287,
+        "JSHeapUsedSize": 82141164,
+        "JSHeapTotalSize": 178241536
+      }
+    },
+    {
+      "swimlanes": 1000,
+      "tasks": 10000,
+      "weekends": "hidden",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 1000,
+          "taskCount": 10000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 92,
+        "scenarioReadyMs": 141.79999995231628,
+        "dom": {
+          "totalNodes": 3081,
+          "authoredSwimlaneRows": 1000,
+          "swimlaneRows": 12,
+          "renderedTaskBars": 5
+        },
+        "longTasks": {
+          "count": 10,
+          "totalDurationMs": 1745,
+          "maxDurationMs": 398,
+          "samples": [
+            {
+              "startTime": 126.09999990463257,
+              "duration": 90
+            },
+            {
+              "startTime": 2032.5999999046326,
+              "duration": 300
+            },
+            {
+              "startTime": 2332.6999999284744,
+              "duration": 88
+            },
+            {
+              "startTime": 2428,
+              "duration": 115
+            },
+            {
+              "startTime": 2579,
+              "duration": 313
+            },
+            {
+              "startTime": 2892.5999999046326,
+              "duration": 68
+            },
+            {
+              "startTime": 2969,
+              "duration": 123
+            },
+            {
+              "startTime": 3125.1999999284744,
+              "duration": 398
+            },
+            {
+              "startTime": 3523.899999976158,
+              "duration": 84
+            },
+            {
+              "startTime": 3619.1999999284744,
+              "duration": 166
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 199000000,
+          "totalJSHeapSize": 254000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 837.8999999761581,
+            "frameCount": 60,
+            "p95FrameMs": 14.400000000000091,
+            "maxFrameMs": 26.700000000000045,
+            "framesOver16_7ms": 3,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 10,
+            "mountedRowsMax": 18,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 867.3000000715256,
+            "frameCount": 60,
+            "p95FrameMs": 14.299999999999955,
+            "maxFrameMs": 40,
+            "framesOver16_7ms": 3,
+            "framesOver50ms": 0,
+            "mountedRowsMin": 12,
+            "mountedRowsMax": 12,
+            "blankFrames": 0,
+            "alignmentFailures": 0
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 24.899999976158142
+          },
+          "rowRetention": {
+            "selection": true,
+            "focus": true,
+            "resize": true
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 212508,
+        "Nodes": 226067,
+        "LayoutCount": 206,
+        "RecalcStyleCount": 279,
+        "LayoutDuration": 0.1815,
+        "RecalcStyleDuration": 0.423841,
+        "ScriptDuration": 2.702853,
+        "TaskDuration": 3.590669,
+        "JSHeapUsedSize": 190402492,
+        "JSHeapTotalSize": 247709696
+      }
+    }
+  ]
+}

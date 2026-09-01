@@ -1,0 +1,3154 @@
+{
+  "schemaVersion": 1,
+  "environmentFile": "candidate-task-60432c11-5ba3da55-environment.json",
+  "scenarios": [
+    {
+      "swimlanes": 100,
+      "tasks": 1000,
+      "weekends": "visible",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 100,
+          "taskCount": 1000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 98.40000009536743,
+        "scenarioReadyMs": 182.90000009536743,
+        "dom": {
+          "totalNodes": 12925,
+          "swimlaneRows": 100,
+          "renderedTaskBars": 16
+        },
+        "longTasks": {
+          "count": 5,
+          "totalDurationMs": 326,
+          "maxDurationMs": 96,
+          "samples": [
+            {
+              "startTime": 100.10000002384186,
+              "duration": 96
+            },
+            {
+              "startTime": 1128.6000000238419,
+              "duration": 57
+            },
+            {
+              "startTime": 1326.6000000238419,
+              "duration": 56
+            },
+            {
+              "startTime": 2153.9000000953674,
+              "duration": 51
+            },
+            {
+              "startTime": 2216.4000000953674,
+              "duration": 66
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 91700000,
+          "totalJSHeapSize": 139000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 795.2000000476837,
+            "frameCount": 60,
+            "p95FrameMs": 13.400000000000091,
+            "maxFrameMs": 14.300000000000068,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 2357.899999976158,
+            "frameCount": 60,
+            "p95FrameMs": 53.299999999999955,
+            "maxFrameMs": 80,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 6
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 22.600000023841858
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 76921,
+        "Nodes": 78995,
+        "LayoutCount": 68,
+        "RecalcStyleCount": 70,
+        "LayoutDuration": 0.104572,
+        "RecalcStyleDuration": 0.2485,
+        "ScriptDuration": 2.072761,
+        "TaskDuration": 2.629092,
+        "JSHeapUsedSize": 86503184,
+        "JSHeapTotalSize": 137363456
+      }
+    },
+    {
+      "swimlanes": 100,
+      "tasks": 1000,
+      "weekends": "visible",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 100,
+          "taskCount": 1000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 88.70000004768372,
+        "scenarioReadyMs": 153.60000002384186,
+        "dom": {
+          "totalNodes": 12925,
+          "swimlaneRows": 100,
+          "renderedTaskBars": 16
+        },
+        "longTasks": {
+          "count": 4,
+          "totalDurationMs": 259,
+          "maxDurationMs": 85,
+          "samples": [
+            {
+              "startTime": 82.20000004768372,
+              "duration": 85
+            },
+            {
+              "startTime": 1065.7000000476837,
+              "duration": 60
+            },
+            {
+              "startTime": 2081.7000000476837,
+              "duration": 62
+            },
+            {
+              "startTime": 2359.100000023842,
+              "duration": 52
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 91700000,
+          "totalJSHeapSize": 148000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 781,
+            "frameCount": 60,
+            "p95FrameMs": 13.5,
+            "maxFrameMs": 14,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 2385.2000000476837,
+            "frameCount": 60,
+            "p95FrameMs": 53.399999999999864,
+            "maxFrameMs": 80,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 12
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 28.899999976158142
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 76735,
+        "Nodes": 78894,
+        "LayoutCount": 68,
+        "RecalcStyleCount": 70,
+        "LayoutDuration": 0.102477,
+        "RecalcStyleDuration": 0.263428,
+        "ScriptDuration": 2.074408,
+        "TaskDuration": 2.63433,
+        "JSHeapUsedSize": 87258920,
+        "JSHeapTotalSize": 143654912
+      }
+    },
+    {
+      "swimlanes": 100,
+      "tasks": 1000,
+      "weekends": "hidden",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 100,
+          "taskCount": 1000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 89,
+        "scenarioReadyMs": 175.10000002384186,
+        "dom": {
+          "totalNodes": 10273,
+          "swimlaneRows": 100,
+          "renderedTaskBars": 16
+        },
+        "longTasks": {
+          "count": 2,
+          "totalDurationMs": 158,
+          "maxDurationMs": 87,
+          "samples": [
+            {
+              "startTime": 97.20000004768372,
+              "duration": 87
+            },
+            {
+              "startTime": 1991.7000000476837,
+              "duration": 71
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 35100000,
+          "totalJSHeapSize": 131000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 799.1000000238419,
+            "frameCount": 60,
+            "p95FrameMs": 13.800000000000068,
+            "maxFrameMs": 14.200000000000045,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 1956.8999999761581,
+            "frameCount": 60,
+            "p95FrameMs": 40.09999999999991,
+            "maxFrameMs": 79.99999999999977,
+            "framesOver16_7ms": 57,
+            "framesOver50ms": 2
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 24.200000047683716
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 95001,
+        "Nodes": 101844,
+        "LayoutCount": 67,
+        "RecalcStyleCount": 76,
+        "LayoutDuration": 0.081735,
+        "RecalcStyleDuration": 0.201128,
+        "ScriptDuration": 1.705907,
+        "TaskDuration": 2.163349,
+        "JSHeapUsedSize": 33791864,
+        "JSHeapTotalSize": 124256256
+      }
+    },
+    {
+      "swimlanes": 100,
+      "tasks": 1000,
+      "weekends": "hidden",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 100,
+          "taskCount": 1000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 88.79999995231628,
+        "scenarioReadyMs": 174.19999992847443,
+        "dom": {
+          "totalNodes": 10273,
+          "swimlaneRows": 100,
+          "renderedTaskBars": 16
+        },
+        "longTasks": {
+          "count": 3,
+          "totalDurationMs": 195,
+          "maxDurationMs": 85,
+          "samples": [
+            {
+              "startTime": 81.10000002384186,
+              "duration": 85
+            },
+            {
+              "startTime": 1090.3000000715256,
+              "duration": 50
+            },
+            {
+              "startTime": 1922.1000000238419,
+              "duration": 60
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 37300000,
+          "totalJSHeapSize": 131000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 796.8999999761581,
+            "frameCount": 60,
+            "p95FrameMs": 13.900000000000091,
+            "maxFrameMs": 14.399999999999977,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 1955.5,
+            "frameCount": 60,
+            "p95FrameMs": 40.09999999999991,
+            "maxFrameMs": 66.59999999999991,
+            "framesOver16_7ms": 57,
+            "framesOver50ms": 2
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 28
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 123350,
+        "Nodes": 94398,
+        "LayoutCount": 69,
+        "RecalcStyleCount": 79,
+        "LayoutDuration": 0.081515,
+        "RecalcStyleDuration": 0.207335,
+        "ScriptDuration": 1.736817,
+        "TaskDuration": 2.21757,
+        "JSHeapUsedSize": 35494972,
+        "JSHeapTotalSize": 129499136
+      }
+    },
+    {
+      "swimlanes": 500,
+      "tasks": 5000,
+      "weekends": "visible",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 500,
+          "taskCount": 5000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 274.39999997615814,
+        "scenarioReadyMs": 540,
+        "dom": {
+          "totalNodes": 63186,
+          "swimlaneRows": 500,
+          "renderedTaskBars": 45
+        },
+        "longTasks": {
+          "count": 66,
+          "totalDurationMs": 11060,
+          "maxDurationMs": 457,
+          "samples": [
+            {
+              "startTime": 89,
+              "duration": 273
+            },
+            {
+              "startTime": 374.5,
+              "duration": 91
+            },
+            {
+              "startTime": 470,
+              "duration": 157
+            },
+            {
+              "startTime": 641.3999999761581,
+              "duration": 90
+            },
+            {
+              "startTime": 1540.0999999046326,
+              "duration": 224
+            },
+            {
+              "startTime": 1773.0999999046326,
+              "duration": 170
+            },
+            {
+              "startTime": 1950.8999999761581,
+              "duration": 182
+            },
+            {
+              "startTime": 2141.7999999523163,
+              "duration": 171
+            },
+            {
+              "startTime": 2321,
+              "duration": 165
+            },
+            {
+              "startTime": 2494.5,
+              "duration": 159
+            },
+            {
+              "startTime": 2662.399999976158,
+              "duration": 158
+            },
+            {
+              "startTime": 2829.399999976158,
+              "duration": 166
+            },
+            {
+              "startTime": 3004.5999999046326,
+              "duration": 160
+            },
+            {
+              "startTime": 3172.6999999284744,
+              "duration": 201
+            },
+            {
+              "startTime": 3381.5999999046326,
+              "duration": 164
+            },
+            {
+              "startTime": 3560.399999976158,
+              "duration": 154
+            },
+            {
+              "startTime": 3723.6999999284744,
+              "duration": 157
+            },
+            {
+              "startTime": 3895.0999999046326,
+              "duration": 157
+            },
+            {
+              "startTime": 4060.6999999284744,
+              "duration": 156
+            },
+            {
+              "startTime": 4230.5,
+              "duration": 196
+            },
+            {
+              "startTime": 4436.399999976158,
+              "duration": 172
+            },
+            {
+              "startTime": 4622.599999904633,
+              "duration": 156
+            },
+            {
+              "startTime": 4786.899999976158,
+              "duration": 157
+            },
+            {
+              "startTime": 4957.299999952316,
+              "duration": 149
+            },
+            {
+              "startTime": 5115.099999904633,
+              "duration": 148
+            },
+            {
+              "startTime": 5273.899999976158,
+              "duration": 187
+            },
+            {
+              "startTime": 5468.599999904633,
+              "duration": 159
+            },
+            {
+              "startTime": 5641,
+              "duration": 159
+            },
+            {
+              "startTime": 5808.199999928474,
+              "duration": 152
+            },
+            {
+              "startTime": 5973.5,
+              "duration": 291
+            },
+            {
+              "startTime": 6276.899999976158,
+              "duration": 457
+            },
+            {
+              "startTime": 6745.699999928474,
+              "duration": 220
+            },
+            {
+              "startTime": 6977.5,
+              "duration": 116
+            },
+            {
+              "startTime": 7100.199999928474,
+              "duration": 150
+            },
+            {
+              "startTime": 7265.099999904633,
+              "duration": 147
+            },
+            {
+              "startTime": 7420.199999928474,
+              "duration": 155
+            },
+            {
+              "startTime": 7588.299999952316,
+              "duration": 150
+            },
+            {
+              "startTime": 7747,
+              "duration": 156
+            },
+            {
+              "startTime": 7910.5,
+              "duration": 157
+            },
+            {
+              "startTime": 8076.199999928474,
+              "duration": 165
+            },
+            {
+              "startTime": 8250.299999952316,
+              "duration": 161
+            },
+            {
+              "startTime": 8420.399999976158,
+              "duration": 197
+            },
+            {
+              "startTime": 8626.5,
+              "duration": 152
+            },
+            {
+              "startTime": 8787,
+              "duration": 165
+            },
+            {
+              "startTime": 8965.399999976158,
+              "duration": 153
+            },
+            {
+              "startTime": 9126.5,
+              "duration": 158
+            },
+            {
+              "startTime": 9297.799999952316,
+              "duration": 149
+            },
+            {
+              "startTime": 9454.899999976158,
+              "duration": 156
+            },
+            {
+              "startTime": 9624.399999976158,
+              "duration": 194
+            },
+            {
+              "startTime": 9827.199999928474,
+              "duration": 158
+            },
+            {
+              "startTime": 9993.599999904633,
+              "duration": 167
+            },
+            {
+              "startTime": 10174.699999928474,
+              "duration": 151
+            },
+            {
+              "startTime": 10334.899999976158,
+              "duration": 156
+            },
+            {
+              "startTime": 10505.399999976158,
+              "duration": 148
+            },
+            {
+              "startTime": 10661.699999928474,
+              "duration": 159
+            },
+            {
+              "startTime": 10834,
+              "duration": 188
+            },
+            {
+              "startTime": 11031.5,
+              "duration": 160
+            },
+            {
+              "startTime": 11200.699999928474,
+              "duration": 168
+            },
+            {
+              "startTime": 11382.399999976158,
+              "duration": 155
+            },
+            {
+              "startTime": 11545.799999952316,
+              "duration": 161
+            },
+            {
+              "startTime": 11720.799999952316,
+              "duration": 150
+            },
+            {
+              "startTime": 11879.5,
+              "duration": 141
+            },
+            {
+              "startTime": 12033.299999952316,
+              "duration": 170
+            },
+            {
+              "startTime": 12206.099999904633,
+              "duration": 202
+            },
+            {
+              "startTime": 12412.099999904633,
+              "duration": 82
+            },
+            {
+              "startTime": 12499.399999976158,
+              "duration": 105
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 225000000,
+          "totalJSHeapSize": 322000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 857.2000000476837,
+            "frameCount": 60,
+            "p95FrameMs": 14.299999999999955,
+            "maxFrameMs": 80.09999999999991,
+            "framesOver16_7ms": 1,
+            "framesOver50ms": 1
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 10678.299999952316,
+            "frameCount": 60,
+            "p95FrameMs": 213.4000000000001,
+            "maxFrameMs": 466.7000000000007,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 58
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 97.10000002384186
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 203043,
+        "Nodes": 532822,
+        "LayoutCount": 67,
+        "RecalcStyleCount": 69,
+        "LayoutDuration": 0.11048,
+        "RecalcStyleDuration": 0.247367,
+        "ScriptDuration": 10.998829,
+        "TaskDuration": 11.676528,
+        "JSHeapUsedSize": 218596880,
+        "JSHeapTotalSize": 314310656
+      }
+    },
+    {
+      "swimlanes": 500,
+      "tasks": 5000,
+      "weekends": "visible",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 500,
+          "taskCount": 5000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 275.2999999523163,
+        "scenarioReadyMs": 545,
+        "dom": {
+          "totalNodes": 63186,
+          "swimlaneRows": 500,
+          "renderedTaskBars": 45
+        },
+        "longTasks": {
+          "count": 66,
+          "totalDurationMs": 11190,
+          "maxDurationMs": 455,
+          "samples": [
+            {
+              "startTime": 109,
+              "duration": 274
+            },
+            {
+              "startTime": 396.2999999523163,
+              "duration": 91
+            },
+            {
+              "startTime": 491.39999997615814,
+              "duration": 161
+            },
+            {
+              "startTime": 666.7999999523163,
+              "duration": 80
+            },
+            {
+              "startTime": 1563,
+              "duration": 198
+            },
+            {
+              "startTime": 1770.3999999761581,
+              "duration": 161
+            },
+            {
+              "startTime": 1939.3999999761581,
+              "duration": 165
+            },
+            {
+              "startTime": 2112.6999999284744,
+              "duration": 161
+            },
+            {
+              "startTime": 2282.5,
+              "duration": 155
+            },
+            {
+              "startTime": 2445.899999976158,
+              "duration": 190
+            },
+            {
+              "startTime": 2645.5,
+              "duration": 164
+            },
+            {
+              "startTime": 2819.0999999046326,
+              "duration": 169
+            },
+            {
+              "startTime": 3002.2999999523163,
+              "duration": 154
+            },
+            {
+              "startTime": 3165,
+              "duration": 156
+            },
+            {
+              "startTime": 3334.5,
+              "duration": 155
+            },
+            {
+              "startTime": 3499.0999999046326,
+              "duration": 152
+            },
+            {
+              "startTime": 3661.0999999046326,
+              "duration": 170
+            },
+            {
+              "startTime": 3842.0999999046326,
+              "duration": 182
+            },
+            {
+              "startTime": 4033.399999976158,
+              "duration": 131
+            },
+            {
+              "startTime": 4176.399999976158,
+              "duration": 115
+            },
+            {
+              "startTime": 4298.199999928474,
+              "duration": 162
+            },
+            {
+              "startTime": 4475,
+              "duration": 157
+            },
+            {
+              "startTime": 4639.799999952316,
+              "duration": 148
+            },
+            {
+              "startTime": 4801.199999928474,
+              "duration": 194
+            },
+            {
+              "startTime": 5004.799999952316,
+              "duration": 159
+            },
+            {
+              "startTime": 5172.299999952316,
+              "duration": 168
+            },
+            {
+              "startTime": 5353.299999952316,
+              "duration": 158
+            },
+            {
+              "startTime": 5519.199999928474,
+              "duration": 121
+            },
+            {
+              "startTime": 5651.199999928474,
+              "duration": 107
+            },
+            {
+              "startTime": 5764.899999976158,
+              "duration": 231
+            },
+            {
+              "startTime": 6010.799999952316,
+              "duration": 455
+            },
+            {
+              "startTime": 6480.5,
+              "duration": 309
+            },
+            {
+              "startTime": 6803.599999904633,
+              "duration": 177
+            },
+            {
+              "startTime": 6989.299999952316,
+              "duration": 156
+            },
+            {
+              "startTime": 7161.399999976158,
+              "duration": 168
+            },
+            {
+              "startTime": 7338.399999976158,
+              "duration": 182
+            },
+            {
+              "startTime": 7535,
+              "duration": 190
+            },
+            {
+              "startTime": 7734.299999952316,
+              "duration": 170
+            },
+            {
+              "startTime": 7915.399999976158,
+              "duration": 168
+            },
+            {
+              "startTime": 8093.299999952316,
+              "duration": 224
+            },
+            {
+              "startTime": 8328.599999904633,
+              "duration": 165
+            },
+            {
+              "startTime": 8502.299999952316,
+              "duration": 167
+            },
+            {
+              "startTime": 8683.099999904633,
+              "duration": 149
+            },
+            {
+              "startTime": 8840.399999976158,
+              "duration": 159
+            },
+            {
+              "startTime": 9013.799999952316,
+              "duration": 155
+            },
+            {
+              "startTime": 9176.599999904633,
+              "duration": 150
+            },
+            {
+              "startTime": 9340.699999928474,
+              "duration": 177
+            },
+            {
+              "startTime": 9528.799999952316,
+              "duration": 181
+            },
+            {
+              "startTime": 9718.799999952316,
+              "duration": 161
+            },
+            {
+              "startTime": 9893.099999904633,
+              "duration": 191
+            },
+            {
+              "startTime": 10094.799999952316,
+              "duration": 169
+            },
+            {
+              "startTime": 10277.799999952316,
+              "duration": 154
+            },
+            {
+              "startTime": 10441,
+              "duration": 188
+            },
+            {
+              "startTime": 10640.099999904633,
+              "duration": 177
+            },
+            {
+              "startTime": 10826.699999928474,
+              "duration": 184
+            },
+            {
+              "startTime": 11026.199999928474,
+              "duration": 166
+            },
+            {
+              "startTime": 11201.699999928474,
+              "duration": 161
+            },
+            {
+              "startTime": 11377.299999952316,
+              "duration": 159
+            },
+            {
+              "startTime": 11546.299999952316,
+              "duration": 152
+            },
+            {
+              "startTime": 11711.899999976158,
+              "duration": 189
+            },
+            {
+              "startTime": 11911.699999928474,
+              "duration": 164
+            },
+            {
+              "startTime": 12084.899999976158,
+              "duration": 150
+            },
+            {
+              "startTime": 12249.099999904633,
+              "duration": 173
+            },
+            {
+              "startTime": 12424.599999904633,
+              "duration": 179
+            },
+            {
+              "startTime": 12612.599999904633,
+              "duration": 78
+            },
+            {
+              "startTime": 12691.299999952316,
+              "duration": 104
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 386000000,
+          "totalJSHeapSize": 435000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 854.1000000238419,
+            "frameCount": 60,
+            "p95FrameMs": 14.099999999999909,
+            "maxFrameMs": 80,
+            "framesOver16_7ms": 1,
+            "framesOver50ms": 1
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 10873.100000023842,
+            "frameCount": 60,
+            "p95FrameMs": 239,
+            "maxFrameMs": 467.8000000000002,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 58
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 86.10000002384186
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 329383,
+        "Nodes": 331726,
+        "LayoutCount": 67,
+        "RecalcStyleCount": 69,
+        "LayoutDuration": 0.111532,
+        "RecalcStyleDuration": 0.267906,
+        "ScriptDuration": 11.132257,
+        "TaskDuration": 11.895317,
+        "JSHeapUsedSize": 371765364,
+        "JSHeapTotalSize": 420741120
+      }
+    },
+    {
+      "swimlanes": 500,
+      "tasks": 5000,
+      "weekends": "hidden",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 500,
+          "taskCount": 5000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 275.7999999523163,
+        "scenarioReadyMs": 651.2000000476837,
+        "dom": {
+          "totalNodes": 50134,
+          "swimlaneRows": 500,
+          "renderedTaskBars": 45
+        },
+        "longTasks": {
+          "count": 67,
+          "totalDurationMs": 9438,
+          "maxDurationMs": 409,
+          "samples": [
+            {
+              "startTime": 108.5,
+              "duration": 274
+            },
+            {
+              "startTime": 383.1999999284744,
+              "duration": 123
+            },
+            {
+              "startTime": 509.1999999284744,
+              "duration": 79
+            },
+            {
+              "startTime": 592.3999999761581,
+              "duration": 104
+            },
+            {
+              "startTime": 706.1999999284744,
+              "duration": 52
+            },
+            {
+              "startTime": 1595.6000000238419,
+              "duration": 171
+            },
+            {
+              "startTime": 1774,
+              "duration": 165
+            },
+            {
+              "startTime": 1945.8999999761581,
+              "duration": 135
+            },
+            {
+              "startTime": 2088,
+              "duration": 139
+            },
+            {
+              "startTime": 2233.5,
+              "duration": 136
+            },
+            {
+              "startTime": 2376,
+              "duration": 131
+            },
+            {
+              "startTime": 2514.100000023842,
+              "duration": 131
+            },
+            {
+              "startTime": 2653.100000023842,
+              "duration": 140
+            },
+            {
+              "startTime": 2801,
+              "duration": 135
+            },
+            {
+              "startTime": 2943.399999976158,
+              "duration": 165
+            },
+            {
+              "startTime": 3115.5,
+              "duration": 133
+            },
+            {
+              "startTime": 3256.2999999523163,
+              "duration": 136
+            },
+            {
+              "startTime": 3405.899999976158,
+              "duration": 129
+            },
+            {
+              "startTime": 3542.399999976158,
+              "duration": 129
+            },
+            {
+              "startTime": 3683.6999999284744,
+              "duration": 132
+            },
+            {
+              "startTime": 3823.600000023842,
+              "duration": 139
+            },
+            {
+              "startTime": 3975.2999999523163,
+              "duration": 134
+            },
+            {
+              "startTime": 4116.299999952316,
+              "duration": 165
+            },
+            {
+              "startTime": 4288.699999928474,
+              "duration": 132
+            },
+            {
+              "startTime": 4427.5,
+              "duration": 133
+            },
+            {
+              "startTime": 4573.5,
+              "duration": 129
+            },
+            {
+              "startTime": 4709.299999952316,
+              "duration": 129
+            },
+            {
+              "startTime": 4850,
+              "duration": 125
+            },
+            {
+              "startTime": 4981.5,
+              "duration": 126
+            },
+            {
+              "startTime": 5118.699999928474,
+              "duration": 125
+            },
+            {
+              "startTime": 5250.5,
+              "duration": 302
+            },
+            {
+              "startTime": 5565,
+              "duration": 409
+            },
+            {
+              "startTime": 5992.199999928474,
+              "duration": 191
+            },
+            {
+              "startTime": 6188.5,
+              "duration": 96
+            },
+            {
+              "startTime": 6295.299999952316,
+              "duration": 120
+            },
+            {
+              "startTime": 6428.399999976158,
+              "duration": 123
+            },
+            {
+              "startTime": 6558.799999952316,
+              "duration": 127
+            },
+            {
+              "startTime": 6696.5,
+              "duration": 125
+            },
+            {
+              "startTime": 6828.5,
+              "duration": 160
+            },
+            {
+              "startTime": 6995.699999928474,
+              "duration": 140
+            },
+            {
+              "startTime": 7143.299999952316,
+              "duration": 141
+            },
+            {
+              "startTime": 7297.100000023842,
+              "duration": 130
+            },
+            {
+              "startTime": 7433.600000023842,
+              "duration": 127
+            },
+            {
+              "startTime": 7573,
+              "duration": 120
+            },
+            {
+              "startTime": 7699.5,
+              "duration": 125
+            },
+            {
+              "startTime": 7836.799999952316,
+              "duration": 125
+            },
+            {
+              "startTime": 7968.699999928474,
+              "duration": 159
+            },
+            {
+              "startTime": 8136.699999928474,
+              "duration": 130
+            },
+            {
+              "startTime": 8274.899999976158,
+              "duration": 139
+            },
+            {
+              "startTime": 8426.899999976158,
+              "duration": 136
+            },
+            {
+              "startTime": 8570.199999928474,
+              "duration": 133
+            },
+            {
+              "startTime": 8715,
+              "duration": 130
+            },
+            {
+              "startTime": 8852.100000023842,
+              "duration": 129
+            },
+            {
+              "startTime": 8993.199999928474,
+              "duration": 123
+            },
+            {
+              "startTime": 9123.799999952316,
+              "duration": 157
+            },
+            {
+              "startTime": 9289.5,
+              "duration": 137
+            },
+            {
+              "startTime": 9434.299999952316,
+              "duration": 136
+            },
+            {
+              "startTime": 9583.100000023842,
+              "duration": 131
+            },
+            {
+              "startTime": 9721.899999976158,
+              "duration": 130
+            },
+            {
+              "startTime": 9865.100000023842,
+              "duration": 129
+            },
+            {
+              "startTime": 10000.899999976158,
+              "duration": 129
+            },
+            {
+              "startTime": 10142.600000023842,
+              "duration": 125
+            },
+            {
+              "startTime": 10274.699999928474,
+              "duration": 155
+            },
+            {
+              "startTime": 10437.699999928474,
+              "duration": 163
+            },
+            {
+              "startTime": 10603.600000023842,
+              "duration": 160
+            },
+            {
+              "startTime": 10772,
+              "duration": 72
+            },
+            {
+              "startTime": 10844.299999952316,
+              "duration": 98
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 239000000,
+          "totalJSHeapSize": 322000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 787.6999999284744,
+            "frameCount": 60,
+            "p95FrameMs": 14.299999999999955,
+            "maxFrameMs": 14.299999999999955,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 9020.299999952316,
+            "frameCount": 60,
+            "p95FrameMs": 173.5,
+            "maxFrameMs": 426.6999999999998,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 58
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 79.80000007152557
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 174099,
+        "Nodes": 170906,
+        "LayoutCount": 67,
+        "RecalcStyleCount": 70,
+        "LayoutDuration": 0.088382,
+        "RecalcStyleDuration": 0.206594,
+        "ScriptDuration": 9.226774,
+        "TaskDuration": 9.823573,
+        "JSHeapUsedSize": 235527592,
+        "JSHeapTotalSize": 310116352
+      }
+    },
+    {
+      "swimlanes": 500,
+      "tasks": 5000,
+      "weekends": "hidden",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 500,
+          "taskCount": 5000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 279.2000000476837,
+        "scenarioReadyMs": 704.2000000476837,
+        "dom": {
+          "totalNodes": 50134,
+          "swimlaneRows": 500,
+          "renderedTaskBars": 45
+        },
+        "longTasks": {
+          "count": 67,
+          "totalDurationMs": 9823,
+          "maxDurationMs": 382,
+          "samples": [
+            {
+              "startTime": 90.79999995231628,
+              "duration": 276
+            },
+            {
+              "startTime": 367.5,
+              "duration": 128
+            },
+            {
+              "startTime": 497.7000000476837,
+              "duration": 75
+            },
+            {
+              "startTime": 576.7000000476837,
+              "duration": 130
+            },
+            {
+              "startTime": 717.6000000238419,
+              "duration": 74
+            },
+            {
+              "startTime": 1627,
+              "duration": 175
+            },
+            {
+              "startTime": 1809.2000000476837,
+              "duration": 140
+            },
+            {
+              "startTime": 1955.5,
+              "duration": 142
+            },
+            {
+              "startTime": 2103.899999976158,
+              "duration": 137
+            },
+            {
+              "startTime": 2247.7000000476837,
+              "duration": 135
+            },
+            {
+              "startTime": 2389.600000023842,
+              "duration": 133
+            },
+            {
+              "startTime": 2530.399999976158,
+              "duration": 161
+            },
+            {
+              "startTime": 2699.399999976158,
+              "duration": 149
+            },
+            {
+              "startTime": 2856.2000000476837,
+              "duration": 152
+            },
+            {
+              "startTime": 3020.600000023842,
+              "duration": 150
+            },
+            {
+              "startTime": 3177.7000000476837,
+              "duration": 144
+            },
+            {
+              "startTime": 3334.899999976158,
+              "duration": 140
+            },
+            {
+              "startTime": 3484.100000023842,
+              "duration": 156
+            },
+            {
+              "startTime": 3649.7999999523163,
+              "duration": 152
+            },
+            {
+              "startTime": 3809.600000023842,
+              "duration": 143
+            },
+            {
+              "startTime": 3959.5,
+              "duration": 111
+            },
+            {
+              "startTime": 4077.2999999523163,
+              "duration": 143
+            },
+            {
+              "startTime": 4233.799999952316,
+              "duration": 135
+            },
+            {
+              "startTime": 4375.399999976158,
+              "duration": 131
+            },
+            {
+              "startTime": 4518.799999952316,
+              "duration": 129
+            },
+            {
+              "startTime": 4655.200000047684,
+              "duration": 130
+            },
+            {
+              "startTime": 4797.399999976158,
+              "duration": 138
+            },
+            {
+              "startTime": 4941.5,
+              "duration": 163
+            },
+            {
+              "startTime": 5110.899999976158,
+              "duration": 111
+            },
+            {
+              "startTime": 5233.100000023842,
+              "duration": 112
+            },
+            {
+              "startTime": 5350.299999952316,
+              "duration": 220
+            },
+            {
+              "startTime": 5586.299999952316,
+              "duration": 382
+            },
+            {
+              "startTime": 5981.100000023842,
+              "duration": 322
+            },
+            {
+              "startTime": 6310.100000023842,
+              "duration": 159
+            },
+            {
+              "startTime": 6476.299999952316,
+              "duration": 134
+            },
+            {
+              "startTime": 6623.299999952316,
+              "duration": 143
+            },
+            {
+              "startTime": 6774.299999952316,
+              "duration": 154
+            },
+            {
+              "startTime": 6939.200000047684,
+              "duration": 146
+            },
+            {
+              "startTime": 7092.899999976158,
+              "duration": 138
+            },
+            {
+              "startTime": 7237.299999952316,
+              "duration": 140
+            },
+            {
+              "startTime": 7384.700000047684,
+              "duration": 142
+            },
+            {
+              "startTime": 7534.799999952316,
+              "duration": 139
+            },
+            {
+              "startTime": 7680.899999976158,
+              "duration": 137
+            },
+            {
+              "startTime": 7824.799999952316,
+              "duration": 158
+            },
+            {
+              "startTime": 7990.200000047684,
+              "duration": 141
+            },
+            {
+              "startTime": 8139.299999952316,
+              "duration": 140
+            },
+            {
+              "startTime": 8291.200000047684,
+              "duration": 132
+            },
+            {
+              "startTime": 8430.299999952316,
+              "duration": 131
+            },
+            {
+              "startTime": 8573.799999952316,
+              "duration": 128
+            },
+            {
+              "startTime": 8710,
+              "duration": 128
+            },
+            {
+              "startTime": 8849.600000023842,
+              "duration": 158
+            },
+            {
+              "startTime": 9015.200000047684,
+              "duration": 173
+            },
+            {
+              "startTime": 9195.600000023842,
+              "duration": 134
+            },
+            {
+              "startTime": 9337.399999976158,
+              "duration": 136
+            },
+            {
+              "startTime": 9486.399999976158,
+              "duration": 131
+            },
+            {
+              "startTime": 9625.100000023842,
+              "duration": 149
+            },
+            {
+              "startTime": 9787.299999952316,
+              "duration": 138
+            },
+            {
+              "startTime": 9933.399999976158,
+              "duration": 128
+            },
+            {
+              "startTime": 10074.399999976158,
+              "duration": 133
+            },
+            {
+              "startTime": 10215.700000047684,
+              "duration": 130
+            },
+            {
+              "startTime": 10353.5,
+              "duration": 159
+            },
+            {
+              "startTime": 10520.700000047684,
+              "duration": 142
+            },
+            {
+              "startTime": 10675,
+              "duration": 127
+            },
+            {
+              "startTime": 10809.100000023842,
+              "duration": 158
+            },
+            {
+              "startTime": 10974.600000023842,
+              "duration": 156
+            },
+            {
+              "startTime": 11134.600000023842,
+              "duration": 68
+            },
+            {
+              "startTime": 11208.200000047684,
+              "duration": 94
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 322000000,
+          "totalJSHeapSize": 364000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 778.2000000476837,
+            "frameCount": 60,
+            "p95FrameMs": 15.200000000000045,
+            "maxFrameMs": 15.399999999999864,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 9356.899999976158,
+            "frameCount": 60,
+            "p95FrameMs": 173.59999999999945,
+            "maxFrameMs": 400,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 58
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 75.79999995231628
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 253358,
+        "Nodes": 253266,
+        "LayoutCount": 68,
+        "RecalcStyleCount": 71,
+        "LayoutDuration": 0.089187,
+        "RecalcStyleDuration": 0.207592,
+        "ScriptDuration": 9.6124,
+        "TaskDuration": 10.253094,
+        "JSHeapUsedSize": 315723580,
+        "JSHeapTotalSize": 360710144
+      }
+    },
+    {
+      "swimlanes": 1000,
+      "tasks": 10000,
+      "weekends": "visible",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 1000,
+          "taskCount": 10000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 536.6000000238419,
+        "scenarioReadyMs": 1084.3999999761581,
+        "dom": {
+          "totalNodes": 126388,
+          "swimlaneRows": 1000,
+          "renderedTaskBars": 123
+        },
+        "longTasks": {
+          "count": 67,
+          "totalDurationMs": 24197,
+          "maxDurationMs": 1057,
+          "samples": [
+            {
+              "startTime": 118.70000004768372,
+              "duration": 535
+            },
+            {
+              "startTime": 674.8000000715256,
+              "duration": 179
+            },
+            {
+              "startTime": 859.3000000715256,
+              "duration": 342
+            },
+            {
+              "startTime": 1219.5,
+              "duration": 169
+            },
+            {
+              "startTime": 1389.6000000238419,
+              "duration": 51
+            },
+            {
+              "startTime": 2236,
+              "duration": 376
+            },
+            {
+              "startTime": 2622.100000023842,
+              "duration": 346
+            },
+            {
+              "startTime": 2978.5,
+              "duration": 345
+            },
+            {
+              "startTime": 3333.2000000476837,
+              "duration": 347
+            },
+            {
+              "startTime": 3689.8000000715256,
+              "duration": 356
+            },
+            {
+              "startTime": 4055.100000023842,
+              "duration": 421
+            },
+            {
+              "startTime": 4486.700000047684,
+              "duration": 344
+            },
+            {
+              "startTime": 4846.700000047684,
+              "duration": 258
+            },
+            {
+              "startTime": 5112,
+              "duration": 321
+            },
+            {
+              "startTime": 5448.100000023842,
+              "duration": 330
+            },
+            {
+              "startTime": 5789.300000071526,
+              "duration": 337
+            },
+            {
+              "startTime": 6137.800000071526,
+              "duration": 336
+            },
+            {
+              "startTime": 6483,
+              "duration": 408
+            },
+            {
+              "startTime": 6900.800000071526,
+              "duration": 344
+            },
+            {
+              "startTime": 7260.700000047684,
+              "duration": 335
+            },
+            {
+              "startTime": 7606.300000071526,
+              "duration": 333
+            },
+            {
+              "startTime": 7955.300000071526,
+              "duration": 335
+            },
+            {
+              "startTime": 8299.399999976158,
+              "duration": 330
+            },
+            {
+              "startTime": 8644.300000071526,
+              "duration": 412
+            },
+            {
+              "startTime": 9066.200000047684,
+              "duration": 346
+            },
+            {
+              "startTime": 9427.100000023842,
+              "duration": 335
+            },
+            {
+              "startTime": 9771.899999976158,
+              "duration": 342
+            },
+            {
+              "startTime": 10128.5,
+              "duration": 320
+            },
+            {
+              "startTime": 10457.700000047684,
+              "duration": 330
+            },
+            {
+              "startTime": 10803.200000047684,
+              "duration": 445
+            },
+            {
+              "startTime": 11260.300000071526,
+              "duration": 891
+            },
+            {
+              "startTime": 12176.399999976158,
+              "duration": 1057
+            },
+            {
+              "startTime": 13247,
+              "duration": 683
+            },
+            {
+              "startTime": 13940.5,
+              "duration": 381
+            },
+            {
+              "startTime": 14336.399999976158,
+              "duration": 351
+            },
+            {
+              "startTime": 14697.200000047684,
+              "duration": 332
+            },
+            {
+              "startTime": 15043.700000047684,
+              "duration": 328
+            },
+            {
+              "startTime": 15382.100000023842,
+              "duration": 333
+            },
+            {
+              "startTime": 15725.600000023842,
+              "duration": 338
+            },
+            {
+              "startTime": 16073.800000071526,
+              "duration": 343
+            },
+            {
+              "startTime": 16426.200000047684,
+              "duration": 272
+            },
+            {
+              "startTime": 16705.100000023842,
+              "duration": 345
+            },
+            {
+              "startTime": 17061.399999976158,
+              "duration": 454
+            },
+            {
+              "startTime": 17525.200000047684,
+              "duration": 348
+            },
+            {
+              "startTime": 17888.899999976158,
+              "duration": 344
+            },
+            {
+              "startTime": 18243.300000071526,
+              "duration": 337
+            },
+            {
+              "startTime": 18595,
+              "duration": 330
+            },
+            {
+              "startTime": 18934.300000071526,
+              "duration": 424
+            },
+            {
+              "startTime": 19367.899999976158,
+              "duration": 351
+            },
+            {
+              "startTime": 19734.200000047684,
+              "duration": 343
+            },
+            {
+              "startTime": 20086.700000047684,
+              "duration": 332
+            },
+            {
+              "startTime": 20433.600000023842,
+              "duration": 326
+            },
+            {
+              "startTime": 20769.5,
+              "duration": 417
+            },
+            {
+              "startTime": 21196.700000047684,
+              "duration": 345
+            },
+            {
+              "startTime": 21551.300000071526,
+              "duration": 342
+            },
+            {
+              "startTime": 21909.200000047684,
+              "duration": 327
+            },
+            {
+              "startTime": 22246.899999976158,
+              "duration": 325
+            },
+            {
+              "startTime": 22586.200000047684,
+              "duration": 332
+            },
+            {
+              "startTime": 22928.200000047684,
+              "duration": 351
+            },
+            {
+              "startTime": 23290.700000047684,
+              "duration": 418
+            },
+            {
+              "startTime": 23720.100000023842,
+              "duration": 347
+            },
+            {
+              "startTime": 24083.5,
+              "duration": 341
+            },
+            {
+              "startTime": 24434.300000071526,
+              "duration": 301
+            },
+            {
+              "startTime": 24749.300000071526,
+              "duration": 340
+            },
+            {
+              "startTime": 25094.100000023842,
+              "duration": 365
+            },
+            {
+              "startTime": 25469.899999976158,
+              "duration": 152
+            },
+            {
+              "startTime": 25622.5,
+              "duration": 243
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 286000000,
+          "totalJSHeapSize": 553000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 975.5,
+            "frameCount": 60,
+            "p95FrameMs": 15.199999999999818,
+            "maxFrameMs": 160,
+            "framesOver16_7ms": 2,
+            "framesOver50ms": 2
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 22868.400000095367,
+            "frameCount": 60,
+            "p95FrameMs": 466.59999999999854,
+            "maxFrameMs": 1066.7000000000007,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 58
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 226.20000004768372
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 753990,
+        "Nodes": 767040,
+        "LayoutCount": 67,
+        "RecalcStyleCount": 69,
+        "LayoutDuration": 0.125,
+        "RecalcStyleDuration": 0.264869,
+        "ScriptDuration": 24.135753,
+        "TaskDuration": 25.024745,
+        "JSHeapUsedSize": 283215124,
+        "JSHeapTotalSize": 528744448
+      }
+    },
+    {
+      "swimlanes": 1000,
+      "tasks": 10000,
+      "weekends": "visible",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 1000,
+          "taskCount": 10000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "visible",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 543.0999999046326,
+        "scenarioReadyMs": 1092.5,
+        "dom": {
+          "totalNodes": 126388,
+          "swimlaneRows": 1000,
+          "renderedTaskBars": 123
+        },
+        "longTasks": {
+          "count": 66,
+          "totalDurationMs": 24451,
+          "maxDurationMs": 1053,
+          "samples": [
+            {
+              "startTime": 127.10000002384186,
+              "duration": 541
+            },
+            {
+              "startTime": 689.2000000476837,
+              "duration": 181
+            },
+            {
+              "startTime": 875.6000000238419,
+              "duration": 342
+            },
+            {
+              "startTime": 1236,
+              "duration": 174
+            },
+            {
+              "startTime": 2249.2000000476837,
+              "duration": 367
+            },
+            {
+              "startTime": 2625.9000000953674,
+              "duration": 348
+            },
+            {
+              "startTime": 2984.3000000715256,
+              "duration": 336
+            },
+            {
+              "startTime": 3330,
+              "duration": 337
+            },
+            {
+              "startTime": 3676.5,
+              "duration": 345
+            },
+            {
+              "startTime": 4030.600000023842,
+              "duration": 413
+            },
+            {
+              "startTime": 4454.400000095367,
+              "duration": 355
+            },
+            {
+              "startTime": 4825.600000023842,
+              "duration": 338
+            },
+            {
+              "startTime": 5173.200000047684,
+              "duration": 339
+            },
+            {
+              "startTime": 5528,
+              "duration": 337
+            },
+            {
+              "startTime": 5876,
+              "duration": 338
+            },
+            {
+              "startTime": 6224.800000071526,
+              "duration": 429
+            },
+            {
+              "startTime": 6663.600000023842,
+              "duration": 349
+            },
+            {
+              "startTime": 7028,
+              "duration": 338
+            },
+            {
+              "startTime": 7376.900000095367,
+              "duration": 333
+            },
+            {
+              "startTime": 7726,
+              "duration": 331
+            },
+            {
+              "startTime": 8067.700000047684,
+              "duration": 354
+            },
+            {
+              "startTime": 8436.900000095367,
+              "duration": 357
+            },
+            {
+              "startTime": 8804.900000095367,
+              "duration": 474
+            },
+            {
+              "startTime": 9290.400000095367,
+              "duration": 352
+            },
+            {
+              "startTime": 9657.800000071526,
+              "duration": 351
+            },
+            {
+              "startTime": 10019.400000095367,
+              "duration": 361
+            },
+            {
+              "startTime": 10396.200000047684,
+              "duration": 328
+            },
+            {
+              "startTime": 10733.800000071526,
+              "duration": 337
+            },
+            {
+              "startTime": 11086.800000071526,
+              "duration": 464
+            },
+            {
+              "startTime": 11562.800000071526,
+              "duration": 893
+            },
+            {
+              "startTime": 12483.5,
+              "duration": 1053
+            },
+            {
+              "startTime": 13552.200000047684,
+              "duration": 579
+            },
+            {
+              "startTime": 14147.300000071526,
+              "duration": 349
+            },
+            {
+              "startTime": 14506.100000023842,
+              "duration": 446
+            },
+            {
+              "startTime": 14962.800000071526,
+              "duration": 353
+            },
+            {
+              "startTime": 15330.700000047684,
+              "duration": 342
+            },
+            {
+              "startTime": 15683.600000023842,
+              "duration": 343
+            },
+            {
+              "startTime": 16042.400000095367,
+              "duration": 399
+            },
+            {
+              "startTime": 16454.400000095367,
+              "duration": 346
+            },
+            {
+              "startTime": 16815.900000095367,
+              "duration": 412
+            },
+            {
+              "startTime": 17238.5,
+              "duration": 359
+            },
+            {
+              "startTime": 17613.300000071526,
+              "duration": 353
+            },
+            {
+              "startTime": 17976.600000023842,
+              "duration": 374
+            },
+            {
+              "startTime": 18366.600000023842,
+              "duration": 348
+            },
+            {
+              "startTime": 18724.200000047684,
+              "duration": 327
+            },
+            {
+              "startTime": 19065.800000071526,
+              "duration": 420
+            },
+            {
+              "startTime": 19497.300000071526,
+              "duration": 348
+            },
+            {
+              "startTime": 19860.5,
+              "duration": 344
+            },
+            {
+              "startTime": 20215.300000071526,
+              "duration": 339
+            },
+            {
+              "startTime": 20570.200000047684,
+              "duration": 331
+            },
+            {
+              "startTime": 20911.300000071526,
+              "duration": 408
+            },
+            {
+              "startTime": 21336.600000023842,
+              "duration": 379
+            },
+            {
+              "startTime": 21726.100000023842,
+              "duration": 476
+            },
+            {
+              "startTime": 22213.200000047684,
+              "duration": 289
+            },
+            {
+              "startTime": 22515.800000071526,
+              "duration": 246
+            },
+            {
+              "startTime": 22770.800000071526,
+              "duration": 247
+            },
+            {
+              "startTime": 23030.900000095367,
+              "duration": 242
+            },
+            {
+              "startTime": 23280.700000047684,
+              "duration": 327
+            },
+            {
+              "startTime": 23624.200000047684,
+              "duration": 333
+            },
+            {
+              "startTime": 23969.100000023842,
+              "duration": 428
+            },
+            {
+              "startTime": 24407.700000047684,
+              "duration": 360
+            },
+            {
+              "startTime": 24783,
+              "duration": 307
+            },
+            {
+              "startTime": 25099.200000047684,
+              "duration": 349
+            },
+            {
+              "startTime": 25457.600000023842,
+              "duration": 357
+            },
+            {
+              "startTime": 25820,
+              "duration": 153
+            },
+            {
+              "startTime": 25973.100000023842,
+              "duration": 243
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 747000000,
+          "totalJSHeapSize": 842000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 972.7999999523163,
+            "frameCount": 60,
+            "p95FrameMs": 15.100000000000136,
+            "maxFrameMs": 173.39999999999986,
+            "framesOver16_7ms": 2,
+            "framesOver50ms": 1
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 23213.199999928474,
+            "frameCount": 60,
+            "p95FrameMs": 493.3000000000011,
+            "maxFrameMs": 1066.699999999999,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 58
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 152.29999995231628
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 661081,
+        "Nodes": 789769,
+        "LayoutCount": 67,
+        "RecalcStyleCount": 69,
+        "LayoutDuration": 0.125951,
+        "RecalcStyleDuration": 0.285594,
+        "ScriptDuration": 24.358595,
+        "TaskDuration": 25.289547,
+        "JSHeapUsedSize": 739224700,
+        "JSHeapTotalSize": 793247744
+      }
+    },
+    {
+      "swimlanes": 1000,
+      "tasks": 10000,
+      "weekends": "hidden",
+      "widths": "default",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 1000,
+          "taskCount": 10000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "default"
+        },
+        "initialRenderMs": 536.6000000238419,
+        "scenarioReadyMs": 1319.5,
+        "dom": {
+          "totalNodes": 100336,
+          "swimlaneRows": 1000,
+          "renderedTaskBars": 123
+        },
+        "longTasks": {
+          "count": 67,
+          "totalDurationMs": 21225,
+          "maxDurationMs": 1091,
+          "samples": [
+            {
+              "startTime": 127.60000002384186,
+              "duration": 535
+            },
+            {
+              "startTime": 662.8999999761581,
+              "duration": 266
+            },
+            {
+              "startTime": 933.1000000238419,
+              "duration": 158
+            },
+            {
+              "startTime": 1095.6999999284744,
+              "duration": 228
+            },
+            {
+              "startTime": 1334.5,
+              "duration": 111
+            },
+            {
+              "startTime": 2317,
+              "duration": 308
+            },
+            {
+              "startTime": 2633.100000023842,
+              "duration": 297
+            },
+            {
+              "startTime": 2938.6999999284744,
+              "duration": 284
+            },
+            {
+              "startTime": 3230.1999999284744,
+              "duration": 285
+            },
+            {
+              "startTime": 3522.600000023842,
+              "duration": 354
+            },
+            {
+              "startTime": 3884.399999976158,
+              "duration": 310
+            },
+            {
+              "startTime": 4203.199999928474,
+              "duration": 290
+            },
+            {
+              "startTime": 4507,
+              "duration": 219
+            },
+            {
+              "startTime": 4731.799999952316,
+              "duration": 283
+            },
+            {
+              "startTime": 5025.699999928474,
+              "duration": 286
+            },
+            {
+              "startTime": 5320.899999976158,
+              "duration": 285
+            },
+            {
+              "startTime": 5614.299999952316,
+              "duration": 285
+            },
+            {
+              "startTime": 5906.5,
+              "duration": 342
+            },
+            {
+              "startTime": 6256.799999952316,
+              "duration": 295
+            },
+            {
+              "startTime": 6566.199999928474,
+              "duration": 294
+            },
+            {
+              "startTime": 6868.899999976158,
+              "duration": 290
+            },
+            {
+              "startTime": 7172.100000023842,
+              "duration": 281
+            },
+            {
+              "startTime": 7460.799999952316,
+              "duration": 285
+            },
+            {
+              "startTime": 7758.5,
+              "duration": 278
+            },
+            {
+              "startTime": 8044.899999976158,
+              "duration": 352
+            },
+            {
+              "startTime": 8405.199999928474,
+              "duration": 312
+            },
+            {
+              "startTime": 8730.799999952316,
+              "duration": 314
+            },
+            {
+              "startTime": 9054.199999928474,
+              "duration": 289
+            },
+            {
+              "startTime": 9356.399999976158,
+              "duration": 282
+            },
+            {
+              "startTime": 9647.100000023842,
+              "duration": 334
+            },
+            {
+              "startTime": 9997.199999928474,
+              "duration": 956
+            },
+            {
+              "startTime": 10973.799999952316,
+              "duration": 1091
+            },
+            {
+              "startTime": 12084.199999928474,
+              "duration": 540
+            },
+            {
+              "startTime": 12633.199999928474,
+              "duration": 306
+            },
+            {
+              "startTime": 12952.199999928474,
+              "duration": 293
+            },
+            {
+              "startTime": 13254,
+              "duration": 293
+            },
+            {
+              "startTime": 13559.899999976158,
+              "duration": 291
+            },
+            {
+              "startTime": 13859.600000023842,
+              "duration": 301
+            },
+            {
+              "startTime": 14170.399999976158,
+              "duration": 299
+            },
+            {
+              "startTime": 14478.299999952316,
+              "duration": 371
+            },
+            {
+              "startTime": 14857.600000023842,
+              "duration": 237
+            },
+            {
+              "startTime": 15106.399999976158,
+              "duration": 287
+            },
+            {
+              "startTime": 15402.5,
+              "duration": 296
+            },
+            {
+              "startTime": 15712.799999952316,
+              "duration": 290
+            },
+            {
+              "startTime": 16012.399999976158,
+              "duration": 286
+            },
+            {
+              "startTime": 16311.899999976158,
+              "duration": 345
+            },
+            {
+              "startTime": 16664.799999952316,
+              "duration": 296
+            },
+            {
+              "startTime": 16974.199999928474,
+              "duration": 295
+            },
+            {
+              "startTime": 17277.299999952316,
+              "duration": 295
+            },
+            {
+              "startTime": 17585.100000023842,
+              "duration": 290
+            },
+            {
+              "startTime": 17883.199999928474,
+              "duration": 287
+            },
+            {
+              "startTime": 18184.299999952316,
+              "duration": 282
+            },
+            {
+              "startTime": 18474,
+              "duration": 354
+            },
+            {
+              "startTime": 18836.899999976158,
+              "duration": 299
+            },
+            {
+              "startTime": 19144.299999952316,
+              "duration": 298
+            },
+            {
+              "startTime": 19457,
+              "duration": 277
+            },
+            {
+              "startTime": 19743,
+              "duration": 279
+            },
+            {
+              "startTime": 20035.299999952316,
+              "duration": 288
+            },
+            {
+              "startTime": 20332.899999976158,
+              "duration": 290
+            },
+            {
+              "startTime": 20637.5,
+              "duration": 289
+            },
+            {
+              "startTime": 20936.899999976158,
+              "duration": 350
+            },
+            {
+              "startTime": 21295.799999952316,
+              "duration": 305
+            },
+            {
+              "startTime": 21614.399999976158,
+              "duration": 264
+            },
+            {
+              "startTime": 21886.699999928474,
+              "duration": 314
+            },
+            {
+              "startTime": 22209.299999952316,
+              "duration": 317
+            },
+            {
+              "startTime": 22532.100000023842,
+              "duration": 126
+            },
+            {
+              "startTime": 22658.699999928474,
+              "duration": 216
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 624000000,
+          "totalJSHeapSize": 703000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 778.6000000238419,
+            "frameCount": 60,
+            "p95FrameMs": 14.300000000000182,
+            "maxFrameMs": 15,
+            "framesOver16_7ms": 0,
+            "framesOver50ms": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 19899.100000023842,
+            "frameCount": 60,
+            "p95FrameMs": 373.2999999999993,
+            "maxFrameMs": 1106.7999999999993,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 58
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 137.29999995231628
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 505528,
+        "Nodes": 584904,
+        "LayoutCount": 67,
+        "RecalcStyleCount": 69,
+        "LayoutDuration": 0.101123,
+        "RecalcStyleDuration": 0.219401,
+        "ScriptDuration": 20.823447,
+        "TaskDuration": 21.615532,
+        "JSHeapUsedSize": 618989540,
+        "JSHeapTotalSize": 662962176
+      }
+    },
+    {
+      "swimlanes": 1000,
+      "tasks": 10000,
+      "weekends": "hidden",
+      "widths": "resized",
+      "page": {
+        "fixture": {
+          "swimlaneCount": 1000,
+          "taskCount": 10000,
+          "seed": 1330468434
+        },
+        "display": {
+          "weekends": "hidden",
+          "monthWidths": "resized"
+        },
+        "initialRenderMs": 543,
+        "scenarioReadyMs": 1282,
+        "dom": {
+          "totalNodes": 100336,
+          "swimlaneRows": 1000,
+          "renderedTaskBars": 123
+        },
+        "longTasks": {
+          "count": 67,
+          "totalDurationMs": 21496,
+          "maxDurationMs": 1104,
+          "samples": [
+            {
+              "startTime": 121.70000004768372,
+              "duration": 541
+            },
+            {
+              "startTime": 663.5,
+              "duration": 261
+            },
+            {
+              "startTime": 928,
+              "duration": 160
+            },
+            {
+              "startTime": 1093.7000000476837,
+              "duration": 295
+            },
+            {
+              "startTime": 1403.7000000476837,
+              "duration": 143
+            },
+            {
+              "startTime": 2402,
+              "duration": 317
+            },
+            {
+              "startTime": 2727.100000023842,
+              "duration": 291
+            },
+            {
+              "startTime": 3026.7000000476837,
+              "duration": 286
+            },
+            {
+              "startTime": 3320.5,
+              "duration": 287
+            },
+            {
+              "startTime": 3615.7000000476837,
+              "duration": 295
+            },
+            {
+              "startTime": 3918.600000023842,
+              "duration": 367
+            },
+            {
+              "startTime": 4295.5,
+              "duration": 297
+            },
+            {
+              "startTime": 4602.100000023842,
+              "duration": 291
+            },
+            {
+              "startTime": 4906.200000047684,
+              "duration": 281
+            },
+            {
+              "startTime": 5195.800000071526,
+              "duration": 287
+            },
+            {
+              "startTime": 5496.899999976158,
+              "duration": 276
+            },
+            {
+              "startTime": 5782,
+              "duration": 283
+            },
+            {
+              "startTime": 6072.700000047684,
+              "duration": 284
+            },
+            {
+              "startTime": 6365,
+              "duration": 345
+            },
+            {
+              "startTime": 6718.5,
+              "duration": 296
+            },
+            {
+              "startTime": 7029.200000047684,
+              "duration": 296
+            },
+            {
+              "startTime": 7335,
+              "duration": 288
+            },
+            {
+              "startTime": 7636.300000071526,
+              "duration": 279
+            },
+            {
+              "startTime": 7923.399999976158,
+              "duration": 284
+            },
+            {
+              "startTime": 8220.800000071526,
+              "duration": 362
+            },
+            {
+              "startTime": 8591.600000023842,
+              "duration": 301
+            },
+            {
+              "startTime": 8905.600000023842,
+              "duration": 304
+            },
+            {
+              "startTime": 9218.399999976158,
+              "duration": 286
+            },
+            {
+              "startTime": 9516.700000047684,
+              "duration": 274
+            },
+            {
+              "startTime": 9799.399999976158,
+              "duration": 329
+            },
+            {
+              "startTime": 10143.399999976158,
+              "duration": 810
+            },
+            {
+              "startTime": 10975.100000023842,
+              "duration": 1104
+            },
+            {
+              "startTime": 12093.200000047684,
+              "duration": 572
+            },
+            {
+              "startTime": 12679.100000023842,
+              "duration": 298
+            },
+            {
+              "startTime": 12984.700000047684,
+              "duration": 297
+            },
+            {
+              "startTime": 13294.800000071526,
+              "duration": 285
+            },
+            {
+              "startTime": 13588.100000023842,
+              "duration": 286
+            },
+            {
+              "startTime": 13888.100000023842,
+              "duration": 288
+            },
+            {
+              "startTime": 14185.100000023842,
+              "duration": 467
+            },
+            {
+              "startTime": 14663.100000023842,
+              "duration": 327
+            },
+            {
+              "startTime": 15003.399999976158,
+              "duration": 302
+            },
+            {
+              "startTime": 15313.600000023842,
+              "duration": 311
+            },
+            {
+              "startTime": 15639,
+              "duration": 287
+            },
+            {
+              "startTime": 15934.300000071526,
+              "duration": 316
+            },
+            {
+              "startTime": 16265.100000023842,
+              "duration": 388
+            },
+            {
+              "startTime": 16662.100000023842,
+              "duration": 303
+            },
+            {
+              "startTime": 16973.800000071526,
+              "duration": 296
+            },
+            {
+              "startTime": 17282.899999976158,
+              "duration": 286
+            },
+            {
+              "startTime": 17577.5,
+              "duration": 285
+            },
+            {
+              "startTime": 17876.200000047684,
+              "duration": 289
+            },
+            {
+              "startTime": 18174.800000071526,
+              "duration": 289
+            },
+            {
+              "startTime": 18477.100000023842,
+              "duration": 354
+            },
+            {
+              "startTime": 18841.5,
+              "duration": 433
+            },
+            {
+              "startTime": 19284.899999976158,
+              "duration": 353
+            },
+            {
+              "startTime": 19646.100000023842,
+              "duration": 246
+            },
+            {
+              "startTime": 19904.100000023842,
+              "duration": 211
+            },
+            {
+              "startTime": 20121.800000071526,
+              "duration": 208
+            },
+            {
+              "startTime": 20341.5,
+              "duration": 216
+            },
+            {
+              "startTime": 20564,
+              "duration": 277
+            },
+            {
+              "startTime": 20855.700000047684,
+              "duration": 290
+            },
+            {
+              "startTime": 21155.800000071526,
+              "duration": 290
+            },
+            {
+              "startTime": 21460,
+              "duration": 286
+            },
+            {
+              "startTime": 21754.300000071526,
+              "duration": 330
+            },
+            {
+              "startTime": 22091.5,
+              "duration": 326
+            },
+            {
+              "startTime": 22426.899999976158,
+              "duration": 334
+            },
+            {
+              "startTime": 22766.200000047684,
+              "duration": 143
+            },
+            {
+              "startTime": 22909.399999976158,
+              "duration": 227
+            }
+          ]
+        },
+        "memory": {
+          "usedJSHeapSize": 491000000,
+          "totalJSHeapSize": 553000000,
+          "jsHeapSizeLimit": 3760000000
+        },
+        "scroll": [
+          {
+            "axis": "vertical",
+            "durationMs": 810.8000000715256,
+            "frameCount": 60,
+            "p95FrameMs": 14.399999999999864,
+            "maxFrameMs": 39.90000000000009,
+            "framesOver16_7ms": 1,
+            "framesOver50ms": 0
+          },
+          {
+            "axis": "horizontal",
+            "durationMs": 20032.300000071526,
+            "frameCount": 60,
+            "p95FrameMs": 480.10000000000036,
+            "maxFrameMs": 1106.699999999999,
+            "framesOver16_7ms": 58,
+            "framesOver50ms": 58
+          }
+        ],
+        "interactions": {
+          "resizePreview": {
+            "status": "measured",
+            "latencyMs": 136
+          },
+          "taskDrag": {
+            "status": "unavailable",
+            "reason": "Requires a trusted pointer/CDP gesture; DOM-synthesized HTML5 drag is rejected by React DnD"
+          }
+        }
+      },
+      "chromium": {
+        "Documents": 1,
+        "Frames": 1,
+        "JSEventListeners": 481055,
+        "Nodes": 1049716,
+        "LayoutCount": 67,
+        "RecalcStyleCount": 69,
+        "LayoutDuration": 0.1026,
+        "RecalcStyleDuration": 0.22141,
+        "ScriptDuration": 21.102139,
+        "TaskDuration": 21.912752,
+        "JSHeapUsedSize": 471342268,
+        "JSHeapTotalSize": 528482304
+      }
+    }
+  ]
+}
